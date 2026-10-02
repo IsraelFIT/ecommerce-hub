@@ -30,6 +30,8 @@ class TenantBase(BaseModel):
     category: Optional[str] = Field(default="General", max_length=100, description="Business vertical / store category")
     custom_domain: Optional[str] = Field(default=None, max_length=255)
     backend_type: BackendType = Field(default=BackendType.POSTGRES)
+    sanity_dataset: Optional[str] = Field(default=None, max_length=100)
+    sanity_project_id: Optional[str] = Field(default=None, max_length=100)
     default_gateway: str = Field(default="paystack")
     branding_config: BrandingConfig = Field(default_factory=BrandingConfig)
 
@@ -60,8 +62,6 @@ class TenantCreate(TenantBase):
 
     paystack_subaccount_code: Optional[str] = None
     stripe_account_id: Optional[str] = None
-    sanity_dataset: Optional[str] = None
-    sanity_project_id: Optional[str] = None
 
 
 class TenantUpdate(BaseModel):
@@ -72,6 +72,9 @@ class TenantUpdate(BaseModel):
                 "name": "Cakes by Bode & Pastries",
                 "category": "Bakery & Confectionery",
                 "custom_domain": "shop.cakesbybode.com",
+                "backend_type": "sanity",
+                "sanity_project_id": "prj_948201",
+                "sanity_dataset": "production-cakes-by-bode",
                 "default_gateway": "paystack",
                 "branding_config": {
                     "primaryColor": "#4f46e5",
@@ -87,6 +90,8 @@ class TenantUpdate(BaseModel):
     category: Optional[str] = None
     custom_domain: Optional[str] = None
     backend_type: Optional[BackendType] = None
+    sanity_dataset: Optional[str] = None
+    sanity_project_id: Optional[str] = None
     default_gateway: Optional[str] = None
     branding_config: Optional[BrandingConfig] = None
     paystack_subaccount_code: Optional[str] = None
@@ -104,6 +109,8 @@ class TenantResponse(TenantBase):
                 "category": "Bakery & Confectionery",
                 "custom_domain": "shop.cakesbybode.com",
                 "backend_type": "postgres",
+                "sanity_dataset": "production-cakes-by-bode",
+                "sanity_project_id": "prj_948201",
                 "default_gateway": "stripe",
                 "branding_config": {
                     "primaryColor": "#6366f1",
@@ -122,3 +129,4 @@ class TenantResponse(TenantBase):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+

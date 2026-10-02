@@ -73,6 +73,9 @@ async def get_rls_db_session(
     return db
 
 
+from app.config import settings
+
+
 async def get_product_adapter(
     tenant: Tenant = Depends(get_tenant_context),
     db: AsyncSession = Depends(get_rls_db_session),
@@ -80,17 +83,24 @@ async def get_product_adapter(
     """
     Strategy/Adapter injector: Inspects tenant's backend_type in the Core Registry
     and returns either PostgresAdapter or SanityAdapter with identical return types.
+    Supports both platform-managed Sanity datasets and custom tenant-provided Sanity projects.
     """
     if tenant.backend_type == BackendType.SANITY:
-        if not tenant.sanity_project_id:
+        project_id = tenant.sanity_project_id or settings.SANITY_PROJECT_ID
+        dataset = tenant.sanity_dataset or (
+            f"production-{tenant.slug}" if settings.SANITY_PROJECT_ID else "production"
+        )
+        token = settings.SANITY_API_TOKEN
+
+        if not project_id:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Tenant configured for Sanity CMS but missing sanity_project_id",
+                detail="Tenant configured for Sanity CMS but no Sanity project ID configured (neither custom nor platform-managed).",
             )
         return SanityAdapter(
-            project_id=tenant.sanity_project_id,
-            dataset=tenant.sanity_dataset or "production",
-            token=None,
+            project_id=project_id,
+            dataset=dataset,
+            token=token,
             tenant_id=tenant.id,
         )
 

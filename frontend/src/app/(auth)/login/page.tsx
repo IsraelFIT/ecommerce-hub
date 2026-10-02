@@ -76,7 +76,19 @@ function LoginForm() {
         `Welcome back, ${authData.first_name || authData.full_name || "Merchant"}!`,
       );
 
-      // If user is tenant_admin and has a tenant_slug, direct straight to their admin dashboard
+      // 1. Super Administrator redirect to core console
+      if (authData.role === "super_admin") {
+        const targetPath = redirectPath || "/";
+        const coreUrl = getTenantSubdomainUrl("core", targetPath);
+        const urlObj = new URL(coreUrl);
+        urlObj.searchParams.set("auth_token", authData.auth.access_token);
+        urlObj.searchParams.set("refresh_token", authData.auth.refresh_token);
+        urlObj.searchParams.set("role", authData.role);
+        window.location.assign(urlObj.toString());
+        return;
+      }
+
+      // 2. Tenant admin direct to their admin dashboard
       if (
         (authData.role === "tenant_admin" || authData.role === "admin") &&
         authData.tenant_slug

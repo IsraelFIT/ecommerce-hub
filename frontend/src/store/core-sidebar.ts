@@ -28,7 +28,7 @@ export const CORE_NAV_ITEMS: CoreNavItem[] = [
     label: "Platform & Escrow Overview",
     shortLabel: "Overview",
     icon: PanelsTopLeft,
-    href: "/core",
+    href: "/",
     title: "Platform Overview",
     subtitle:
       "Real-time tenant health, fee splits, escrow balances, and ecosystem metrics",
@@ -38,7 +38,7 @@ export const CORE_NAV_ITEMS: CoreNavItem[] = [
     label: "Tenants & Stores",
     shortLabel: "Tenants",
     icon: Store,
-    href: "/core/tenants",
+    href: "/tenants",
     title: "Tenants & Stores",
     subtitle:
       "Multi-tenant storefront directory, custom domains, and database isolation",
@@ -51,7 +51,7 @@ export const CORE_NAV_ITEMS: CoreNavItem[] = [
     label: "Revenue & Escrow",
     shortLabel: "Revenue",
     icon: WalletCards,
-    href: "/core/revenue",
+    href: "/revenue",
     title: "Revenue & Escrow",
     subtitle:
       "2.5% platform fee split earnings, Stripe & Paystack subaccount balances",
@@ -63,7 +63,7 @@ export const CORE_NAV_ITEMS: CoreNavItem[] = [
     label: "Subscriptions & Billing",
     shortLabel: "Plans",
     icon: CreditCard,
-    href: "/core/subscriptions",
+    href: "/subscriptions",
     title: "Subscriptions & Billing",
     subtitle:
       "Tenant subscription plans, recurring MRR, and platform feature tiers",
@@ -73,7 +73,7 @@ export const CORE_NAV_ITEMS: CoreNavItem[] = [
     label: "Data Layer Adapters",
     shortLabel: "Adapters",
     icon: Layers,
-    href: "/core/adapters",
+    href: "/adapters",
     title: "Data Layer Adapters",
     subtitle:
       "Neon Serverless Postgres branches & Sanity CMS interchangeable backends",
@@ -83,7 +83,7 @@ export const CORE_NAV_ITEMS: CoreNavItem[] = [
     label: "Developers & APIs",
     shortLabel: "Developers",
     icon: Code2,
-    href: "/core/developers",
+    href: "/developers",
     title: "Developers & APIs",
     subtitle:
       "Master API keys, webhook endpoints, and Neon database connection strings",
@@ -93,7 +93,7 @@ export const CORE_NAV_ITEMS: CoreNavItem[] = [
     label: "Security & Audit Logs",
     shortLabel: "Security",
     icon: ShieldCheck,
-    href: "/core/security",
+    href: "/security",
     title: "Security & Audit Logs",
     subtitle:
       "Super admin access logs, JWT session lifecycle, and compliance policies",
@@ -106,12 +106,12 @@ export interface PageInfo {
 }
 
 export const EXTRA_CORE_PAGE_INFO: Record<string, PageInfo> = {
-  "/core/settings": {
+  "/settings": {
     title: "Platform Settings",
     subtitle:
       "Global platform fee %, default payment routing, and master configuration",
   },
-  "/settings": {
+  "/core/settings": {
     title: "Platform Settings",
     subtitle:
       "Global platform fee %, default payment routing, and master configuration",
@@ -124,14 +124,19 @@ export const DEFAULT_CORE_PAGE_INFO: PageInfo = {
 };
 
 export function getCorePageInfo(pathname: string): PageInfo {
-  // Normalize path if on subdomain without /core prefix
-  const cleanPath = pathname.startsWith("/core")
-    ? pathname
-    : pathname === "/"
-      ? "/core"
-      : `/core${pathname}`;
+  // Normalize path if on subdomain or with /core prefix
+  let cleanPath = pathname;
+  if (cleanPath.startsWith("/core/")) {
+    cleanPath = cleanPath.slice(5);
+  } else if (cleanPath === "/core") {
+    cleanPath = "/";
+  }
 
-  if (cleanPath === "/core" || cleanPath === "/core/dashboard") {
+  if (
+    cleanPath === "/" ||
+    cleanPath === "/dashboard" ||
+    cleanPath === "/overview"
+  ) {
     const item = CORE_NAV_ITEMS.find((n) => n.id === "overview");
     return {
       title: item?.title || "Platform Overview",

@@ -198,7 +198,7 @@ export default function CoreDashboardPage() {
             ))}
           </div>
 
-          <Link href="/core/tenants">
+          <Link href="/tenants">
             <Button size="md" className="gap-1.5 h-8 text-xs cursor-pointer">
               <Store className="size-3.5" />
               <span>Manage Stores</span>
@@ -304,14 +304,14 @@ export default function CoreDashboardPage() {
 
             <div className="mt-4 pt-3 border-t border-border flex items-center justify-between">
               <Link
-                href="/core/adapters"
+                href="/adapters"
                 className="text-xs text-primary font-semibold hover:underline flex items-center gap-1"
               >
                 <span>Adapter Configuration</span>
                 <ArrowRight className="size-3" />
               </Link>
               <Link
-                href="/core/developers"
+                href="/developers"
                 className="text-xs text-muted-foreground hover:text-foreground font-mono"
               >
                 View Connection String →
@@ -326,28 +326,28 @@ export default function CoreDashboardPage() {
             </h4>
             <div className="grid grid-cols-2 gap-2">
               <Link
-                href="/core/tenants"
+                href="/tenants"
                 className="flex items-center gap-2 p-2.5 rounded-lg border border-border bg-card-gray/30 dark:bg-white/5 hover:border-primary/50 hover:bg-primary/5 transition-all text-xs font-medium text-foreground group"
               >
                 <Store className="size-4 text-primary group-hover:scale-110 transition-transform" />
                 <span>Add Storefront</span>
               </Link>
               <Link
-                href="/core/revenue"
+                href="/revenue"
                 className="flex items-center gap-2 p-2.5 rounded-lg border border-border bg-card-gray/30 dark:bg-white/5 hover:border-primary/50 hover:bg-primary/5 transition-all text-xs font-medium text-foreground group"
               >
                 <DollarSign className="size-4 text-emerald-500 group-hover:scale-110 transition-transform" />
                 <span>Audit Escrow</span>
               </Link>
               <Link
-                href="/core/developers"
+                href="/developers"
                 className="flex items-center gap-2 p-2.5 rounded-lg border border-border bg-card-gray/30 dark:bg-white/5 hover:border-primary/50 hover:bg-primary/5 transition-all text-xs font-medium text-foreground group"
               >
                 <Zap className="size-4 text-purple-500 group-hover:scale-110 transition-transform" />
                 <span>API Keys</span>
               </Link>
               <Link
-                href="/core/security"
+                href="/security"
                 className="flex items-center gap-2 p-2.5 rounded-lg border border-border bg-card-gray/30 dark:bg-white/5 hover:border-primary/50 hover:bg-primary/5 transition-all text-xs font-medium text-foreground group"
               >
                 <ShieldCheck className="size-4 text-sky-500 group-hover:scale-110 transition-transform" />
@@ -374,7 +374,7 @@ export default function CoreDashboardPage() {
                   </span>
                 </div>
               </div>
-              <Link href="/core/revenue">
+              <Link href="/revenue">
                 <Button
                   variant="ghost"
                   size="md"
@@ -460,7 +460,7 @@ export default function CoreDashboardPage() {
               *.ecommerce-hub.com)
             </span>
           </div>
-          <Link href="/core/tenants">
+          <Link href="/tenants">
             <Button size="md" variant="outline" className="text-xs gap-1.5 h-8">
               <span>View All 18 Stores</span>
               <ArrowRight className="size-3" />

@@ -69,6 +69,18 @@ function TenantLoginForm({ tenantSlug }: { tenantSlug: string }) {
         `Welcome back, ${authData.first_name || authData.full_name || "Shopper"}!`,
       );
 
+      // 1. Super Administrator redirect to core console
+      if (authData.role === "super_admin") {
+        const targetPath = redirectPath || "/";
+        const coreUrl = getTenantSubdomainUrl("core", targetPath);
+        const urlObj = new URL(coreUrl);
+        urlObj.searchParams.set("auth_token", authData.auth.access_token);
+        urlObj.searchParams.set("refresh_token", authData.auth.refresh_token);
+        urlObj.searchParams.set("role", authData.role);
+        window.location.assign(urlObj.toString());
+        return;
+      }
+
       // Determine appropriate destination
       const isTenantAdmin =
         authData.role === "tenant_admin" || authData.role === "admin";

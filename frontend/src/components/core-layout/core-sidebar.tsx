@@ -103,7 +103,7 @@ export function CoreSidebar() {
         {/* Top Brand / Logo */}
         <div className="flex items-center justify-between px-0.5 shrink-0 h-10 overflow-hidden">
           <Link
-            href="/core"
+            href="/"
             className="flex items-center group overflow-hidden"
             title="EcommerceHub Core Console"
           >
@@ -168,24 +168,14 @@ export function CoreSidebar() {
               {CORE_NAV_ITEMS.map((item) => {
                 const Icon = item.icon;
                 const isActive =
-                  item.href === "/core"
-                    ? pathname === "/core" ||
-                      pathname === "/" ||
-                      pathname === "/core/dashboard"
+                  item.href === "/"
+                    ? pathname === "/" ||
+                      pathname === "/core" ||
+                      pathname === "/dashboard"
                     : pathname === item.href ||
                       pathname.startsWith(`${item.href}/`) ||
-                      (item.href === "/core/tenants" &&
-                        pathname.includes("/tenants")) ||
-                      (item.href === "/core/revenue" &&
-                        pathname.includes("/revenue")) ||
-                      (item.href === "/core/subscriptions" &&
-                        pathname.includes("/subscriptions")) ||
-                      (item.href === "/core/adapters" &&
-                        pathname.includes("/adapters")) ||
-                      (item.href === "/core/developers" &&
-                        pathname.includes("/developers")) ||
-                      (item.href === "/core/security" &&
-                        pathname.includes("/security"));
+                      pathname === `/core${item.href}` ||
+                      pathname.startsWith(`/core${item.href}/`);
 
                 const linkElement = (
                   <Link
@@ -283,7 +273,7 @@ export function CoreSidebar() {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Link
-                    href="/core/settings"
+                    href="/settings"
                     className={cn(
                       "size-8.5 mx-auto justify-center px-0 rounded-sm flex items-center text-foreground hover:text-primary hover:bg-muted/80 transition-colors duration-200 overflow-hidden border border-transparent",
                       pathname.includes("/settings") &&
@@ -299,7 +289,7 @@ export function CoreSidebar() {
               </Tooltip>
             ) : (
               <Link
-                href="/core/settings"
+                href="/settings"
                 className={cn(
                   "px-2.5 py-2 w-full justify-start rounded-sm flex items-center text-foreground hover:text-primary hover:bg-muted/80 transition-colors duration-200 overflow-hidden border border-transparent",
                   pathname.includes("/settings") &&
@@ -354,7 +344,7 @@ export function CoreSidebar() {
 
                   <div className="flex flex-col gap-1">
                     <Link
-                      href="/core/settings"
+                      href="/settings"
                       className="flex items-center gap-2 px-2.5 py-2 rounded-sm text-xs text-foreground hover:bg-muted/80 hover:text-primary transition-colors"
                     >
                       <Settings className="size-3.5" />
@@ -376,7 +366,7 @@ export function CoreSidebar() {
           ) : (
             <div className="flex items-center justify-between gap-1.5 w-full pt-1">
               <Link
-                href="/core/settings"
+                href="/settings"
                 className="relative rounded-sm flex items-center hover:bg-muted/80 transition-all duration-300 ease-in-out overflow-hidden px-2 py-1.5 flex-1 min-w-0"
                 title={`${displayName} (Super Admin)`}
               >

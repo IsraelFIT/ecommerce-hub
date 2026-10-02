@@ -55,7 +55,7 @@ export function CoreBreadcrumb({ className }: { className?: string }) {
           {/* Breadcrumb Trail */}
           <nav aria-label="Breadcrumb" className="flex items-center gap-2">
             <Link
-              href="/core"
+              href="/"
               className="text-muted-foreground hover:text-primary transition-colors truncate"
             >
               Core
@@ -70,7 +70,7 @@ export function CoreBreadcrumb({ className }: { className?: string }) {
 
             {segments.map((segment, index) => {
               const isLast = index === segments.length - 1;
-              const href = `/core/${segments.slice(0, index + 1).join("/")}`;
+              const href = `/${segments.slice(0, index + 1).join("/")}`;
 
               let title = segment;
               if (index === 0) {
@@ -79,6 +79,7 @@ export function CoreBreadcrumb({ className }: { className?: string }) {
                 title =
                   navItem?.detailTitle ||
                   EXTRA_CORE_PAGE_INFO[href]?.title ||
+                  EXTRA_CORE_PAGE_INFO[`/core${href}`]?.title ||
                   segment.charAt(0).toUpperCase() + segment.slice(1);
               } else {
                 title = segment.charAt(0).toUpperCase() + segment.slice(1);

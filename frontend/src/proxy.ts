@@ -119,7 +119,8 @@ export async function proxy(request: NextRequest) {
         normalizedPath === prefix ||
         normalizedPath.startsWith(`${prefix}/`) ||
         pathname.includes(prefix),
-    ) || (tenantSlug === "core" && normalizedPath !== "/login");
+    ) ||
+    (tenantSlug === "core" && normalizedPath !== "/login");
 
   const isAuthPath = authPaths.some(
     (path) => normalizedPath === path || normalizedPath.startsWith(`${path}/`),
@@ -174,9 +175,37 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL(fallbackPath, request.url));
   }
 
-  // 5. Multi-tenant URL rewrite for tenant subdomains (e.g. jazz-cakes.localhost:3000 or jazz-cakes.ecommerce-hub.com)
+  // 5. Multi-tenant URL rewrite for tenant subdomains (e.g. core.localhost:3000 or bakery.localhost:3000)
   if (tenantSlug) {
-    const rewrittenPath = `/${tenantSlug}${normalizedPath === "/" ? "" : normalizedPath}`;
+    let rewrittenPath: string;
+
+    if (tenantSlug === "core") {
+      // Core Super Admin Console routing
+      let coreSubPath = normalizedPath;
+      if (coreSubPath.startsWith("/core/")) {
+        coreSubPath = coreSubPath.slice(5) || "/";
+      } else if (coreSubPath === "/core") {
+        coreSubPath = "/";
+      }
+
+      if (
+        coreSubPath === "/" ||
+        coreSubPath === "/dashboard" ||
+        coreSubPath === "/overview"
+      ) {
+        rewrittenPath = "/core/core";
+      } else if (coreSubPath === "/login") {
+        rewrittenPath = "/core/login";
+      } else {
+        const cleanSub = coreSubPath.startsWith("/")
+          ? coreSubPath
+          : `/${coreSubPath}`;
+        rewrittenPath = `/core/core${cleanSub}`;
+      }
+    } else {
+      rewrittenPath = `/${tenantSlug}${normalizedPath === "/" ? "" : normalizedPath}`;
+    }
+
     const tenantUrl = new URL(rewrittenPath, request.url);
     const response = NextResponse.rewrite(tenantUrl);
 
@@ -194,7 +223,20 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  // 6. Standard response with security headers for root domain
+  // 6. Redirect root domain /core/* to core.{domain}/*
+  if (pathname === "/core" || pathname.startsWith("/core/")) {
+    const subPath = pathname.slice(5) || "/";
+    const port = request.nextUrl.port ? `:${request.nextUrl.port}` : "";
+    const isLocal =
+      currentHost === "localhost" || currentHost.endsWith(".localhost");
+    const targetHost = isLocal ? `core.localhost${port}` : `core.${rootDomain}`;
+    const redirectUrl = new URL(
+      `${request.nextUrl.protocol}//${targetHost}${subPath}`,
+    );
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  // 7. Standard response with security headers for root domain
   const response = NextResponse.next();
   if (isProtectedPath) {
     response.headers.set("X-Content-Type-Options", "nosniff");

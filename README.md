@@ -10,21 +10,23 @@
 **E-Commerce Hub** is an enterprise-ready, multi-tenant e-commerce platform designed for instant tenant provisioning, custom storefront branding, and isolated data domains. It leverages Next.js Edge Proxy routing on the frontend and an asynchronous FastAPI backend backed by Neon Serverless PostgreSQL with Row-Level Security (RLS).
 
 ```mermaid
-graph TD
-    Client[Client Request] --> Proxy[Next.js Edge Proxy / proxy.ts]
+flowchart TD
+    Client["Client Request"] --> Proxy["Next.js Edge Proxy (proxy.ts)"]
 
-    Proxy -->|Root Host / Landing| Landing[SaaS Landing & Onboarding]
-    Proxy -->|core.domain.com| CoreConsole[Core Super-Admin Console]
-    Proxy -->|{tenant}.domain.com| Storefront[Tenant Storefront]
-    Proxy -->|{tenant}.domain.com/admin| TenantAdmin[Tenant Merchant Admin]
+    Proxy -->|"Root Host / Landing"| Landing["SaaS Landing & Onboarding"]
+    Proxy -->|"core.domain.com"| CoreConsole["Core Super-Admin Console"]
+    Proxy -->|"[tenant].domain.com"| Storefront["Tenant Storefront"]
+    Proxy -->|"[tenant].domain.com/admin"| TenantAdmin["Tenant Merchant Admin"]
 
-    Storefront & TenantAdmin & CoreConsole --> Backend[FastAPI Async Backend]
+    Storefront --> Backend["FastAPI Async Backend"]
+    TenantAdmin --> Backend
+    CoreConsole --> Backend
 
-    Backend --> RLS[Postgres Row-Level Security Engine]
-    Backend --> Adapters[Interchangeable Data Adapters]
+    Backend --> RLS["Postgres Row-Level Security Engine"]
+    Backend --> Adapters["Interchangeable Data Adapters"]
 
-    Adapters --> Postgres[Neon Serverless Postgres]
-    Adapters --> Sanity[Sanity CMS Layer]
+    Adapters --> Postgres["Neon Serverless Postgres"]
+    Adapters --> Sanity["Sanity CMS Layer"]
 ```
 
 ---

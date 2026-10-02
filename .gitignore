@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+.venv/
+env/
+venv/
+ENV/
+
+# Environment and Secrets
+.env
+.env*.local
+.env.production
+.neon/
+
+# Local databases & testing
+*.db
+*.sqlite
+*.sqlite3
+test_suite.db
+ecommerce_hub.db
+.pytest_cache/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Next.js Build & Outputs
+.next/
+out/
+build/
+dist/
+
+# OS and IDE Files
+.DS_Store
+*.pem
+.vscode/
+.idea/
+
+# Custom Exclusions
+CONTEXT.md
+API_DOCUMENTATION.md
+skills-lock.json

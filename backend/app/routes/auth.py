@@ -40,12 +40,48 @@ router = APIRouter(
 )
 
 
+COUNTRY_DEFAULTS = {
+    "NG": {"country": "Nigeria", "currency": "NGN", "gateway": "paystack"},
+    "NIGERIA": {"country": "Nigeria", "currency": "NGN", "gateway": "paystack"},
+    "GH": {"country": "Ghana", "currency": "GHS", "gateway": "paystack"},
+    "GHANA": {"country": "Ghana", "currency": "GHS", "gateway": "paystack"},
+    "KE": {"country": "Kenya", "currency": "KES", "gateway": "paystack"},
+    "KENYA": {"country": "Kenya", "currency": "KES", "gateway": "paystack"},
+    "ZA": {"country": "South Africa", "currency": "ZAR", "gateway": "paystack"},
+    "SOUTH AFRICA": {"country": "South Africa", "currency": "ZAR", "gateway": "paystack"},
+    "US": {"country": "United States", "currency": "USD", "gateway": "stripe"},
+    "UNITED STATES": {"country": "United States", "currency": "USD", "gateway": "stripe"},
+    "USA": {"country": "United States", "currency": "USD", "gateway": "stripe"},
+    "GB": {"country": "United Kingdom", "currency": "GBP", "gateway": "stripe"},
+    "UK": {"country": "United Kingdom", "currency": "GBP", "gateway": "stripe"},
+    "UNITED KINGDOM": {"country": "United Kingdom", "currency": "GBP", "gateway": "stripe"},
+    "CA": {"country": "Canada", "currency": "CAD", "gateway": "stripe"},
+    "CANADA": {"country": "Canada", "currency": "CAD", "gateway": "stripe"},
+    "DE": {"country": "Germany", "currency": "EUR", "gateway": "stripe"},
+    "GERMANY": {"country": "Germany", "currency": "EUR", "gateway": "stripe"},
+    "EE": {"country": "Estonia", "currency": "EUR", "gateway": "stripe"},
+    "ESTONIA": {"country": "Estonia", "currency": "EUR", "gateway": "stripe"},
+    "AU": {"country": "Australia", "currency": "AUD", "gateway": "stripe"},
+    "AUSTRALIA": {"country": "Australia", "currency": "AUD", "gateway": "stripe"},
+}
+
+
+def resolve_country_and_currency(country_input: Optional[str], currency_input: Optional[str] = None):
+    lookup = (country_input or "Nigeria").strip().upper()
+    info = COUNTRY_DEFAULTS.get(lookup, {"country": country_input or "Nigeria", "currency": "USD", "gateway": "stripe"})
+    
+    country = info["country"] if lookup in COUNTRY_DEFAULTS else (country_input or "Nigeria")
+    currency = (currency_input or info["currency"]).upper()
+    gateway = info.get("gateway", "paystack" if currency in ["NGN", "GHS", "KES", "ZAR"] else "stripe")
+    return country, currency, gateway
+
+
 @router.post(
     "/register",
     status_code=status.HTTP_201_CREATED,
     response_model=ApiResponse[AuthResponse],
     summary="Register a new tenant store owner, provision store and issue tokens",
-    description="Registers a new store owner, automatically creates tenant organisation and returns 6-hour access token & 3-day refresh token.",
+    description="Registers a new store owner, automatically creates tenant organisation and returns 30-minute access token & 12-hour refresh token.",
 )
 async def register(
     payload: RegisterRequest,
@@ -67,11 +103,19 @@ async def register(
             detail=f"Store subdomain slug '{payload.store_slug}' is already taken",
         )
 
-    # 3. Provision Tenant Store
+    # 3. Resolve Country, Currency & Default Gateway
+    resolved_country, resolved_currency, resolved_gateway = resolve_country_and_currency(
+        payload.country, payload.currency
+    )
+
+    # 4. Provision Tenant Store
     tenant = Tenant(
         name=payload.store_name,
         slug=payload.store_slug,
         category=payload.store_category,
+        country=resolved_country,
+        currency=resolved_currency,
+        default_gateway=resolved_gateway,
         is_active=True,
     )
     db.add(tenant)
@@ -95,7 +139,7 @@ async def register(
     await db.refresh(user)
     await db.refresh(tenant)
 
-    # 5. Generate 6-hour Access Token & 3-day Refresh Token
+    # 5. Generate 30-minute Access Token & 12-hour Refresh Token
     token_claims = {
         "sub": str(user.id),
         "email": user.email,
@@ -118,7 +162,7 @@ async def register(
         "auth": {
             "access_token": access_token,
             "refresh_token": refresh_token,
-            "expires_in": "21600",  # 6 hours = 21600 seconds
+            "expires_in": "1800",  # 30 minutes = 1800 seconds
         },
     }
 
@@ -173,7 +217,7 @@ async def tenant_customer_register(
     await db.commit()
     await db.refresh(user)
 
-    # 4. Generate 6-hour Access Token & 3-day Refresh Token
+    # 4. Generate 30-minute Access Token & 12-hour Refresh Token
     token_claims = {
         "sub": str(user.id),
         "email": user.email,
@@ -196,7 +240,7 @@ async def tenant_customer_register(
         "auth": {
             "access_token": access_token,
             "refresh_token": refresh_token,
-            "expires_in": "21600",
+            "expires_in": "1800",
         },
     }
 
@@ -210,8 +254,8 @@ async def tenant_customer_register(
     "/login",
     status_code=status.HTTP_200_OK,
     response_model=ApiResponse[AuthResponse],
-    summary="Authenticate user and retrieve 6-hour access and 3-day refresh tokens",
-    description="Authenticates tenant merchant credentials and returns a JWT access token valid for 6 hours along with a 3-day refresh token.",
+    summary="Authenticate user and retrieve 30-minute access and 12-hour refresh tokens",
+    description="Authenticates tenant merchant credentials and returns a JWT access token valid for 30 minutes along with a 12-hour refresh token.",
 )
 async def login(
     payload: LoginRequest,
@@ -243,7 +287,7 @@ async def login(
             tenant_slug = tenant.slug
             tenant_name = tenant.name
 
-    # 3. Create 6-hour Access Token & 3-day Refresh Token
+    # 3. Create 30-minute Access Token & 12-hour Refresh Token
     token_claims = {
         "sub": str(user.id),
         "email": user.email,
@@ -266,7 +310,7 @@ async def login(
         "auth": {
             "access_token": access_token,
             "refresh_token": refresh_token,
-            "expires_in": "21600",  # 6 hours in seconds
+            "expires_in": "1800",  # 30 minutes in seconds
         },
     }
 
@@ -280,8 +324,8 @@ async def login(
     "/refresh-token",
     status_code=status.HTTP_200_OK,
     response_model=ApiResponse[AuthResponse],
-    summary="Exchange valid 3-day refresh token for new access token & refreshed tokens",
-    description="Validates a 3-day refresh token and re-issues a new 6-hour access token and updated refresh token.",
+    summary="Exchange valid 12-hour refresh token for new 30-minute access token & updated refresh token",
+    description="Validates a 12-hour refresh token and re-issues a new 30-minute access token and updated refresh token.",
 )
 async def refresh_token(
     payload: RefreshTokenRequest,
@@ -329,7 +373,7 @@ async def refresh_token(
             tenant_slug = tenant.slug
             tenant_name = tenant.name
 
-    # 3. Issue fresh 6-hour access token and updated 3-day refresh token
+    # 3. Issue fresh 30-minute access token and updated 12-hour refresh token
     token_claims = {
         "sub": str(user.id),
         "email": user.email,
@@ -352,7 +396,7 @@ async def refresh_token(
         "auth": {
             "access_token": new_access_token,
             "refresh_token": new_refresh_token,
-            "expires_in": "21600",
+            "expires_in": "1800",
         },
     }
 

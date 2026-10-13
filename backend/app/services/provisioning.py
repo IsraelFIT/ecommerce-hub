@@ -17,6 +17,8 @@ async def provision_new_tenant(
         name=tenant_in.name,
         slug=tenant_in.slug.lower().strip(),
         custom_domain=tenant_in.custom_domain,
+        country=tenant_in.country,
+        currency=tenant_in.currency,
         backend_type=tenant_in.backend_type,
         default_gateway=tenant_in.default_gateway,
         branding_config=tenant_in.branding_config.model_dump(),

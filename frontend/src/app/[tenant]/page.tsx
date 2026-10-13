@@ -1,13 +1,11 @@
-import { TenantHero } from "@/components/pages/tenant/tenant-hero";
-import { TenantAbout } from "@/components/pages/tenant/tenant-about";
-import { TenantStats } from "@/components/pages/tenant/tenant-stats";
-import { TenantCollection } from "@/components/pages/tenant/tenant-collection";
-import { TenantCtaBooking } from "@/components/pages/tenant/tenant-cta-booking";
-import { TenantTestimonials } from "@/components/pages/tenant/tenant-testimonials";
-import { TenantBanner } from "@/components/pages/tenant/tenant-banner";
-
 import CoreDashboardLayout from "./(core)/layout";
 import CoreDashboardPage from "./(core)/core/page";
+import { DefaultStorefront } from "@/components/storefronts/default/default-storefront";
+import {
+  BESPOKE_STOREFRONTS,
+  hasBespokeStorefront,
+} from "@/components/storefronts/bespoke";
+import { getTenantServerData } from "@/lib/api/server-tenant";
 
 interface TenantPageProps {
   params: Promise<{
@@ -28,41 +26,36 @@ export default async function TenantStorefrontPage({
     );
   }
 
-  const storeName = tenant
-    .split("-")
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
+  // 1. Fetch server-side tenant configuration
+  const tenantData = await getTenantServerData(tenant);
+  const branding = tenantData?.branding_config;
+  const storeName =
+    tenantData?.name ||
+    tenant
+      .split("-")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
 
+  // 2. If tenant opted for bespoke custom storefront & custom component exists in registry:
+  if (branding?.landingPageType === "custom" && hasBespokeStorefront(tenant)) {
+    const BespokeComponent = BESPOKE_STOREFRONTS[tenant.toLowerCase()];
+    if (BespokeComponent) {
+      return (
+        <BespokeComponent
+          tenantSlug={tenant}
+          storeName={storeName}
+          branding={branding}
+        />
+      );
+    }
+  }
+
+  // 3. Fallback to standard high-converting multi-tenant storefront
   return (
-    <div className="flex min-h-screen flex-col bg-stone-50 text-stone-900 selection:bg-stone-950 selection:text-white">
-      {/* Store Hero */}
-      <TenantHero storeName={storeName} tenantSlug={tenant} />
-
-      {/* About Store Section */}
-      <section id="about">
-        <TenantAbout storeName={storeName} tenantSlug={tenant} />
-      </section>
-
-      {/* Stats Strip */}
-      <TenantStats storeName={storeName} />
-
-      {/* Signature / Featured Products Collection */}
-      <section id="collection">
-        <TenantCollection storeName={storeName} tenantSlug={tenant} />
-      </section>
-
-      {/* Custom Booking / Inquiries CTA */}
-      <section id="consultations">
-        <TenantCtaBooking storeName={storeName} tenantSlug={tenant} />
-      </section>
-
-      {/* Client Testimonials */}
-      <section id="testimonials">
-        <TenantTestimonials storeName={storeName} />
-      </section>
-
-      {/* Final Store CTA Banner */}
-      <TenantBanner storeName={storeName} tenantSlug={tenant} />
-    </div>
+    <DefaultStorefront
+      tenantSlug={tenant}
+      storeName={storeName}
+      branding={branding}
+    />
   );
 }

@@ -4,14 +4,22 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import engine, Base, init_db
+import os
+from fastapi.staticfiles import StaticFiles
 from app.routes import (
     health_router,
     auth_router,
     tenants_router,
     products_router,
+    categories_router,
+    filters_router,
     orders_router,
     payments_router,
     webhooks_router,
+    uploads_router,
+    customizations_router,
+    reviews_router,
+    likes_router,
 )
 
 
@@ -52,23 +60,34 @@ app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 app.add_exception_handler(Exception, generic_exception_handler)
 
-# CORS Configuration
+# CORS Configuration - Permit all localhost subdomains and live storefront domains
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origin_regex=r"^https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Static Files Directory
+static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../static"))
+os.makedirs(os.path.join(static_dir, "uploads"), exist_ok=True)
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 # Register API Routers
 app.include_router(health_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
 app.include_router(tenants_router, prefix="/api")
 app.include_router(products_router, prefix="/api")
+app.include_router(categories_router, prefix="/api")
+app.include_router(filters_router, prefix="/api")
 app.include_router(orders_router, prefix="/api")
 app.include_router(payments_router, prefix="/api")
 app.include_router(webhooks_router, prefix="/api")
+app.include_router(uploads_router, prefix="/api")
+app.include_router(customizations_router, prefix="/api")
+app.include_router(reviews_router, prefix="/api")
+app.include_router(likes_router, prefix="/api")
 
 
 from app.schemas.response import success_response, ApiResponse

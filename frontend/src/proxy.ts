@@ -32,15 +32,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 2. Allow API routes
-  if (pathname.startsWith("/api/")) {
-    return NextResponse.next();
-  }
-
-  // 3. Extract current host without port
+  // 2. Extract current host without port and multi-tenant subdomain
   const currentHost = hostname.replace(/:\d+$/, "").toLowerCase();
-
-  // Multi-tenant subdomain extraction (Supports *.localhost:3000 in dev and *.{rootDomain} in prod)
   let tenantSlug: string | null = null;
 
   if (currentHost.endsWith(".localhost") && currentHost !== "localhost") {
@@ -52,6 +45,34 @@ export async function proxy(request: NextRequest) {
     currentHost !== `app.${rootDomain}`
   ) {
     tenantSlug = currentHost.replace(`.${rootDomain}`, "");
+  }
+
+  // 3. Proxy API routes & static uploads directly to FastAPI backend
+  if (pathname.startsWith("/api/") || pathname.startsWith("/static/")) {
+    const backendBase =
+      process.env.INTERNAL_BACKEND_URL ||
+      process.env.NEXT_PUBLIC_BACKEND_URL ||
+      "http://127.0.0.1:8000";
+    const targetUrl = new URL(
+      `${backendBase.replace(/\/+$/, "")}${pathname}${request.nextUrl.search}`,
+    );
+    const requestHeaders = new Headers(request.headers);
+    if (tenantSlug && !requestHeaders.has("x-tenant-slug")) {
+      requestHeaders.set("x-tenant-slug", tenantSlug);
+    }
+    if (!requestHeaders.has("authorization")) {
+      const token =
+        request.cookies.get("auth_session")?.value ||
+        request.cookies.get("auth_token")?.value;
+      if (token) {
+        requestHeaders.set("authorization", `Bearer ${token}`);
+      }
+    }
+    return NextResponse.rewrite(targetUrl, {
+      request: {
+        headers: requestHeaders,
+      },
+    });
   }
 
   // Cross-subdomain token handoff support (e.g. redirecting from root login to tenant admin)
@@ -68,17 +89,41 @@ export async function proxy(request: NextRequest) {
     cleanUrl.searchParams.delete("refresh_token");
 
     const response = NextResponse.redirect(cleanUrl);
-    const cookieOptions = {
-      maxAge: 60 * 60 * 24 * 7,
+    const accessCookieOptions = {
+      maxAge: 30 * 60, // 30 minutes
       path: "/",
       sameSite: "lax" as const,
     };
-    response.cookies.set("auth_session", queryToken, cookieOptions);
-    response.cookies.set("auth_token", queryToken, cookieOptions);
-    if (queryRole) response.cookies.set("userRole", queryRole, cookieOptions);
+    const refreshCookieOptions = {
+      maxAge: 12 * 60 * 60, // 12 hours
+      path: "/",
+      sameSite: "lax" as const,
+    };
+    response.cookies.set("auth_session", queryToken, accessCookieOptions);
+    response.cookies.set("auth_token", queryToken, accessCookieOptions);
+    if (queryRole)
+      response.cookies.set("userRole", queryRole, refreshCookieOptions);
     if (queryRefreshToken)
-      response.cookies.set("refresh_token", queryRefreshToken, cookieOptions);
+      response.cookies.set(
+        "refresh_token",
+        queryRefreshToken,
+        refreshCookieOptions,
+      );
     return response;
+  }
+
+  // 3.5 Redirect redundant tenant prefix on subdomain URLs (e.g. jazz-cakes-ltd.localhost:3000/jazz-cakes-ltd/products -> /products)
+  if (
+    tenantSlug &&
+    tenantSlug !== "core" &&
+    (pathname === `/${tenantSlug}` || pathname.startsWith(`/${tenantSlug}/`))
+  ) {
+    const cleanPath = pathname.slice(`/${tenantSlug}`.length) || "/";
+    const redirectUrl = new URL(
+      `${cleanPath}${request.nextUrl.search}`,
+      request.url,
+    );
+    return NextResponse.redirect(redirectUrl);
   }
 
   // Normalize path if the subdomain URL included the leading tenant slug
@@ -103,14 +148,18 @@ export async function proxy(request: NextRequest) {
     "/admin",
     "/products",
     "/orders",
+    "/reviews",
+    "/users",
     "/branding",
     "/adapters",
     "/tenants",
+    "/customizations",
     "/revenue",
     "/subscriptions",
     "/developers",
     "/security",
     "/core",
+    "/category-filters",
   ];
 
   const isProtectedPath =

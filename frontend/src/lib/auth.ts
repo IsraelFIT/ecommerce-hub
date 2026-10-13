@@ -22,8 +22,15 @@ export function setAuthSession(
   refreshToken?: string,
 ) {
   const domain = getCookieDomain();
-  const cookieOptions = {
-    maxAge: 60 * 60 * 24 * 7, // 7 days
+  const accessCookieOptions = {
+    maxAge: 30 * 60, // 30 minutes
+    path: "/",
+    sameSite: "lax" as const,
+    ...(domain ? { domain } : {}),
+  };
+
+  const refreshCookieOptions = {
+    maxAge: 12 * 60 * 60, // 12 hours
     path: "/",
     sameSite: "lax" as const,
     ...(domain ? { domain } : {}),
@@ -32,23 +39,73 @@ export function setAuthSession(
   setCookie(
     APP_CONFIG.sessionCookieName || "auth_session",
     token,
-    cookieOptions,
+    accessCookieOptions,
   );
-  setCookie("auth_token", token, cookieOptions);
+  setCookie("auth_token", token, accessCookieOptions);
   if (refreshToken) {
-    setCookie("refresh_token", refreshToken, cookieOptions);
+    setCookie("refresh_token", refreshToken, refreshCookieOptions);
   }
-  setCookie(APP_CONFIG.roleCookieName || "userRole", user.role, cookieOptions);
+  setCookie(
+    APP_CONFIG.roleCookieName || "userRole",
+    user.role,
+    refreshCookieOptions,
+  );
 }
 
 export function clearAuthSession() {
   const domain = getCookieDomain();
   const deleteOptions = { path: "/", ...(domain ? { domain } : {}) };
 
-  deleteCookie(APP_CONFIG.sessionCookieName || "auth_session", deleteOptions);
-  deleteCookie("auth_token", deleteOptions);
-  deleteCookie("refresh_token", deleteOptions);
-  deleteCookie(APP_CONFIG.roleCookieName || "userRole", deleteOptions);
+  const cookieNames = [
+    APP_CONFIG.sessionCookieName || "auth_session",
+    "auth_session",
+    "auth_token",
+    "refresh_token",
+    APP_CONFIG.roleCookieName || "userRole",
+    "userRole",
+    "tenant_id",
+    "tenant_slug",
+  ];
+
+  // 1. Delete cookies via cookies-next (host-only & root domain)
+  cookieNames.forEach((name) => {
+    deleteCookie(name, { path: "/" });
+    if (domain) {
+      deleteCookie(name, deleteOptions);
+    }
+  });
+
+  // 2. Direct browser cleanup for cookies, localStorage, and sessionStorage
+  if (typeof window !== "undefined") {
+    try {
+      const cookies = document.cookie.split(";");
+      for (const cookie of cookies) {
+        const eqPos = cookie.indexOf("=");
+        const name =
+          eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+        if (name) {
+          document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;`;
+          if (domain) {
+            document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=${domain};`;
+          }
+        }
+      }
+    } catch {
+      // Ignore document access errors
+    }
+
+    try {
+      localStorage.removeItem("user-storage");
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("refresh_token");
+      localStorage.removeItem("auth_session");
+      localStorage.removeItem("userRole");
+      localStorage.clear();
+      sessionStorage.clear();
+    } catch (e) {
+      console.warn("Could not clear localStorage/sessionStorage:", e);
+    }
+  }
 }
 
 export function getRefreshToken(): string | undefined {

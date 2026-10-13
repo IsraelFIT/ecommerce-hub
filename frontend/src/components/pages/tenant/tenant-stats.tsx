@@ -22,7 +22,7 @@ export function TenantStats({}: TenantStatsProps) {
               <h1 className="font-secondary font-semibold text-3xl md:text-4xl lg:text-5xl leading-none tracking-tight text-white">
                 {stat.value}
               </h1>
-              <span className="text-[10px] md:text-xs tracking-[0.2em] uppercase font-medium text-stone-400">
+              <span className="text-[10px] md:text-xs tracking-[0.2em] uppercase font-medium">
                 {stat.label}
               </span>
             </div>

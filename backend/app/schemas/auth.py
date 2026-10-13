@@ -32,6 +32,8 @@ class RegisterRequest(BaseModel):
                 "store_name": "Cakes by Bode",
                 "store_slug": "cakes-by-bode",
                 "store_category": "Bakery & Confectionery",
+                "country": "Nigeria",
+                "currency": "NGN",
                 "password": "SecurePassword123!",
                 "confirm_password": "SecurePassword123!",
                 "consent_to_terms": True,
@@ -48,6 +50,8 @@ class RegisterRequest(BaseModel):
     store_name: str = Field(..., min_length=2, max_length=255, description="Tenant brand/store name")
     store_slug: str = Field(..., min_length=2, max_length=100, description="Store subdomain slug")
     store_category: str = Field(default="General", max_length=100, description="Store category/industry")
+    country: str = Field(default="Nigeria", max_length=100, description="Country / Primary Operating Market")
+    currency: Optional[str] = Field(default=None, max_length=10, description="Operational currency code (e.g. NGN, USD, GBP, EUR)")
     
     password: str = Field(..., min_length=6, description="Account password (min 6 characters)")
     confirm_password: str = Field(..., min_length=6, description="Password confirmation")

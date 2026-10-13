@@ -8,26 +8,40 @@ from app.models.tenant import BackendType
 class BrandingConfig(BaseModel):
     model_config = ConfigDict(
         from_attributes=True,
+        extra="allow",
         json_schema_extra={
             "example": {
-                "primaryColor": "#6366f1",
+                "primaryColor": "#059669",
+                "secondaryColor": "#ec4899",
                 "accentColor": "#ec4899",
+                "landingPageType": "default",
+                "customLandingPageStatus": "none",
                 "logoUrl": "https://cdn.ecommerce-hub.com/logos/cakes-by-bode.png",
                 "tagline": "Handcrafted artisanal pastries and custom bakes",
+                "storeHeadline": "Official Online Store",
+                "announcementText": "Free standard shipping on all domestic orders over $75 ✨",
             }
         },
     )
 
-    primaryColor: str = Field(default="#6366f1", description="Primary brand hex color")
+    primaryColor: str = Field(default="#059669", description="Primary brand hex color")
+    secondaryColor: Optional[str] = Field(default="#ec4899", description="Secondary brand hex color")
     accentColor: str = Field(default="#ec4899", description="Accent brand hex color")
+    landingPageType: str = Field(default="default", description="Storefront landing page mode: 'default' or 'custom'")
+    customLandingPageStatus: Optional[str] = Field(default="none", description="Request status: 'none', 'pending', 'in_progress', 'completed'")
     logoUrl: Optional[str] = Field(default=None, description="URL to tenant logo image")
     tagline: Optional[str] = Field(default="Welcome to our store", description="Store tagline")
+    storeHeadline: Optional[str] = Field(default=None, description="Store headline on live site")
+    announcementText: Optional[str] = Field(default=None, description="Announcement banner text")
+    bannerUrl: Optional[str] = Field(default=None, description="Banner image URL")
 
 
 class TenantBase(BaseModel):
     name: str = Field(..., min_length=2, max_length=255, description="Tenant organization name")
     slug: str = Field(..., min_length=2, max_length=100, pattern="^[a-z0-9-]+$", description="Unique subdomain slug")
     category: Optional[str] = Field(default="General", max_length=100, description="Business vertical / store category")
+    country: str = Field(default="Nigeria", max_length=100, description="Country / Primary Operating Market")
+    currency: str = Field(default="NGN", max_length=10, description="Default operational currency code (e.g. NGN, USD, GBP, EUR)")
     custom_domain: Optional[str] = Field(default=None, max_length=255)
     backend_type: BackendType = Field(default=BackendType.POSTGRES)
     sanity_dataset: Optional[str] = Field(default=None, max_length=100)
@@ -43,9 +57,11 @@ class TenantCreate(TenantBase):
                 "name": "Cakes by Bode",
                 "slug": "cakes-by-bode",
                 "category": "Bakery & Confectionery",
+                "country": "Nigeria",
+                "currency": "NGN",
                 "custom_domain": "shop.cakesbybode.com",
                 "backend_type": "postgres",
-                "default_gateway": "stripe",
+                "default_gateway": "paystack",
                 "branding_config": {
                     "primaryColor": "#6366f1",
                     "accentColor": "#ec4899",
@@ -71,6 +87,8 @@ class TenantUpdate(BaseModel):
             "example": {
                 "name": "Cakes by Bode & Pastries",
                 "category": "Bakery & Confectionery",
+                "country": "Nigeria",
+                "currency": "NGN",
                 "custom_domain": "shop.cakesbybode.com",
                 "backend_type": "sanity",
                 "sanity_project_id": "prj_948201",
@@ -88,6 +106,8 @@ class TenantUpdate(BaseModel):
 
     name: Optional[str] = None
     category: Optional[str] = None
+    country: Optional[str] = None
+    currency: Optional[str] = None
     custom_domain: Optional[str] = None
     backend_type: Optional[BackendType] = None
     sanity_dataset: Optional[str] = None

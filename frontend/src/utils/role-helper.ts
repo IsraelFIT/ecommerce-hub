@@ -19,9 +19,12 @@ export function checkPathAllowed(
       pathname.startsWith("/settings") ||
       pathname.startsWith("/products") ||
       pathname.startsWith("/orders") ||
+      pathname.startsWith("/reviews") ||
+      pathname.startsWith("/users") ||
       pathname.startsWith("/branding") ||
       pathname.startsWith("/adapters") ||
       pathname.startsWith("/tenants") ||
+      pathname.startsWith("/category-filters") ||
       pathname.startsWith("/core")
     ) {
       return true;

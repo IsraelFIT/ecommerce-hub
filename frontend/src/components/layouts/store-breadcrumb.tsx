@@ -1,0 +1,138 @@
+"use client";
+
+import Link from "next/link";
+import { useParams, usePathname, useRouter } from "next/navigation";
+import { ChevronLeft } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { STORE_NAV_ITEMS } from "@/store/sidebar";
+import useUserStore from "@/store/user";
+import { getTenantRoute } from "@/utils/helper";
+
+export function StoreBreadcrumb({ className }: { className?: string }) {
+  const params = useParams();
+  const pathname = usePathname();
+  const router = useRouter();
+  const { user } = useUserStore();
+
+  const tenantSlug = (params?.tenant as string) || "store";
+  const formattedStoreName =
+    user?.tenant_name ||
+    tenantSlug
+      .split("-")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+
+  // Normalize path by stripping tenant prefix if present (e.g. /sasha-clothing/products -> /products)
+  let cleanPath = pathname;
+  if (
+    tenantSlug &&
+    (cleanPath === `/${tenantSlug}` || cleanPath.startsWith(`/${tenantSlug}/`))
+  ) {
+    cleanPath = cleanPath.slice(`/${tenantSlug}`.length) || "/";
+  }
+
+  const rawSegments = cleanPath.split("/").filter(Boolean);
+  const isOverview = cleanPath === "/" || cleanPath === "/admin";
+  const isVisible = rawSegments.length > 0 && !isOverview;
+
+  const currentSegment = rawSegments[0] || "";
+  const navItem = STORE_NAV_ITEMS.find(
+    (item) =>
+      item.hrefSegment === `/${currentSegment}` || item.id === currentSegment,
+  );
+
+  const parentName =
+    navItem?.shortLabel ||
+    navItem?.title ||
+    (currentSegment
+      ? currentSegment.charAt(0).toUpperCase() + currentSegment.slice(1)
+      : "Overview");
+
+  return (
+    <div
+      className={cn(
+        "grid transition-all duration-300 ease-out z-0 relative shrink-0",
+        isVisible
+          ? "grid-rows-[1fr] opacity-100 translate-y-0 pointer-events-auto"
+          : "grid-rows-[0fr] opacity-0 translate-y-3 pointer-events-none",
+        className,
+      )}
+    >
+      <div className="overflow-hidden">
+        <div className="flex items-center gap-2 p-1.5 pb-3 mx-3.5 -mb-2 rounded-t-xl border-t border-l border-r border-border bg-card/60 text-xs md:text-sm">
+          {/* Back Button */}
+          <button
+            type="button"
+            onClick={() => router.back()}
+            aria-label="Go back"
+            className="inline-flex items-center justify-center size-6 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer mr-0.5"
+          >
+            <ChevronLeft className="size-4" />
+          </button>
+
+          {/* Breadcrumb Trail */}
+          <nav aria-label="Breadcrumb" className="flex items-center gap-2">
+            <Link
+              href={getTenantRoute(tenantSlug, "/admin")}
+              className="text-muted-foreground hover:text-primary transition-colors truncate max-w-28 md:max-w-none"
+            >
+              {formattedStoreName}
+            </Link>
+
+            <span
+              className="text-muted-foreground/60 select-none font-normal"
+              aria-hidden="true"
+            >
+              /
+            </span>
+
+            {rawSegments.map((segment, index) => {
+              const isLast = index === rawSegments.length - 1;
+              const subPath = `/${rawSegments.slice(0, index + 1).join("/")}`;
+              const href = getTenantRoute(tenantSlug, subPath);
+
+              let title = segment;
+              if (index === 0) {
+                title = parentName;
+              } else if (isLast) {
+                title =
+                  navItem?.detailTitle ||
+                  segment.charAt(0).toUpperCase() + segment.slice(1);
+              } else {
+                title = segment.charAt(0).toUpperCase() + segment.slice(1);
+              }
+
+              return (
+                <div key={href} className="flex items-center gap-2">
+                  {index > 0 && (
+                    <span
+                      className="text-muted-foreground/60 select-none font-normal"
+                      aria-hidden="true"
+                    >
+                      /
+                    </span>
+                  )}
+
+                  {isLast ? (
+                    <span className="font-semibold text-foreground truncate max-w-50 md:max-w-none">
+                      {title}
+                    </span>
+                  ) : (
+                    <Link
+                      href={href}
+                      className="text-muted-foreground hover:text-primary transition-colors truncate max-w-37.5 md:max-w-none"
+                    >
+                      {title}
+                    </Link>
+                  )}
+                </div>
+              );
+            })}
+          </nav>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default StoreBreadcrumb;

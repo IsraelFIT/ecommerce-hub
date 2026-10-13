@@ -213,7 +213,7 @@ export default function CheckoutPage() {
             {/* 1. Client details */}
             <div className="bg-white border border-stone-200 p-8 shadow-xs">
               <h3 className="font-serif text-xl font-bold text-stone-950 mb-6 pb-2 border-b border-stone-100 flex items-center gap-2">
-                <span className="inline-flex w-6 h-6 rounded-full bg-stone-100 text-stone-700 items-center justify-center text-xs font-bold">
+                <span className="inline-flex w-6 h-6 rounded-full bg-stone-100 text-foreground items-center justify-center text-xs font-bold">
                   1
                 </span>
                 Contact Coordinates
@@ -290,7 +290,7 @@ export default function CheckoutPage() {
             {/* 2. Fulfillment selection */}
             <div className="bg-white border border-stone-200 p-8 shadow-xs">
               <h3 className="font-serif text-xl font-bold text-stone-950 mb-6 pb-2 border-b border-stone-100 flex items-center gap-2">
-                <span className="inline-flex w-6 h-6 rounded-full bg-stone-100 text-stone-700 items-center justify-center text-xs font-bold">
+                <span className="inline-flex w-6 h-6 rounded-full bg-stone-100 text-foreground items-center justify-center text-xs font-bold">
                   2
                 </span>
                 Fulfillment Logistics
@@ -440,7 +440,7 @@ export default function CheckoutPage() {
             {/* 3. Payment Details */}
             <div className="bg-white border border-stone-200 p-8 shadow-xs">
               <h3 className="font-serif text-xl font-bold text-stone-950 mb-6 pb-2 border-b border-stone-100 flex items-center gap-2">
-                <span className="inline-flex w-6 h-6 rounded-full bg-stone-100 text-stone-700 items-center justify-center text-xs font-bold">
+                <span className="inline-flex w-6 h-6 rounded-full bg-stone-100 text-foreground items-center justify-center text-xs font-bold">
                   3
                 </span>
                 Secure Payment Details

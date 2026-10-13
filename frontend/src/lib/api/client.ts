@@ -1,5 +1,14 @@
 import { ApiResponse } from "@/types/users";
-import { deleteSession, getSession, createSession } from "@/lib/session";
+import {
+  deleteSession,
+  getSession,
+  createSession,
+  ACCESS_TOKEN_MAX_AGE,
+} from "@/lib/session";
+import {
+  recordUserActivity,
+  isUserRecentlyActive,
+} from "@/lib/activity-tracker";
 import { APP_CONFIG } from "@/constants";
 
 interface ParsedData {
@@ -13,15 +22,29 @@ interface ParsedData {
 }
 
 export const getBackendBaseUrl = (): string => {
+  if (typeof window !== "undefined") {
+    // In browser: if an external custom API is specified (e.g. non-localhost remote API in production), use it.
+    // Otherwise use "" (relative URL) so Next.js proxy/rewrites handle the request locally without CORS or localhost IPv6 issues.
+    const customApi =
+      process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL;
+    if (
+      customApi &&
+      !customApi.includes("localhost") &&
+      !customApi.includes("127.0.0.1")
+    ) {
+      return customApi.replace(/\/+$/, "");
+    }
+    return "";
+  }
+
   const url =
+    process.env.INTERNAL_BACKEND_URL ||
     process.env.NEXT_PUBLIC_BACKEND_URL ||
     process.env.NEXT_PUBLIC_API_URL ||
     APP_CONFIG.apiUrl ||
-    "http://localhost:8000";
+    "http://127.0.0.1:8000";
   return url.replace(/\/+$/, "");
 };
-
-const BACKEND_URL = getBackendBaseUrl();
 
 /**
  * Normalizes an API endpoint to ensure consistent URL formatting.
@@ -43,18 +66,31 @@ export const apiRequest = async <T = unknown>(
   options: RequestInit = {},
 ): Promise<ApiResponse<T>> => {
   try {
+    // Record frontend activity on outgoing user API requests
+    recordUserActivity();
+
     const session = await getSession();
     const accessToken = session?.accessToken;
 
-    // Prepare headers with JSON default and Bearer authorization
+    const isFormData =
+      typeof FormData !== "undefined" && options.body instanceof FormData;
+
+    const guestId =
+      typeof window !== "undefined"
+        ? localStorage.getItem("ecommerce_guest_session_id")
+        : null;
+
+    // Prepare headers with JSON default (unless FormData) and Bearer authorization
     const headers: HeadersInit = {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      ...(guestId ? { "X-Session-ID": guestId } : {}),
       ...options.headers,
     };
 
     const path = normalizeEndpoint(endpoint);
-    const url = `${BACKEND_URL}${path}`;
+    const baseUrl = getBackendBaseUrl();
+    const url = `${baseUrl}${path}`;
     const isSilent =
       endpoint.includes("/notifications") || endpoint.includes("/health");
 
@@ -101,9 +137,12 @@ export const apiRequest = async <T = unknown>(
     if (response.status === 401) {
       const isRefreshEndpoint = endpoint.includes("/refresh-token");
 
-      if (!isRefreshEndpoint && session?.refreshToken) {
+      // Only attempt refresh if there was user activity in the last 30 minutes
+      const hasRecentActivity = isUserRecentlyActive(30 * 60 * 1000);
+
+      if (!isRefreshEndpoint && session?.refreshToken && hasRecentActivity) {
         console.log(
-          "⚠️ Access token expired, attempting automatic token refresh...",
+          "⚠️ Access token expired, user is active: attempting automatic token refresh...",
         );
         try {
           // Dynamic import to avoid circular dependency
@@ -130,7 +169,7 @@ export const apiRequest = async <T = unknown>(
                 undefined,
                 authData.role,
                 {},
-                60 * 60 * 24 * 7,
+                ACCESS_TOKEN_MAX_AGE,
               );
 
               console.log(
@@ -259,7 +298,8 @@ export const apiFormDataRequest = async <T = unknown>(
     };
 
     const path = normalizeEndpoint(endpoint);
-    const url = `${BACKEND_URL}${path}`;
+    const baseUrl = getBackendBaseUrl();
+    const url = `${baseUrl}${path}`;
 
     if (process.env.NODE_ENV !== "production") {
       console.log(

@@ -23,6 +23,8 @@ ecommerce_hub.db
 __pycache__/
 *.py[cod]
 *$py.class
+backend/tests/
+tests/
 
 # Next.js Build & Outputs
 .next/

@@ -112,7 +112,7 @@
 
 @layer base {
   :root {
-    @apply bg-background text-foreground font-primary leading-[20px] antialiased;
+    @apply bg-background text-foreground font-primary leading-5 antialiased;
     font-synthesis: none;
     text-rendering: optimizeLegibility;
   }
@@ -161,27 +161,27 @@
   }
 
   h3 {
-    @apply text-[20px] leading-[24px] md:text-[30px] md:leading-8.5 font-secondary;
+    @apply text-[20px] leading-6 md:text-[30px] md:leading-8.5 font-secondary;
   }
 
   h4 {
-    @apply text-[18px] leading-[22px] md:text-[20px] font-primary;
+    @apply text-[18px] leading-5.5 md:text-[20px] font-primary;
   }
 
   h5 {
-    @apply text-[16px] leading-[22px] md:text-[18px] font-primary;
+    @apply text-[16px] leading-5.5 md:text-[18px] font-primary;
   }
 
   h6 {
-    @apply text-[12px] leading-[18px] md:text-[14px] font-primary;
+    @apply text-[12px] leading-4.5 md:text-[14px] font-primary;
   }
 
   p {
-    @apply leading-[20px] font-primary;
+    @apply leading-5 font-primary;
   }
 
   span {
-    @apply leading-[20px] font-primary;
+    @apply leading-5 font-primary;
   }
 
   img {
@@ -223,6 +223,6 @@
 
 @layer components {
   .container {
-    @apply w-full h-full px-5 max-w-[1412px] 2xl:max-w-[1712px] m-auto flex flex-row justify-between items-center;
+    @apply w-full h-full px-5 max-w-353 2xl:max-w-[1712px] m-auto flex flex-row justify-between items-center;
   }
 }

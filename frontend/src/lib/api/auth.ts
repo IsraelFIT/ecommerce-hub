@@ -14,6 +14,8 @@ export interface RegisterPayload {
   store_name: string;
   store_slug: string;
   store_category?: string;
+  country: string;
+  currency?: string;
   password: string;
   confirm_password: string;
   consent_to_terms: boolean;

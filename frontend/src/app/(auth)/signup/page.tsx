@@ -33,6 +33,13 @@ import { getTenantSubdomainUrl } from "@/utils/helper";
 
 const COUNTRIES = [
   {
+    code: "NG",
+    name: "Nigeria",
+    flag: "🇳🇬",
+    dial: "+234",
+    currency: "NGN",
+  },
+  {
     code: "US",
     name: "United States",
     flag: "🇺🇸",
@@ -46,7 +53,27 @@ const COUNTRIES = [
     dial: "+44",
     currency: "GBP",
   },
-  { code: "NG", name: "Nigeria", flag: "🇳🇬", dial: "+234", currency: "NGN" },
+  {
+    code: "GH",
+    name: "Ghana",
+    flag: "🇬🇭",
+    dial: "+233",
+    currency: "GHS",
+  },
+  {
+    code: "KE",
+    name: "Kenya",
+    flag: "🇰🇪",
+    dial: "+254",
+    currency: "KES",
+  },
+  {
+    code: "ZA",
+    name: "South Africa",
+    flag: "🇿🇦",
+    dial: "+27",
+    currency: "ZAR",
+  },
   { code: "CA", name: "Canada", flag: "🇨🇦", dial: "+1", currency: "CAD" },
   { code: "DE", name: "Germany", flag: "🇩🇪", dial: "+49", currency: "EUR" },
   { code: "AU", name: "Australia", flag: "🇦🇺", dial: "+61", currency: "AUD" },
@@ -82,9 +109,6 @@ export default function SignupPage() {
   const [storeName, setStoreName] = useState("");
   const [storeSlug, setStoreSlug] = useState("");
   const [category, setCategory] = useState(CATEGORIES[0]);
-  const [paymentGateway, setPaymentGateway] = useState<"stripe" | "paystack">(
-    "stripe",
-  );
 
   // Step 3: What is your phone number?
   const [phoneNational, setPhoneNational] = useState("");
@@ -159,6 +183,8 @@ export default function SignupPage() {
         store_name: storeName.trim(),
         store_slug: storeSlug.trim(),
         store_category: category,
+        country: selectedCountry.name,
+        currency: selectedCountry.currency,
         password,
         confirm_password: confirmPassword,
         consent_to_terms: agreeTerms,
@@ -670,7 +696,7 @@ export default function SignupPage() {
                       </span>
                     </div>
 
-                    {/* Category & Payment Split Gateway */}
+                    {/* Category & Operating Currency */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <Label className=" font-semibold text-foreground">
@@ -694,34 +720,20 @@ export default function SignupPage() {
                       </div>
 
                       <div className="space-y-1">
-                        <Label className=" font-semibold text-foreground">
-                          Split Payout Provider
+                        <Label className="font-semibold text-foreground">
+                          Operating Currency & Gateway
                         </Label>
-                        <div className="grid grid-cols-2 gap-2 h-10">
-                          <button
-                            type="button"
-                            onClick={() => setPaymentGateway("stripe")}
-                            className={`flex items-center justify-center gap-1 rounded-md border  font-medium transition-all ${
-                              paymentGateway === "stripe"
-                                ? "border-primary bg-primary-light text-primary font-semibold"
-                                : "border-border bg-card text-muted-foreground hover:bg-muted"
-                            }`}
-                          >
-                            <CreditCard className="h-3 w-3" />
-                            <span>Stripe</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setPaymentGateway("paystack")}
-                            className={`flex items-center justify-center gap-1 rounded-md border  font-medium transition-all ${
-                              paymentGateway === "paystack"
-                                ? "border-primary bg-primary-light text-primary font-semibold"
-                                : "border-border bg-card text-muted-foreground hover:bg-muted"
-                            }`}
-                          >
-                            <CreditCard className="h-3 w-3" />
-                            <span>Paystack</span>
-                          </button>
+                        <div className="h-9 px-3 rounded-md border border-border bg-card-gray flex items-center justify-between text-xs">
+                          <span className="font-bold text-primary font-mono text-sm">
+                            {selectedCountry.currency}
+                          </span>
+                          <span className="text-muted-foreground font-medium">
+                            {["NGN", "GHS", "KES", "ZAR"].includes(
+                              selectedCountry.currency,
+                            )
+                              ? "Paystack Automated Split"
+                              : "Stripe Connect"}
+                          </span>
                         </div>
                       </div>
                     </div>

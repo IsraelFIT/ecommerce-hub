@@ -35,6 +35,8 @@ class Tenant(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     # Category & Dynamic Storefront Branding
     category: Mapped[str] = mapped_column(String(100), default="General", nullable=False)
+    country: Mapped[str] = mapped_column(String(100), default="Nigeria", nullable=False)
+    currency: Mapped[str] = mapped_column(String(10), default="NGN", nullable=False)
     branding_config: Mapped[Dict[str, Any]] = mapped_column(
         JSON,
         default=lambda: {
@@ -50,3 +52,5 @@ class Tenant(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     users = relationship("User", back_populates="tenant", cascade="all, delete-orphan")
     products = relationship("Product", back_populates="tenant", cascade="all, delete-orphan")
     orders = relationship("Order", back_populates="tenant", cascade="all, delete-orphan")
+    reviews = relationship("Review", back_populates="tenant", cascade="all, delete-orphan")
+    likes = relationship("ProductLike", back_populates="tenant", cascade="all, delete-orphan")

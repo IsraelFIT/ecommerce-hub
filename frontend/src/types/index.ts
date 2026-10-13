@@ -1,4 +1,5 @@
 export * from "./users";
+export * from "./products";
 
 export interface ApiResponse<T = unknown> {
   success: boolean;

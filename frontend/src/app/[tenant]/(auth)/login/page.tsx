@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, use, Suspense } from "react";
+import { useState, use, Suspense, useEffect } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Store, Lock, Mail, ArrowRight, Loader2, Sparkles } from "lucide-react";
@@ -27,6 +27,17 @@ function TenantLoginForm({ tenantSlug }: { tenantSlug: string }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("reason") === "inactivity") {
+      toast.error(
+        "Your session expired due to inactivity. Please sign in again.",
+        {
+          id: "inactivity-tenant-login-toast",
+        },
+      );
+    }
+  }, [searchParams]);
 
   const formattedStoreName = tenantSlug
     .split("-")

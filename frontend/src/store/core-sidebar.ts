@@ -7,6 +7,7 @@ import {
   Layers,
   Code2,
   ShieldCheck,
+  Palette,
   type LucideIcon,
 } from "lucide-react";
 
@@ -45,6 +46,18 @@ export const CORE_NAV_ITEMS: CoreNavItem[] = [
     detailTitle: "Tenant Details",
     detailSubtitle:
       "Manage store configuration, domain bindings, and adapter status",
+  },
+  {
+    id: "customizations",
+    label: "Store Customizations & Branding",
+    shortLabel: "Branding",
+    icon: Palette,
+    href: "/customizations",
+    title: "Storefront Customizations",
+    subtitle:
+      "Tenant brand palettes, logos, and bespoke custom landing page design requests",
+    detailTitle: "Customization Request Details",
+    detailSubtitle: "Review design specifications and manage deployment status",
   },
   {
     id: "revenue",

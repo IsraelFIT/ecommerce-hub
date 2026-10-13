@@ -34,6 +34,19 @@ from app.schemas.webhook import (
     GenericWebhookEvent,
 )
 
+from app.schemas.category import (
+    CategoryBase,
+    CategoryCreate,
+    CategoryUpdate,
+    CategoryResponse,
+)
+from app.schemas.filter import (
+    FilterBase,
+    FilterCreate,
+    FilterUpdate,
+    FilterResponse,
+)
+
 __all__ = [
     "TenantCreate",
     "TenantUpdate",
@@ -43,6 +56,14 @@ __all__ = [
     "ProductCreate",
     "ProductUpdate",
     "ProductResponse",
+    "CategoryBase",
+    "CategoryCreate",
+    "CategoryUpdate",
+    "CategoryResponse",
+    "FilterBase",
+    "FilterCreate",
+    "FilterUpdate",
+    "FilterResponse",
     "OrderItem",
     "OrderCreate",
     "OrderResponse",

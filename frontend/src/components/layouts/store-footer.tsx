@@ -1,8 +1,8 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { ShieldCheck } from "lucide-react";
 import { useStoreInvalidPaths } from "@/hooks/invalid-paths";
+import { getRootAppUrl } from "@/utils/helper";
 
 export function StoreFooter() {
   const isInvalid = useStoreInvalidPaths();
@@ -17,15 +17,21 @@ export function StoreFooter() {
   if (isInvalid) return null;
 
   return (
-    <footer className="mt-auto border-t border-border bg-card py-8 text-xs text-muted-foreground">
+    <footer className="mt-auto border-t border-border bg-card py-5 text-xs text-muted-foreground">
       <div className="container mx-auto px-4 md:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-2">
-          <ShieldCheck className="h-4 w-4 text-primary" />
-          <span>Encrypted Checkout via Paystack & Stripe Subaccounts</span>
+          © {new Date().getFullYear()} {formattedStoreName}.
         </div>
         <p>
-          © {new Date().getFullYear()} {formattedStoreName}. Powered by{" "}
-          <span className="font-semibold text-foreground">EcommerceHub</span>{" "}
+          Powered by{" "}
+          <span className="font-semibold text-foreground">
+            <a
+              href={getRootAppUrl("/")}
+              className="hover:underline hover:text-primary transition-colors"
+            >
+              EcommerceHub
+            </a>
+          </span>{" "}
           Multi-Tenant Engine.
         </p>
       </div>

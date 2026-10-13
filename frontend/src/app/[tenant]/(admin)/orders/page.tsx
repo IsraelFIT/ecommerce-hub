@@ -149,17 +149,17 @@ export default function TenantOrdersPage({}: OrdersPageProps) {
   });
 
   return (
-    <div className="p-4 md:p-6 lg:p-8 space-y-4 w-full">
+    <div className="space-y-4 w-full text-foreground">
       {/* Header & Filter Controls */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-stone-200/90 shadow-xs">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-card p-4 rounded-2xl border border-border shadow-xs">
         <div className="flex flex-1 items-center gap-2 max-w-md">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-3 h-3.5 w-3.5 text-stone-400 z-10 pointer-events-none" />
+            <Search className="absolute left-3 top-3 h-3.5 w-3.5 text-muted-foreground z-10 pointer-events-none" />
             <Input
               placeholder="Search order ID, customer or gateway..."
               value={orderSearch}
               onChange={(e) => handleSearchChange(e.target.value)}
-              className="pl-8 h-9"
+              className="pl-8 h-9 bg-background border-border text-foreground"
             />
           </div>
 
@@ -167,10 +167,10 @@ export default function TenantOrdersPage({}: OrdersPageProps) {
             value={statusFilter}
             onValueChange={(val) => handleStatusChange(val)}
           >
-            <SelectTrigger className="h-9 w-40 text-xs bg-white border-stone-200 text-stone-700">
+            <SelectTrigger className="h-9 w-40 bg-background border-border text-foreground">
               <SelectValue placeholder="All Statuses" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-card border-border text-foreground">
               <SelectItem value="all">All Statuses</SelectItem>
               <SelectItem value="paid">Paid</SelectItem>
               <SelectItem value="processing">Processing</SelectItem>
@@ -181,49 +181,49 @@ export default function TenantOrdersPage({}: OrdersPageProps) {
         </div>
 
         <div className="flex items-center gap-2">
-          <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold px-3 py-1">
+          <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-xs font-semibold px-3 py-1">
             Auto-Payout: Active
           </Badge>
         </div>
       </div>
 
       {/* Orders Table */}
-      <div className="rounded-2xl border border-stone-200/90 bg-white shadow-xs overflow-hidden">
+      <div className="rounded-2xl border border-border bg-card shadow-xs overflow-hidden">
         <Table>
-          <TableHeader className="bg-stone-50 border-b border-stone-200/60">
-            <TableRow className="hover:bg-transparent">
-              <TableHead className="p-4 text-xs font-medium text-stone-500">
+          <TableHeader className="bg-muted/60 border-b border-border">
+            <TableRow className="border-border hover:bg-transparent">
+              <TableHead className="p-4 text-xs font-semibold text-foreground">
                 Order ID
               </TableHead>
-              <TableHead className="p-4 text-xs font-medium text-stone-500">
+              <TableHead className="p-4 text-xs font-semibold text-foreground">
                 Customer
               </TableHead>
-              <TableHead className="p-4 text-xs font-medium text-stone-500">
+              <TableHead className="p-4 text-xs font-semibold text-foreground">
                 Gateway
               </TableHead>
-              <TableHead className="p-4 text-xs font-medium text-stone-500">
+              <TableHead className="p-4 text-xs font-semibold text-foreground">
                 Total Amount
               </TableHead>
-              <TableHead className="p-4 text-xs font-medium text-stone-500">
+              <TableHead className="p-4 text-xs font-semibold text-foreground">
                 Merchant Net (97.5%)
               </TableHead>
-              <TableHead className="p-4 text-xs font-medium text-stone-500">
+              <TableHead className="p-4 text-xs font-semibold text-foreground">
                 Platform Fee (2.5%)
               </TableHead>
-              <TableHead className="p-4 text-xs font-medium text-stone-500">
+              <TableHead className="p-4 text-xs font-semibold text-foreground">
                 Fulfillment Status
               </TableHead>
-              <TableHead className="p-4 text-xs font-medium text-stone-500 text-right">
+              <TableHead className="p-4 text-xs font-semibold text-foreground text-right">
                 Update
               </TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody className="divide-y divide-stone-100">
+          <TableBody className="divide-y divide-border">
             {filteredOrders.length === 0 ? (
-              <TableRow>
+              <TableRow className="border-border">
                 <TableCell
                   colSpan={8}
-                  className="p-8 text-center text-stone-400"
+                  className="p-8 text-center text-muted-foreground"
                 >
                   No orders found matching your filter criteria.
                 </TableCell>
@@ -234,50 +234,50 @@ export default function TenantOrdersPage({}: OrdersPageProps) {
                 .map((ord) => (
                   <TableRow
                     key={ord.id}
-                    className="hover:bg-stone-50/60 transition-colors"
+                    className="border-border hover:bg-muted/40 transition-colors"
                   >
-                    <TableCell className="p-4 font-mono font-bold text-stone-900 text-xs">
+                    <TableCell className="p-4 font-mono font-bold text-foreground text-xs">
                       {ord.id}
                     </TableCell>
                     <TableCell className="p-4">
-                      <div className="font-semibold text-stone-900">
+                      <div className="font-semibold text-foreground">
                         {ord.customerName}
                       </div>
-                      <div className="text-xs text-stone-400">
+                      <div className="text-xs text-muted-foreground">
                         {ord.customerEmail}
                       </div>
                     </TableCell>
                     <TableCell className="p-4">
-                      <Badge className="bg-stone-100 px-2 py-1 text-xs font-medium text-stone-700">
+                      <Badge className="bg-muted border border-border px-2 py-1 text-xs font-medium text-foreground">
                         {ord.gateway}
                       </Badge>
                     </TableCell>
-                    <TableCell className="p-4 font-bold text-stone-900">
+                    <TableCell className="p-4 font-bold text-foreground">
                       ${ord.grossAmount.toFixed(2)}
                     </TableCell>
-                    <TableCell className="p-4 font-bold text-emerald-600">
+                    <TableCell className="p-4 font-bold text-emerald-600 dark:text-emerald-400">
                       ${ord.netPayout.toFixed(2)}
                     </TableCell>
-                    <TableCell className="p-4 text-stone-600">
+                    <TableCell className="p-4 text-muted-foreground">
                       ${ord.platformFee.toFixed(2)}
                     </TableCell>
                     <TableCell className="p-4">
                       <Badge
                         className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold transition-transform cursor-pointer capitalize ${
                           ord.status === "delivered"
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
                             : ord.status === "shipped"
-                              ? "bg-blue-50 text-blue-700 border border-blue-200"
-                              : "bg-amber-50 text-amber-700 border border-amber-200"
+                              ? "bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20"
+                              : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20"
                         }`}
                       >
                         <span
                           className={`text-xs ${
                             ord.status === "delivered"
-                              ? "text-emerald-600"
+                              ? "text-emerald-600 dark:text-emerald-400"
                               : ord.status === "shipped"
-                                ? "text-blue-600"
-                                : "text-amber-600"
+                                ? "text-blue-600 dark:text-blue-400"
+                                : "text-amber-600 dark:text-amber-400"
                           }`}
                         >
                           {ord.status}
@@ -294,10 +294,10 @@ export default function TenantOrdersPage({}: OrdersPageProps) {
                           )
                         }
                       >
-                        <SelectTrigger className="h-8 w-32 text-xs bg-white border-stone-200 text-stone-700 ml-auto">
+                        <SelectTrigger className="h-8 w-32 text-xs bg-background border-border text-foreground ml-auto">
                           <SelectValue placeholder="Status" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="bg-card border-border text-foreground">
                           <SelectItem value="paid">Paid</SelectItem>
                           <SelectItem value="processing">Processing</SelectItem>
                           <SelectItem value="shipped">Shipped</SelectItem>
@@ -313,7 +313,7 @@ export default function TenantOrdersPage({}: OrdersPageProps) {
 
         {/* Pagination Footer */}
         {filteredOrders.length > 0 && (
-          <div className="p-4 border-t border-stone-100 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs text-stone-500">
+          <div className="p-4 border-t border-border flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs text-muted-foreground">
             <span>
               Showing{" "}
               {Math.min(

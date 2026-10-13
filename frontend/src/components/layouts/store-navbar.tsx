@@ -1,74 +1,120 @@
 "use client";
 
 import { useParams, usePathname } from "next/navigation";
-import { Menu, ArrowUpRight, User as UserIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useSidebarStore } from "@/store/sidebar";
-import { useUserStore } from "@/store/user";
+import {
+  Menu,
+  PanelLeft,
+  Search,
+  Bell,
+  ArrowUpRight,
+  Sparkles,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import useSidebarStore, { getStoreAdminPageInfo } from "@/store/sidebar";
+import useUserStore from "@/store/user";
 import { getTenantSubdomainUrl } from "@/utils/helper";
-import Link from "next/link";
 
 export function StoreNavbar() {
   const params = useParams();
   const pathname = usePathname();
-  const tenantSlug = (params?.tenant as string) || "store";
-
-  const { toggleOpen } = useSidebarStore();
   const { user } = useUserStore();
+  const { toggleMobile, toggleExpand, isExpanded } = useSidebarStore();
 
+  const tenantSlug = (params?.tenant as string) || "store";
+  const pageInfo = getStoreAdminPageInfo(pathname, tenantSlug);
   const subdomainUrl = getTenantSubdomainUrl(tenantSlug);
 
-  const getPageTitle = () => {
-    if (pathname.includes("/products")) return "Products & Catalog";
-    if (pathname.includes("/orders")) return "Orders & Payouts";
-    if (pathname.includes("/branding")) return "Storefront & Domain";
-    if (pathname.includes("/adapters")) return "DB / CMS Adapters";
-    if (pathname.includes("/settings")) return "Settings";
-    return "Overview";
-  };
+  const tenantCurrency = user?.tenant_currency || "NGN";
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-stone-200/90 bg-white/95 backdrop-blur-md shrink-0">
-      <div className="flex h-16 items-center justify-between px-4 md:px-6 md:px-8 gap-4">
-        {/* Left: Mobile Toggle & Store Title */}
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden text-stone-700"
-            onClick={toggleOpen}
-            aria-label="Toggle store menu"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
+    <header className="h-14 px-2 flex items-center justify-between gap-3 md:gap-4 select-none shrink-0 bg-transparent animate-fadeInDown">
+      {/* Left Section: Mobile Menu + Desktop Toggle + Dynamic Title */}
+      <div className="flex items-center gap-2.5 md:gap-3 min-w-0 transition-all duration-300 ease-in-out">
+        {/* Mobile Sidebar Toggle */}
+        <button
+          type="button"
+          onClick={toggleMobile}
+          className="md:hidden size-8 rounded-sm flex items-center justify-center bg-card dark:bg-white/5 text-foreground hover:text-primary hover:bg-muted/80 transition-all duration-200 cursor-pointer shrink-0"
+          title="Open Menu"
+        >
+          <Menu className="size-4.5" />
+        </button>
 
-          <h5 className="font-semibold text-stone-800 text-sm md:text-base">
-            {getPageTitle()}
-          </h5>
-        </div>
-
-        {/* Right: Quick actions & Live Store link */}
-        <div className="flex items-center gap-2.5">
-          <Link
-            href={subdomainUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 hover:text-emerald-700 hover:border-emerald-200 transition-all shadow-2xs"
-          >
-            <span>Live Store</span>
-            <ArrowUpRight className="h-3.5 w-3.5 text-stone-400" />
-          </Link>
-
-          {user && (
-            <div className="hidden md:flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-stone-50 border border-stone-200/70 text-xs">
-              <UserIcon className="h-3.5 w-3.5 text-stone-500" />
-              <span className="font-medium text-stone-700">
-                {user.name || user.full_name}
-              </span>
-            </div>
+        {/* Desktop Sidebar Toggle */}
+        <button
+          type="button"
+          onClick={toggleExpand}
+          className={cn(
+            "hidden md:flex size-8 rounded-sm items-center justify-center bg-card dark:bg-white/5 text-foreground hover:text-primary hover:bg-muted/80 cursor-pointer shrink-0 transition-all duration-300 ease-in-out",
+            !isExpanded
+              ? "opacity-100 scale-100 w-8 pointer-events-auto mr-0"
+              : "opacity-0 scale-75 w-0 pointer-events-none -mr-2.5 overflow-hidden p-0 border-0",
           )}
+          title="Expand Sidebar"
+        >
+          <PanelLeft className="size-4 shrink-0 transition-transform duration-200 group-hover:scale-110" />
+        </button>
+
+        {/* Dynamic Page Title & Subtitle */}
+        <div
+          key={pathname}
+          className="flex flex-col min-w-0 justify-center animate-fadeIn"
+        >
+          <div className="flex items-center gap-2">
+            <h4 className="font-secondary font-bold text-sm md:text-[15px] leading-tight text-foreground truncate transition-colors duration-200">
+              {pageInfo.title}
+            </h4>
+            <span className="hidden md:inline-flex items-center gap-1 text-[10px] font-semibold font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+              <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              {tenantCurrency} Store
+            </span>
+          </div>
+          <span className="text-[11px] text-muted-foreground hidden md:block truncate leading-tight transition-colors duration-200">
+            {pageInfo.subtitle}
+          </span>
         </div>
+      </div>
+
+      {/* Right Section: Search + Live Store + Notifications */}
+      <div className="flex items-center gap-2 md:gap-3 shrink-0 transition-all duration-300 ease-in-out">
+        {/* Quick Search */}
+        <div className="hidden md:flex items-center gap-2 px-2.5 py-2.5 rounded-md bg-card border border-border w-44 md:w-80 focus-within:border-primary/70 focus-within:ring-1 focus-within:ring-primary/20 transition-all duration-200 h-9">
+          <Search className="size-3.5 shrink-0 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search products, orders, customers..."
+            className="bg-transparent border-none outline-none text-xs text-foreground placeholder:text-muted-foreground w-full font-primary"
+          />
+          <kbd className="text-[10px] font-mono bg-background px-1.5 py-0.5 rounded text-foreground border border-border shadow-xs">
+            ⌘K
+          </kbd>
+        </div>
+
+        {/* Live Storefront Link Button */}
+        <a
+          href={subdomainUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-card border border-border text-xs text-foreground hover:text-primary hover:border-primary/50 transition-all shadow-2xs group"
+          title="Open live public storefront in a new tab"
+        >
+          <Sparkles className="size-3.5 text-primary group-hover:rotate-12 transition-transform" />
+          <span className="text-[11px] font-semibold">Live Store</span>
+          <ArrowUpRight className="size-3 text-muted-foreground group-hover:text-primary transition-colors" />
+        </a>
+
+        {/* Notifications */}
+        <button
+          type="button"
+          className="relative size-8 rounded-sm bg-card dark:bg-white/5 flex items-center justify-center text-foreground hover:text-primary hover:bg-muted/80 transition-all duration-200 cursor-pointer shrink-0 hover:scale-105 active:scale-95"
+          title="Store Notifications"
+        >
+          <Bell className="size-4" />
+          <span className="absolute top-2 right-2 size-1.5 rounded-full bg-primary ring-2 ring-background animate-pulse" />
+        </button>
       </div>
     </header>
   );
 }
+
+export default StoreNavbar;

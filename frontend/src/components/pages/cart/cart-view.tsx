@@ -96,7 +96,7 @@ export function CartView() {
                     <div className="flex flex-col gap-1 mb-4 text-xs text-stone-500">
                       {item.size && (
                         <div>
-                          <span className="font-semibold text-stone-700">
+                          <span className="font-semibold text-foreground">
                             Size:
                           </span>{" "}
                           {item.size}
@@ -104,7 +104,7 @@ export function CartView() {
                       )}
                       {item.flavor && (
                         <div>
-                          <span className="font-semibold text-stone-700">
+                          <span className="font-semibold text-foreground">
                             Flavor:
                           </span>{" "}
                           {item.flavor}
@@ -200,7 +200,7 @@ export function CartView() {
                   className={`py-3 text-center text-xs font-bold tracking-wide uppercase cursor-pointer border ${
                     shippingMethod === "pickup"
                       ? "border-stone-950 bg-stone-950 text-white"
-                      : "border-stone-200 hover:border-stone-400 bg-white text-stone-700"
+                      : "border-stone-200 hover:border-stone-400 bg-white text-foreground"
                   }`}
                 >
                   Studio Pickup
@@ -210,7 +210,7 @@ export function CartView() {
                   className={`py-3 text-center text-xs font-bold tracking-wide uppercase cursor-pointer border ${
                     shippingMethod === "delivery"
                       ? "border-stone-950 bg-stone-950 text-white"
-                      : "border-stone-200 hover:border-stone-400 bg-white text-stone-700"
+                      : "border-stone-200 hover:border-stone-400 bg-white text-foreground"
                   }`}
                 >
                   White-Glove Delivery

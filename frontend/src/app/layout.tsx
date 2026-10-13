@@ -5,6 +5,7 @@ import "./globals.css";
 import "@/styles/main.scss";
 import { Header } from "@/components/layouts/header";
 import { Footer } from "@/components/layouts/footer";
+import { SessionMonitor } from "@/components/providers/session-monitor";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -40,6 +41,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className={`${dmSans.className} ${bricolageGrotesque.className}`}>
+        <SessionMonitor />
         <Header />
         <main>{children}</main>
         <Toaster position="top-right" theme="light" closeButton richColors />

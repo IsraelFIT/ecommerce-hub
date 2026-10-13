@@ -6,12 +6,10 @@ import {
   LayoutDashboard,
   ShoppingBag,
   Store,
-  Layers,
   Settings,
   LogOut,
   ChevronLeft,
   ChevronRight,
-  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSidebarStore } from "@/store/sidebar";
@@ -107,7 +105,9 @@ export function Sidebar() {
         <div className="border-t border-border/60 p-3">
           {user && !isCollapsed && (
             <div className="mb-2 px-2 py-1">
-              <p className="text-xs font-semibold truncate">{user.name || user.full_name}</p>
+              <p className="text-xs font-semibold truncate">
+                {user.name || user.full_name}
+              </p>
               <p className="text-[11px] text-muted-foreground truncate">
                 {user.email}
               </p>

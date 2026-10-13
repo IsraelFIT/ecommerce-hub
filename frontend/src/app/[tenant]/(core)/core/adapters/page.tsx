@@ -145,9 +145,11 @@ export default function CoreAdaptersPage() {
 
             <div className="flex flex-col gap-2.5 mt-4 text-xs">
               <div className="flex items-center justify-between p-2.5 rounded-lg bg-card-gray/40 dark:bg-white/5 border border-border">
-                <span className="text-muted-foreground">Dataset Target</span>
-                <span className="font-mono font-bold text-foreground">
-                  production
+                <span className="text-muted-foreground">
+                  Active Dataset Target
+                </span>
+                <span className="font-mono font-bold text-primary text-xs">
+                  staging (Default)
                 </span>
               </div>
               <div className="flex items-center justify-between p-2.5 rounded-lg bg-card-gray/40 dark:bg-white/5 border border-border">

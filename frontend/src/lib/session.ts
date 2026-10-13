@@ -7,6 +7,10 @@ export const AUTH_TOKEN_KEY = APP_CONFIG.sessionCookieName || "auth_session";
 export const USER_ROLE_KEY = APP_CONFIG.roleCookieName || "userRole";
 export const REFRESH_TOKEN_KEY = "refresh_token";
 
+// Expiration constants
+export const ACCESS_TOKEN_MAX_AGE = 30 * 60; // 30 minutes in seconds (1800)
+export const REFRESH_TOKEN_MAX_AGE = 12 * 60 * 60; // 12 hours in seconds (43200)
+
 export interface ClientSession {
   accessToken?: string;
   refreshToken?: string;
@@ -14,14 +18,57 @@ export interface ClientSession {
 }
 
 /**
- * Validates session presence from NextRequest inside Proxy (Middleware).
+ * Safely extracts exp timestamp (in milliseconds) from a JWT token.
+ * Returns null if token is missing or malformed.
+ */
+export function getJwtExpirationMs(token: string | undefined): number | null {
+  if (!token) return null;
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonStr = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join(""),
+    );
+    const payload = JSON.parse(jsonStr);
+    return typeof payload.exp === "number" ? payload.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Checks whether a given JWT token is already expired.
+ */
+export function isTokenExpired(token: string | undefined): boolean {
+  const expMs = getJwtExpirationMs(token);
+  if (!expMs) return false;
+  return Date.now() >= expMs;
+}
+
+/**
+ * Validates session presence and expiration from NextRequest inside Proxy (Middleware).
  */
 export function validateSessionFromRequest(request: NextRequest): boolean {
   const token =
     request.cookies.get(AUTH_TOKEN_KEY)?.value ||
     request.cookies.get("auth_session")?.value ||
     request.cookies.get("auth_token")?.value;
-  return Boolean(token && token.trim().length > 0);
+
+  if (!token || token.trim().length === 0) {
+    return false;
+  }
+
+  // Reject expired access tokens
+  if (isTokenExpired(token)) {
+    return false;
+  }
+
+  return true;
 }
 
 /**
@@ -41,6 +88,7 @@ export function getSessionTokenClient(): string | undefined {
 export async function getSession(): Promise<ClientSession | null> {
   const accessToken =
     (getCookie(AUTH_TOKEN_KEY) as string | undefined) ||
+    (getCookie("auth_session") as string | undefined) ||
     (getCookie("auth_token") as string | undefined);
   const refreshToken = getCookie(REFRESH_TOKEN_KEY) as string | undefined;
   const role = getCookie(USER_ROLE_KEY) as string | undefined;
@@ -57,7 +105,10 @@ export async function getSession(): Promise<ClientSession | null> {
 }
 
 /**
- * Stores tokens and session state in cookies.
+ * Stores tokens and session state in cookies with accurate expirations:
+ * - Access token: 30 minutes
+ * - Refresh token: 12 hours
+ * - User role: 12 hours
  */
 export async function createSession(
   accessToken: string,
@@ -65,36 +116,94 @@ export async function createSession(
   customToken?: string,
   role?: string,
   extra?: Record<string, unknown>,
-  expiresInSeconds: number = 60 * 60 * 24 * 7,
+  expiresInSeconds: number = ACCESS_TOKEN_MAX_AGE,
 ): Promise<void> {
-  const cookieOptions = {
-    maxAge: expiresInSeconds,
+  const accessCookieOptions = {
+    maxAge: expiresInSeconds || ACCESS_TOKEN_MAX_AGE,
     path: "/",
     sameSite: "lax" as const,
   };
 
-  setCookie(AUTH_TOKEN_KEY, accessToken, cookieOptions);
-  setCookie("auth_session", accessToken, cookieOptions);
-  setCookie("auth_token", accessToken, cookieOptions);
+  const refreshCookieOptions = {
+    maxAge: REFRESH_TOKEN_MAX_AGE,
+    path: "/",
+    sameSite: "lax" as const,
+  };
+
+  setCookie(AUTH_TOKEN_KEY, accessToken, accessCookieOptions);
+  setCookie("auth_session", accessToken, accessCookieOptions);
+  setCookie("auth_token", accessToken, accessCookieOptions);
 
   if (refreshToken) {
-    setCookie(REFRESH_TOKEN_KEY, refreshToken, cookieOptions);
+    setCookie(REFRESH_TOKEN_KEY, refreshToken, refreshCookieOptions);
   }
   if (role) {
-    setCookie(USER_ROLE_KEY, role, cookieOptions);
+    setCookie(USER_ROLE_KEY, role, refreshCookieOptions);
   }
 }
 
 /**
- * Deletes all authentication and session cookies.
+ * Deletes all authentication and session cookies, as well as client local/session storage.
  */
 export async function deleteSession(): Promise<void> {
-  deleteCookie(AUTH_TOKEN_KEY, { path: "/" });
-  deleteCookie("auth_session", { path: "/" });
-  deleteCookie("auth_token", { path: "/" });
-  deleteCookie(USER_ROLE_KEY, { path: "/" });
-  deleteCookie("userRole", { path: "/" });
-  deleteCookie(REFRESH_TOKEN_KEY, { path: "/" });
+  const cookieNames = [
+    AUTH_TOKEN_KEY,
+    "auth_session",
+    "auth_token",
+    USER_ROLE_KEY,
+    "userRole",
+    REFRESH_TOKEN_KEY,
+    "tenant_id",
+    "tenant_slug",
+  ];
+
+  // 1. Delete standard cookies (host-level)
+  cookieNames.forEach((name) => {
+    deleteCookie(name, { path: "/" });
+  });
+
+  // 2. Delete root-domain cookies if in browser on custom subdomain
+  if (typeof window !== "undefined") {
+    const rootDomain =
+      process.env.NEXT_PUBLIC_ROOT_DOMAIN || "ecommerce-hub.com";
+    const hostname = window.location.hostname;
+    if (hostname.endsWith(rootDomain)) {
+      cookieNames.forEach((name) => {
+        deleteCookie(name, { path: "/", domain: `.${rootDomain}` });
+      });
+    }
+
+    // Direct document.cookie fallback
+    try {
+      const cookies = document.cookie.split(";");
+      for (const cookie of cookies) {
+        const eqPos = cookie.indexOf("=");
+        const name =
+          eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+        if (name) {
+          document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;`;
+          if (hostname.endsWith(rootDomain)) {
+            document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=.${rootDomain};`;
+          }
+        }
+      }
+    } catch {
+      // Ignore
+    }
+
+    // 3. Clear localStorage and sessionStorage completely
+    try {
+      localStorage.removeItem("user-storage");
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("refresh_token");
+      localStorage.removeItem("auth_session");
+      localStorage.removeItem("userRole");
+      localStorage.clear();
+      sessionStorage.clear();
+    } catch (err) {
+      console.warn("Could not clear browser storage on deleteSession:", err);
+    }
+  }
 }
 
 export function deleteAuthCookies(): void {

@@ -25,7 +25,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
-    """Generates a signed JWT access token valid for 6 hours (default)."""
+    """Generates a signed JWT access token valid for 30 minutes (default)."""
     to_encode = data.copy()
     now = datetime.now(timezone.utc)
     if expires_delta:
@@ -42,13 +42,13 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
 
 
 def create_refresh_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
-    """Generates a signed JWT refresh token valid for 3 days (default)."""
+    """Generates a signed JWT refresh token valid for 12 hours (default)."""
     to_encode = data.copy()
     now = datetime.now(timezone.utc)
     if expires_delta:
         expire = now + expires_delta
     else:
-        expire = now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+        expire = now + timedelta(hours=settings.REFRESH_TOKEN_EXPIRE_HOURS)
     
     to_encode.update({
         "exp": expire,

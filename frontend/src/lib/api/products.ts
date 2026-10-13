@@ -1,0 +1,168 @@
+import { apiRequest } from "./client";
+import {
+  Product,
+  CreateProductInput,
+  UpdateProductInput,
+} from "@/types/products";
+import { ApiResponse } from "@/types/users";
+
+export interface PaginatedProductsResponse {
+  items: Product[];
+}
+
+/**
+ * Fetch list of products for a tenant.
+ */
+export async function getProducts(options?: {
+  tenantSlug?: string;
+  page?: number;
+  per_page?: number;
+  published_only?: boolean;
+}): Promise<ApiResponse<PaginatedProductsResponse>> {
+  const {
+    tenantSlug,
+    page = 1,
+    per_page = 50,
+    published_only = false,
+  } = options || {};
+  const queryParams = new URLSearchParams({
+    page: page.toString(),
+    per_page: per_page.toString(),
+    published_only: published_only.toString(),
+  });
+
+  const headers: HeadersInit = {};
+  if (tenantSlug) {
+    headers["X-Tenant-Slug"] = tenantSlug;
+  }
+
+  return apiRequest<PaginatedProductsResponse>(
+    `/products?${queryParams.toString()}`,
+    {
+      method: "GET",
+      headers,
+    },
+  );
+}
+
+/**
+ * Fetch a single product by URL slug.
+ */
+export async function getProductBySlug(
+  slug: string,
+  tenantSlug?: string,
+): Promise<ApiResponse<Product>> {
+  const headers: HeadersInit = {};
+  if (tenantSlug) {
+    headers["X-Tenant-Slug"] = tenantSlug;
+  }
+
+  return apiRequest<Product>(`/products/by-slug/${slug}`, {
+    method: "GET",
+    headers,
+  });
+}
+
+/**
+ * Fetch a single product by UUID.
+ */
+export async function getProductById(
+  id: string,
+  tenantSlug?: string,
+): Promise<ApiResponse<Product>> {
+  const headers: HeadersInit = {};
+  if (tenantSlug) {
+    headers["X-Tenant-Slug"] = tenantSlug;
+  }
+
+  return apiRequest<Product>(`/products/${id}`, {
+    method: "GET",
+    headers,
+  });
+}
+
+/**
+ * Create a new product in the active tenant's catalog (PostgreSQL or Sanity CMS).
+ */
+export async function createProduct(
+  payload: CreateProductInput,
+  tenantSlug?: string,
+): Promise<ApiResponse<Product>> {
+  const headers: HeadersInit = {};
+  if (tenantSlug) {
+    headers["X-Tenant-Slug"] = tenantSlug;
+  }
+
+  return apiRequest<Product>("/products", {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+  });
+}
+
+/**
+ * Update an existing product.
+ */
+export async function updateProduct(
+  id: string,
+  payload: UpdateProductInput,
+  tenantSlug?: string,
+): Promise<ApiResponse<Product>> {
+  const headers: HeadersInit = {};
+  if (tenantSlug) {
+    headers["X-Tenant-Slug"] = tenantSlug;
+  }
+
+  return apiRequest<Product>(`/products/${id}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(payload),
+  });
+}
+
+/**
+ * Delete a product from tenant catalog.
+ */
+export async function deleteProduct(
+  id: string,
+  tenantSlug?: string,
+): Promise<ApiResponse<Record<string, unknown>>> {
+  const headers: HeadersInit = {};
+  if (tenantSlug) {
+    headers["X-Tenant-Slug"] = tenantSlug;
+  }
+
+  return apiRequest<Record<string, unknown>>(`/products/${id}`, {
+    method: "DELETE",
+    headers,
+  });
+}
+
+export interface UploadImageResponse {
+  url: string;
+  filename: string;
+  storage: string;
+  size: number;
+}
+
+/**
+ * Upload an image file to the platform media pipeline (Sanity CDN or local storage).
+ */
+export async function uploadProductImage(
+  file: File,
+  tenantSlug?: string,
+): Promise<ApiResponse<UploadImageResponse>> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const headers: HeadersInit = {};
+  if (tenantSlug) {
+    headers["X-Tenant-Slug"] = tenantSlug;
+  }
+
+  return apiRequest<UploadImageResponse>("/uploads/image", {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+}

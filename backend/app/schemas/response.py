@@ -31,7 +31,6 @@ class PaginatedData(BaseModel, Generic[T]):
     model_config = ConfigDict(extra="ignore")
 
     items: List[T]
-    pagination: Optional[PaginationMeta] = None
 
 
 class ApiResponse(BaseModel, Generic[T]):

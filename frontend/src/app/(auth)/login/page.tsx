@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -33,6 +33,17 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("reason") === "inactivity") {
+      toast.error(
+        "Your session expired due to inactivity. Please sign in again.",
+        {
+          id: "inactivity-login-toast",
+        },
+      );
+    }
+  }, [searchParams]);
 
   const [loggedInTenant] = useState<{
     slug: string;

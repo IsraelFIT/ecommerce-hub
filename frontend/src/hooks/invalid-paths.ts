@@ -65,13 +65,19 @@ export default function useInvalidPaths(): boolean {
     "/admin",
     "/products",
     "/orders",
+    "/reviews",
+    "/users",
     "/branding",
     "/adapters",
     "/settings",
+    "/category-filters",
   ];
 
   const isExcludedPath = platformExcludedPaths.some(
-    (path) => pathname === path || pathname.startsWith(`${path}/`) || pathname.includes(path),
+    (path) =>
+      pathname === path ||
+      pathname.startsWith(`${path}/`) ||
+      pathname.includes(path),
   );
 
   return isSubdomain || isTenantRoute || isExcludedPath;
@@ -80,7 +86,7 @@ export default function useInvalidPaths(): boolean {
 /**
  * Hook to determine if the tenant Store Header and Store Footer should be hidden.
  * Returns true (hidden) on:
- * - Tenant Admin Dashboard & management pages (admin, products, orders, branding, adapters, settings)
+ * - Tenant Admin Dashboard & management pages (admin, products, orders, branding, adapters, settings, category-filters)
  * - Tenant Auth pages (/login, /register, /signup, /forgot-password, /reset-password)
  */
 export function useStoreInvalidPaths(): boolean {
@@ -90,7 +96,11 @@ export function useStoreInvalidPaths(): boolean {
 
   // Normalize path by stripping leading tenant segment if present (e.g. /[tenant]/products -> /products)
   let normalizedPath = pathname;
-  if (tenant && (normalizedPath === `/${tenant}` || normalizedPath.startsWith(`/${tenant}/`))) {
+  if (
+    tenant &&
+    (normalizedPath === `/${tenant}` ||
+      normalizedPath.startsWith(`/${tenant}/`))
+  ) {
     normalizedPath = normalizedPath.slice(`/${tenant}`.length) || "/";
   }
 
@@ -98,9 +108,12 @@ export function useStoreInvalidPaths(): boolean {
     "/admin",
     "/products",
     "/orders",
+    "/reviews",
+    "/users",
     "/branding",
     "/adapters",
     "/settings",
+    "/category-filters",
     "/login",
     "/register",
     "/signup",
@@ -115,4 +128,3 @@ export function useStoreInvalidPaths(): boolean {
       pathname.includes(path),
   );
 }
-

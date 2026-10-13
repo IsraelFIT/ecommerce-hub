@@ -14,13 +14,18 @@ from app.payments.paystack import PaystackPaymentProvider
 from app.payments.stripe import StripePaymentProvider
 
 
+from app.core.security import decode_access_token
+
+
 async def get_tenant_context(
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
     x_tenant_slug: Optional[str] = Header(None, alias="X-Tenant-Slug"),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
     db: AsyncSession = Depends(get_db),
 ) -> Tenant:
     """
-    Extracts tenant identity from request headers and fetches from Core Registry.
+    Extracts tenant identity from request headers (X-Tenant-ID / X-Tenant-Slug)
+    or falls back to extracting tenant claims from Bearer access token.
     """
     tenant: Optional[Tenant] = None
 
@@ -37,6 +42,22 @@ async def get_tenant_context(
     elif x_tenant_slug:
         result = await db.execute(select(Tenant).where(Tenant.slug == x_tenant_slug.lower()))
         tenant = result.scalar_one_or_none()
+    elif authorization and authorization.startswith("Bearer "):
+        token = authorization.split("Bearer ")[1].strip()
+        payload = decode_access_token(token)
+        if payload:
+            token_tenant_id = payload.get("tenant_id")
+            token_tenant_slug = payload.get("tenant_slug")
+            if token_tenant_id:
+                try:
+                    t_uuid = uuid.UUID(str(token_tenant_id))
+                    result = await db.execute(select(Tenant).where(Tenant.id == t_uuid))
+                    tenant = result.scalar_one_or_none()
+                except ValueError:
+                    pass
+            if not tenant and token_tenant_slug:
+                result = await db.execute(select(Tenant).where(Tenant.slug == str(token_tenant_slug).lower()))
+                tenant = result.scalar_one_or_none()
 
     if not tenant:
         raise HTTPException(
@@ -53,6 +74,9 @@ async def get_tenant_context(
     return tenant
 
 
+from app.database import get_db, is_sqlite
+
+
 async def get_rls_db_session(
     tenant: Tenant = Depends(get_tenant_context),
     db: AsyncSession = Depends(get_db),
@@ -61,15 +85,15 @@ async def get_rls_db_session(
     Injects PostgreSQL Row-Level Security (RLS) tenant context into the active session.
     Enforces that queries automatically filter by app.current_tenant at database level.
     """
-    try:
-        # Set transaction-local PostgreSQL session variable for RLS
-        await db.execute(
-            text("SET LOCAL app.current_tenant = :tenant_id"),
-            {"tenant_id": str(tenant.id)},
-        )
-    except Exception:
-        # Fallback for SQLite in local test environments
-        pass
+    if not is_sqlite and db.bind and "postgresql" in str(db.bind.url):
+        try:
+            # Set PostgreSQL session variable for RLS
+            await db.execute(
+                text("SELECT set_config('app.current_tenant', :tenant_id, false)"),
+                {"tenant_id": str(tenant.id)},
+            )
+        except Exception:
+            pass
     return db
 
 
@@ -87,9 +111,7 @@ async def get_product_adapter(
     """
     if tenant.backend_type == BackendType.SANITY:
         project_id = tenant.sanity_project_id or settings.SANITY_PROJECT_ID
-        dataset = tenant.sanity_dataset or (
-            f"production-{tenant.slug}" if settings.SANITY_PROJECT_ID else "production"
-        )
+        dataset = tenant.sanity_dataset or settings.SANITY_DATASET or "staging"
         token = settings.SANITY_API_TOKEN
 
         if not project_id:
@@ -102,9 +124,14 @@ async def get_product_adapter(
             dataset=dataset,
             token=token,
             tenant_id=tenant.id,
+            currency=tenant.currency or "NGN",
         )
 
-    return PostgresAdapter(session=db, tenant_id=tenant.id)
+    return PostgresAdapter(
+        session=db,
+        tenant_id=tenant.id,
+        currency=tenant.currency or "NGN",
+    )
 
 
 def get_payment_provider(

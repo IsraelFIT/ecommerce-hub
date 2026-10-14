@@ -1,25 +1,57 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useParams, usePathname } from "next/navigation";
-import { Store, ShoppingCart, UserCheck } from "lucide-react";
+import { useParams, usePathname, useRouter } from "next/navigation";
+import {
+  Store,
+  ShoppingCart,
+  User,
+  Heart,
+  Package,
+  MapPin,
+  KeyRound,
+  ShieldCheck,
+  LogOut,
+  ChevronDown,
+  LogIn,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useCartStore } from "@/store/cart";
 import { useUserStore } from "@/store/user";
 import { useStoreInvalidPaths } from "@/hooks/invalid-paths";
 import { useTenantTheme } from "@/components/providers/tenant-theme-provider";
+import { deleteAuthCookies } from "@/lib/session";
+import { clearAuthSession } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 export function StoreHeader() {
   const isInvalid = useStoreInvalidPaths();
   const params = useParams();
   const pathname = usePathname();
+  const router = useRouter();
   const tenant = (params?.tenant as string) || "store";
   const { branding } = useTenantTheme();
-  const { user } = useUserStore();
+  const { user, clearUser } = useUserStore();
+  const [isAccountOpen, setIsAccountOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
-  const isTenantAdmin = user?.role === "tenant_admin";
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIsMounted(true);
+  }, []);
+
+  const isTenantAdmin =
+    user?.role === "tenant_admin" ||
+    user?.role === "super_admin" ||
+    user?.role === "admin";
   const cartCount = useCartStore((state) => state.getCartCount());
 
   const navLinks = [
@@ -33,6 +65,60 @@ export function StoreHeader() {
     .split("-")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
+
+  // Normalize path for both subdomain routing (/menu) and path-based routing (/store-slug/menu)
+  const normalizedPath =
+    (pathname || "/").replace(new RegExp(`^/${tenant}(?=/|$)`), "") || "/";
+
+  const isLinkActive = (href: string, label: string) => {
+    if (label === "Home" || href === `/${tenant}`) {
+      return (
+        normalizedPath === "/" ||
+        pathname === `/${tenant}` ||
+        pathname === `/${tenant}/`
+      );
+    }
+    const linkBase = href.replace(new RegExp(`^/${tenant}`), "");
+    if (!linkBase) return false;
+
+    return (
+      normalizedPath === linkBase ||
+      normalizedPath.startsWith(`${linkBase}/`) ||
+      pathname === href ||
+      pathname?.startsWith(`${href}/`)
+    );
+  };
+
+  const handleLogout = () => {
+    try {
+      deleteAuthCookies();
+      clearAuthSession();
+      clearUser();
+      setIsAccountOpen(false);
+      toast.success("Logged out successfully");
+      router.push(`/${tenant}`);
+      router.refresh();
+    } catch {
+      clearUser();
+      setIsAccountOpen(false);
+      router.push(`/${tenant}`);
+    }
+  };
+
+  const userInitial = user?.first_name?.[0]
+    ? user.first_name[0].toUpperCase()
+    : user?.name?.[0]
+      ? user.name[0].toUpperCase()
+      : user?.email?.[0]
+        ? user.email[0].toUpperCase()
+        : null;
+
+  const displayName = user
+    ? user.full_name ||
+      user.name ||
+      `${user.first_name || ""} ${user.last_name || ""}`.trim() ||
+      user.email
+    : "Guest User";
 
   if (isInvalid) return null;
 
@@ -78,14 +164,10 @@ export function StoreHeader() {
             </div>
           </Link>
 
-          {/* Navigation Menus - Centered */}
+          {/* Navigation Menus */}
           <nav className="hidden lg:flex absolute left-1/2 -translate-x-1/2 items-center gap-1.5 p-1 rounded-full border border-border bg-muted/40 shadow-2xs">
             {navLinks.map((link, idx) => {
-              const active =
-                link.href === `/${tenant}`
-                  ? pathname === `/${tenant}` || pathname === `/${tenant}/`
-                  : pathname === link.href ||
-                    pathname?.startsWith(`${link.href}/`);
+              const active = isLinkActive(link.href, link.label);
 
               return (
                 <Link
@@ -103,7 +185,7 @@ export function StoreHeader() {
                   className={cn(
                     "px-4 py-1.5 text-xs font-semibold rounded-full transition-all",
                     active
-                      ? "font-bold shadow-2xs"
+                      ? "bg-primary text-primary-foreground font-bold shadow-xs"
                       : "text-muted-foreground hover:text-foreground hover:bg-card",
                   )}
                 >
@@ -113,33 +195,158 @@ export function StoreHeader() {
             })}
           </nav>
 
-          {/* Right Actions: Admin Link & Cart */}
-          <div className="flex items-center gap-2.5 md:gap-3">
-            {isTenantAdmin && (
-              <Link
-                href={`/${tenant}/admin`}
-                className="hidden md:inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-              >
-                <UserCheck className="h-3.5 w-3.5 text-primary" />
-                <span>Admin Portal</span>
-              </Link>
-            )}
-
+          {/* Right Actions: Cart & My Account */}
+          <div className="flex items-center gap-2 md:gap-2.5">
             <Link href={`/${tenant}/cart`}>
               <Button
                 variant="outline"
                 size="md"
-                className="relative gap-2 h-9 cursor-pointer"
+                className="relative gap-2 h-9 cursor-pointer border-border bg-card hover:bg-muted/50"
               >
                 <ShoppingCart className="h-4 w-4" />
-                <span className="hidden md:inline">Cart</span>
-                {cartCount > 0 && (
+                <span className="hidden md:inline text-xs font-semibold">
+                  Cart
+                </span>
+                {isMounted && cartCount > 0 && (
                   <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
                     {cartCount}
                   </span>
                 )}
               </Button>
             </Link>
+
+            {/* My Account Popover */}
+            <Popover open={isAccountOpen} onOpenChange={setIsAccountOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="md"
+                  className="h-9 px-2.5 sm:px-3 gap-1.5 sm:gap-2 cursor-pointer font-semibold text-xs border-border bg-card hover:bg-muted/50 transition-colors"
+                >
+                  {userInitial ? (
+                    <div
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-white text-[10px] font-bold"
+                      style={{
+                        backgroundColor:
+                          branding.primaryColor || "var(--primary)",
+                      }}
+                    >
+                      {userInitial}
+                    </div>
+                  ) : (
+                    <User className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  <span className="hidden sm:inline">My Account</span>
+                  <ChevronDown className="h-3 w-3 text-muted-foreground opacity-70" />
+                </Button>
+              </PopoverTrigger>
+
+              <PopoverContent
+                align="end"
+                className="w-64 p-2 shadow-lg border border-border bg-popover rounded-xl"
+              >
+                {/* User Header */}
+                <div className="px-3 py-2.5 border-b border-border/60 mb-1">
+                  <p className="text-xs font-bold text-foreground truncate">
+                    {displayName}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground truncate">
+                    {user?.email || "Not signed in"}
+                  </p>
+                  {user?.role && (
+                    <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground uppercase tracking-wider">
+                      {user.role.replace("_", " ")}
+                    </span>
+                  )}
+                </div>
+
+                {/* Account Navigation Links */}
+                <div className="flex flex-col gap-0.5 py-1">
+                  <Link
+                    href={`/${tenant}/profile?tab=profile`}
+                    onClick={() => setIsAccountOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-foreground hover:bg-muted/70 hover:text-foreground transition-colors"
+                  >
+                    <User className="h-4 w-4 text-muted-foreground" />
+                    <span>My Profile</span>
+                  </Link>
+
+                  <Link
+                    href={`/${tenant}/profile?tab=wishlist`}
+                    onClick={() => setIsAccountOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-foreground hover:bg-muted/70 hover:text-foreground transition-colors"
+                  >
+                    <Heart className="h-4 w-4 text-rose-500" />
+                    <span>Wishlist</span>
+                  </Link>
+
+                  <Link
+                    href={`/${tenant}/profile?tab=orders`}
+                    onClick={() => setIsAccountOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-foreground hover:bg-muted/70 hover:text-foreground transition-colors"
+                  >
+                    <Package className="h-4 w-4 text-amber-500" />
+                    <span>My Orders</span>
+                  </Link>
+
+                  <Link
+                    href={`/${tenant}/profile?tab=address`}
+                    onClick={() => setIsAccountOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-foreground hover:bg-muted/70 hover:text-foreground transition-colors"
+                  >
+                    <MapPin className="h-4 w-4 text-blue-500" />
+                    <span>Manage Address</span>
+                  </Link>
+
+                  <Link
+                    href={`/${tenant}/profile?tab=password`}
+                    onClick={() => setIsAccountOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-foreground hover:bg-muted/70 hover:text-foreground transition-colors"
+                  >
+                    <KeyRound className="h-4 w-4 text-emerald-500" />
+                    <span>Change Password</span>
+                  </Link>
+
+                  {/* Tenant Admin / Super Admin Portal */}
+                  {isTenantAdmin && (
+                    <>
+                      <div className="my-1 border-t border-border/60" />
+                      <Link
+                        href={`/${tenant}/admin`}
+                        onClick={() => setIsAccountOpen(false)}
+                        className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
+                      >
+                        <ShieldCheck className="h-4 w-4" />
+                        <span>Admin Portal</span>
+                      </Link>
+                    </>
+                  )}
+                </div>
+
+                {/* Auth Actions (Login / Logout) */}
+                <div className="mt-1 pt-1 border-t border-border/60">
+                  {user ? (
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-destructive hover:bg-destructive/10 transition-colors text-left cursor-pointer"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      <span>Logout</span>
+                    </button>
+                  ) : (
+                    <Link
+                      href={`/login?redirect=/${tenant}/profile`}
+                      onClick={() => setIsAccountOpen(false)}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
+                    >
+                      <LogIn className="h-4 w-4" />
+                      <span>Sign In / Register</span>
+                    </Link>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
       </header>

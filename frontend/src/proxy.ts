@@ -57,8 +57,38 @@ export async function proxy(request: NextRequest) {
       `${backendBase.replace(/\/+$/, "")}${pathname}${request.nextUrl.search}`,
     );
     const requestHeaders = new Headers(request.headers);
-    if (tenantSlug && !requestHeaders.has("x-tenant-slug")) {
-      requestHeaders.set("x-tenant-slug", tenantSlug);
+
+    let effectiveTenant = tenantSlug || requestHeaders.get("x-tenant-slug");
+    if (!effectiveTenant) {
+      effectiveTenant =
+        searchParams.get("tenant_slug") || searchParams.get("tenant") || null;
+    }
+    if (!effectiveTenant) {
+      const referer = request.headers.get("referer");
+      if (referer) {
+        try {
+          const refererUrl = new URL(referer);
+          const segs = refererUrl.pathname.split("/").filter(Boolean);
+          const reserved = [
+            "api",
+            "core",
+            "login",
+            "signup",
+            "dashboard",
+            "_next",
+            "static",
+          ];
+          if (segs.length > 0 && !reserved.includes(segs[0])) {
+            effectiveTenant = segs[0];
+          }
+        } catch {
+          // ignore invalid referer
+        }
+      }
+    }
+
+    if (effectiveTenant && !requestHeaders.has("x-tenant-slug")) {
+      requestHeaders.set("x-tenant-slug", effectiveTenant);
     }
     if (!requestHeaders.has("authorization")) {
       const token =

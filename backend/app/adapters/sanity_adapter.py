@@ -240,6 +240,7 @@ class SanityAdapter(ProductRepositoryAdapter):
         skip: int = 0,
         limit: int = 50,
         published_only: bool = True,
+        **kwargs,
     ) -> List[ProductResponse]:
         url = f"{self.base_url}/query/{self.dataset}"
         filter_expr = '!(_id in path("drafts.**"))' if published_only else "true"

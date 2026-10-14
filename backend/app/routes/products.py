@@ -1,5 +1,6 @@
+import json
 import uuid
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 from fastapi import APIRouter, Depends, HTTPException, Header, Query, Request, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,7 +10,13 @@ from app.adapters.base import ProductRepositoryAdapter
 from app.core.security import decode_access_token
 from app.models.review import Review
 from app.models.like import ProductLike
-from app.schemas.product import ProductCreate, ProductUpdate, ProductResponse
+from app.schemas.product import (
+    ProductCreate,
+    ProductUpdate,
+    ProductResponse,
+    ProductSummaryResponse,
+    ProductMenuSummaryResponse,
+)
 from app.schemas.response import success_response, PaginationMeta, ApiResponse, PaginatedData, ErrorResponse
 
 router = APIRouter(
@@ -125,13 +132,13 @@ async def enrich_products_metadata(
 
 @router.get(
     "",
-    response_model=ApiResponse[PaginatedData[ProductResponse]],
+    response_model=ApiResponse[PaginatedData[Union[ProductMenuSummaryResponse, ProductSummaryResponse]]],
     summary="List products for active tenant (PostgreSQL / Sanity CMS)",
     description="Lists products for the authenticated tenant. Dispatches dynamically to PostgreSQL (with RLS) or Sanity CMS.",
 )
 @router.get(
     "/",
-    response_model=ApiResponse[PaginatedData[ProductResponse]],
+    response_model=ApiResponse[PaginatedData[Union[ProductMenuSummaryResponse, ProductSummaryResponse]]],
     summary="List products for active tenant (PostgreSQL / Sanity CMS)",
     description="Lists products for the authenticated tenant. Dispatches dynamically to PostgreSQL (with RLS) or Sanity CMS.",
 )
@@ -140,6 +147,13 @@ async def list_products(
     page: int = 1,
     per_page: int = 15,
     published_only: bool = True,
+    category: Optional[str] = Query(None, description="Category filter"),
+    min_price: Optional[float] = Query(None, description="Minimum price filter"),
+    max_price: Optional[float] = Query(None, description="Maximum price filter"),
+    rating: Optional[float] = Query(None, description="Minimum average rating filter"),
+    availability: Optional[str] = Query(None, description="Availability filter ('available', 'preorder', 'schedule')"),
+    search: Optional[str] = Query(None, description="Search keyword filter"),
+    filters: Optional[str] = Query(None, description="JSON-encoded dynamic filters dictionary"),
     authorization: Optional[str] = Header(None, alias="Authorization"),
     x_session_id: Optional[str] = Header(None, alias="X-Session-ID"),
     session_id: Optional[str] = Query(None),
@@ -147,7 +161,41 @@ async def list_products(
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     skip = (page - 1) * per_page
-    products = await adapter.list_products(skip=skip, limit=per_page, published_only=published_only)
+
+    # Parse dynamic filters JSON or query params
+    parsed_filters: Dict[str, List[str]] = {}
+    if filters:
+        try:
+            raw = json.loads(filters)
+            if isinstance(raw, dict):
+                for k, v in raw.items():
+                    if isinstance(v, list):
+                        parsed_filters[str(k)] = [str(x) for x in v if str(x).strip()]
+                    elif v is not None and str(v).strip():
+                        parsed_filters[str(k)] = [str(v).strip()]
+        except Exception:
+            pass
+
+    # Also extract any filter_<slug> from query parameters
+    for qk, qv in request.query_params.multi_items():
+        if qk.startswith("filter_"):
+            slug = qk[len("filter_"):]
+            if slug not in parsed_filters:
+                parsed_filters[slug] = []
+            if qv not in parsed_filters[slug]:
+                parsed_filters[slug].append(qv)
+
+    products = await adapter.list_products(
+        skip=skip,
+        limit=per_page,
+        published_only=published_only,
+        category=category,
+        min_price=min_price,
+        max_price=max_price,
+        availability=availability,
+        search=search,
+        filters=parsed_filters or None,
+    )
     
     user_id = _extract_user_id(authorization, request)
     active_session_id = x_session_id or session_id or request.headers.get("x-session-id")
@@ -156,7 +204,19 @@ async def list_products(
         products, db=db, user_id=user_id, session_id=active_session_id
     )
 
-    items = [p.model_dump(mode="json") if hasattr(p, "model_dump") else p for p in enriched_products]
+    # Filter by average rating if requested
+    if rating is not None and rating > 0:
+        enriched_products = [
+            p for p in enriched_products if (getattr(p, "average_rating", 0.0) or 0.0) >= rating
+        ]
+
+    target_schema = ProductMenuSummaryResponse if published_only else ProductSummaryResponse
+    items = [
+        target_schema.model_validate(p).model_dump(mode="json")
+        if isinstance(p, (ProductResponse, ProductSummaryResponse, ProductMenuSummaryResponse)) or hasattr(p, "model_dump")
+        else p
+        for p in enriched_products
+    ]
 
     pagination = PaginationMeta(
         current_page=page,

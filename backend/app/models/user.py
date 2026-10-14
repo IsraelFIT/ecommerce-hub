@@ -34,3 +34,5 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     otps = relationship("PasswordResetOTP", back_populates="user", cascade="all, delete-orphan")
     reviews = relationship("Review", back_populates="user")
     likes = relationship("ProductLike", back_populates="user", cascade="all, delete-orphan")
+    orders = relationship("Order", back_populates="user")
+

@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, PackageOpen } from "lucide-react";
 import { useTenantTheme } from "@/components/providers/tenant-theme-provider";
 import { getProducts } from "@/lib/api/products";
 import { MenuCard } from "@/components/pages/menu/menu-card";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { Product } from "@/types/products";
 
 interface TenantCollectionProps {
@@ -157,14 +158,16 @@ export function TenantCollection({
             {[1, 2, 3, 4].map((n) => (
               <div
                 key={n}
-                className="flex-none w-72 md:w-80 rounded-2xl border border-stone-200 bg-white p-2 animate-pulse space-y-4"
+                className="flex-none w-72 md:w-80 rounded-2xl border border-stone-200 bg-white p-2 space-y-4 shadow-xs"
               >
-                <div className="aspect-square w-full rounded-xl bg-stone-200" />
-                <div className="h-4 bg-stone-200 rounded-sm w-3/4" />
-                <div className="h-3 bg-stone-200 rounded-sm w-1/2" />
-                <div className="pt-3 border-t border-stone-100 flex justify-between items-center">
-                  <div className="h-5 bg-stone-200 rounded-sm w-16" />
-                  <div className="h-9 bg-stone-200 rounded-lg w-24" />
+                <Skeleton className="aspect-square w-full rounded-xl" />
+                <div className="space-y-2 p-2">
+                  <Skeleton className="h-4 w-3/4 rounded-sm" />
+                  <Skeleton className="h-3 w-1/2 rounded-sm" />
+                </div>
+                <div className="p-2 pt-1 border-t border-stone-100 flex justify-between items-center">
+                  <Skeleton className="h-5 w-16 rounded-sm" />
+                  <Skeleton className="h-9 w-24 rounded-lg" />
                 </div>
               </div>
             ))}

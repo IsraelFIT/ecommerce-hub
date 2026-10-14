@@ -16,8 +16,11 @@ import {
   Zap,
   Check,
   BadgeCheck,
+  Truck,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -129,6 +132,8 @@ export interface ItemDetails {
   flavors: string[];
   allergenInfo: string;
   specifications?: Record<string, unknown>;
+  filters?: Record<string, string[]>;
+  availability?: string;
   variants?: ProductVariant[];
   product_class?: string;
   sku?: string;
@@ -202,6 +207,11 @@ export function ItemDetailsClient({
                 : [],
               allergenInfo: pDietaryInfo,
               specifications: pSpecs,
+              filters: (p.filters || {}) as Record<string, string[]>,
+              availability:
+                p.availability ||
+                (pSpecs.availability as string) ||
+                "available",
               variants: pVariants,
               product_class: p.product_class,
               sku: pVariants[0]?.sku || p.sku || undefined,
@@ -356,11 +366,57 @@ export function ItemDetailsClient({
     return getOptionValues(item.specifications, "color");
   }, [currentVariant?.options, item.specifications]);
 
+  const [selectedFilters, setSelectedFilters] = useState<
+    Record<string, string>
+  >({});
+
+  useEffect(() => {
+    if (item.filters && typeof item.filters === "object") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelectedFilters((prev) => {
+        const next = { ...prev };
+        Object.entries(item.filters || {}).forEach(
+          ([filterKey, filterOptions]) => {
+            if (Array.isArray(filterOptions) && filterOptions.length > 0) {
+              if (!next[filterKey]) {
+                next[filterKey] = String(filterOptions[0]);
+              }
+            }
+          },
+        );
+        return next;
+      });
+    }
+  }, [item.filters]);
+
   const sizeOptions = useMemo(() => {
+    if (item.filters) {
+      const filterSizes =
+        item.filters.sizes ||
+        item.filters.size ||
+        item.filters.Sizes ||
+        item.filters.Size;
+      if (Array.isArray(filterSizes) && filterSizes.length > 0) {
+        return filterSizes.map(String);
+      }
+    }
     const vSizes = getOptionValues(currentVariant?.options, "size");
     if (vSizes.length > 0) return vSizes;
     return getOptionValues(item.specifications, "size");
-  }, [currentVariant?.options, item.specifications]);
+  }, [item.filters, currentVariant?.options, item.specifications]);
+
+  const otherFilterEntries = useMemo(() => {
+    if (!item.filters || typeof item.filters !== "object") return [];
+    return Object.entries(item.filters).filter(([k, opts]) => {
+      const norm = k.toLowerCase().trim();
+      return (
+        norm !== "sizes" &&
+        norm !== "size" &&
+        Array.isArray(opts) &&
+        opts.length > 0
+      );
+    });
+  }, [item.filters]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -395,8 +451,25 @@ export function ItemDetailsClient({
   };
 
   const handleAddToCart = (redirectAfter = false) => {
-    const selectedSizeLabel = sizeOptions[selectedSizeIdx] || "";
+    const selectedSizeLabel =
+      selectedFilters["sizes"] ||
+      selectedFilters["size"] ||
+      sizeOptions[selectedSizeIdx] ||
+      "";
     const selectedColorLabel = colorOptions[selectedColorIdx] || "";
+
+    const otherFilterDescriptions = otherFilterEntries
+      .map(([k]) => {
+        const val = selectedFilters[k];
+        return val ? `${k.charAt(0).toUpperCase() + k.slice(1)}: ${val}` : null;
+      })
+      .filter(Boolean);
+
+    const descParts = [
+      selectedSizeLabel ? `Size: ${selectedSizeLabel}` : null,
+      selectedColorLabel ? `Color: ${selectedColorLabel}` : null,
+      ...otherFilterDescriptions,
+    ].filter(Boolean);
 
     addToCart(
       {
@@ -404,9 +477,10 @@ export function ItemDetailsClient({
         name: item.name,
         price: currentPrice,
         image: images[selectedImageIdx] || item.image,
-        description: item.description,
+        description:
+          descParts.length > 0 ? descParts.join(" • ") : item.description,
         size: selectedSizeLabel || undefined,
-        flavor: selectedColorLabel || undefined,
+        flavor: selectedColorLabel || selectedFilters["dietary"] || undefined,
       },
       quantity,
     );
@@ -414,7 +488,6 @@ export function ItemDetailsClient({
     setIsAdded(true);
     setTimeout(() => setIsAdded(false), 2000);
 
-    const descParts = [selectedSizeLabel, selectedColorLabel].filter(Boolean);
     toast.success(`Added ${quantity}x "${item.name}" to cart!`, {
       description: descParts.length > 0 ? descParts.join(" • ") : undefined,
       action: {
@@ -504,6 +577,7 @@ export function ItemDetailsClient({
                 width={800}
                 height={800}
                 priority
+                style={{ width: "auto", height: "auto" }}
                 className="w-auto h-auto max-w-full max-h-150 object-contain block transition-all duration-300"
                 sizes="(max-width: 1024px) 100vw, 50vw"
               />
@@ -530,6 +604,7 @@ export function ItemDetailsClient({
                       width={80}
                       height={80}
                       sizes="80px"
+                      style={{ width: "auto", height: "auto" }}
                       className="w-auto h-auto max-w-20 max-h-20 object-contain block transition-all"
                     />
                   </button>
@@ -696,34 +771,99 @@ export function ItemDetailsClient({
                 </div>
               )}
 
-              {/* Sizes (only displays if attached to the selected variant) */}
+              {/* Sizes (derived from item.filters or variants) */}
               {sizeOptions.length > 0 && (
                 <div className="space-y-2">
                   <span className="text-xs font-bold text-stone-800 dark:text-stone-200 uppercase tracking-wider block">
-                    Size{sizeOptions[selectedSizeIdx] ? `: ` : ""}
+                    Size:{" "}
                     <span className="font-normal text-muted-foreground">
-                      {sizeOptions[selectedSizeIdx] || ""}
+                      {selectedFilters["sizes"] ||
+                        selectedFilters["size"] ||
+                        sizeOptions[selectedSizeIdx] ||
+                        ""}
                     </span>
                   </span>
                   <div className="flex flex-wrap items-center gap-2">
-                    {sizeOptions.map((sizeName, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => setSelectedSizeIdx(idx)}
-                        className={cn(
-                          "px-3 py-1.5 rounded-md text-xs font-semibold border transition-all cursor-pointer min-w-9 text-center",
-                          selectedSizeIdx === idx
-                            ? "bg-primary text-white border-primary shadow-xs"
-                            : "bg-stone-50 dark:bg-stone-900 text-foreground border-border hover:border-primary hover:bg-white dark:hover:bg-stone-800",
-                        )}
-                      >
-                        {sizeName}
-                      </button>
-                    ))}
+                    {sizeOptions.map((sizeName, idx) => {
+                      const isSelected =
+                        selectedFilters["sizes"] === sizeName ||
+                        selectedFilters["size"] === sizeName ||
+                        (!selectedFilters["sizes"] &&
+                          !selectedFilters["size"] &&
+                          selectedSizeIdx === idx);
+
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            setSelectedSizeIdx(idx);
+                            setSelectedFilters((prev) => ({
+                              ...prev,
+                              sizes: sizeName,
+                              size: sizeName,
+                            }));
+                          }}
+                          className={cn(
+                            "px-3 py-1.5 rounded-md text-xs font-semibold border transition-all cursor-pointer min-w-9 text-center",
+                            isSelected
+                              ? "bg-primary text-white border-primary shadow-xs"
+                              : "bg-stone-50 dark:bg-stone-900 text-foreground border-border hover:border-primary hover:bg-white dark:hover:bg-stone-800",
+                          )}
+                        >
+                          {sizeName}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
+
+              {/* Other Custom Filter Groups (e.g. dietary, etc.) */}
+              {otherFilterEntries.map(([fKey, fOptions]) => {
+                const label =
+                  fKey.charAt(0).toUpperCase() +
+                  fKey.slice(1).replace(/_/g, " ");
+                const currentVal = selectedFilters[fKey] || fOptions[0];
+
+                return (
+                  <div key={fKey} className="space-y-2">
+                    <span className="text-xs font-bold text-stone-800 dark:text-stone-200 uppercase tracking-wider block">
+                      {label}:{" "}
+                      <span className="font-normal text-muted-foreground">
+                        {currentVal}
+                      </span>
+                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {fOptions.map((optName, optIdx) => {
+                        const isSelected =
+                          (selectedFilters[fKey] || fOptions[0]) === optName;
+
+                        return (
+                          <button
+                            key={optIdx}
+                            type="button"
+                            onClick={() =>
+                              setSelectedFilters((prev) => ({
+                                ...prev,
+                                [fKey]: optName,
+                              }))
+                            }
+                            className={cn(
+                              "px-3 py-1.5 rounded-md text-xs font-semibold border transition-all cursor-pointer min-w-9 text-center",
+                              isSelected
+                                ? "bg-primary text-white border-primary shadow-xs"
+                                : "bg-stone-50 dark:bg-stone-900 text-foreground border-border hover:border-primary hover:bg-white dark:hover:bg-stone-800",
+                            )}
+                          >
+                            {optName}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
 
               {/* Quantity Counter */}
               <div className="space-y-2">
@@ -786,10 +926,17 @@ export function ItemDetailsClient({
             )}
 
             {/* Availability */}
-            {/* <div className="flex items-center gap-2 text-xs font-medium text-emerald-700 bg-emerald-50/70 border border-emerald-200/60 px-3.5 py-2.5 rounded-xl">
-              <Truck className="h-4 w-4 text-emerald-600 shrink-0" />
-              <span>In Stock — Ships in 1–2 business days</span>
-            </div> */}
+            {item.availability === "preorder" ? (
+              <div className="flex items-center gap-2 text-xs font-medium text-amber-700 bg-amber-50/80 border border-amber-200/70 px-3.5 py-2.5 rounded-xl">
+                <Clock className="h-4 w-4 text-amber-600 shrink-0" />
+                <span>Preorder: Made to order / Schedule for later</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-xs font-medium text-emerald-700 bg-emerald-50/70 border border-emerald-200/60 px-3.5 py-2.5 rounded-xl">
+                <Truck className="h-4 w-4 text-emerald-600 shrink-0" />
+                <span>In Stock: Ships in 1–2 business days</span>
+              </div>
+            )}
 
             {/* Store Seller Profile Card */}
             <div className="flex items-center justify-between p-3.5 bg-stone-50 rounded-2xl border border-stone-200/80">
@@ -1125,8 +1272,25 @@ export function ItemDetailsClient({
           {/* User Review Testimonial Cards from Database */}
           <div className="pt-2">
             {isReviewsLoading ? (
-              <div className="p-8 text-center text-xs text-muted-foreground bg-stone-50 dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800">
-                Loading reviews from database...
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[1, 2, 3].map((n) => (
+                  <div
+                    key={`rev-skel-${n}`}
+                    className="p-5 bg-card rounded-2xl border border-border space-y-3 shadow-xs"
+                  >
+                    <div className="flex items-center justify-between">
+                      <Skeleton className="h-4 w-20 rounded-md" />
+                      <Skeleton className="h-3.5 w-16 rounded-md" />
+                    </div>
+                    <Skeleton className="h-3.5 w-3/4 rounded-md" />
+                    <Skeleton className="h-3 w-full rounded-md" />
+                    <Skeleton className="h-3 w-5/6 rounded-md" />
+                    <div className="pt-2 border-t border-border flex items-center gap-2">
+                      <Skeleton className="h-6 w-6 rounded-full" />
+                      <Skeleton className="h-3.5 w-24 rounded-md" />
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : productReviews.length === 0 ? (
               <div className="p-8 text-center space-y-2 bg-stone-50 dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800">

@@ -224,7 +224,7 @@ export function JazzCakesBespokeStorefront({
             </span>
           </div>
 
-          <h1 className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-serif font-extrabold tracking-tight text-balance leading-[1.08] text-white">
+          <h1 className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl  font-extrabold tracking-tight text-balance leading-[1.08] text-white">
             Where Haute Pastry <br className="hidden sm:inline" />
             <span className="italic font-normal text-transparent bg-clip-text bg-linear-to-r from-amber-200 via-amber-400 to-yellow-600">
               Meets Modern Artistry
@@ -261,7 +261,7 @@ export function JazzCakesBespokeStorefront({
           {/* Stat Pillars */}
           <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-6 pt-12 border-t border-stone-800/80 w-full max-w-4xl text-left">
             <div>
-              <p className="text-2xl sm:text-3xl font-serif font-bold text-amber-300">
+              <p className="text-2xl sm:text-3xl  font-bold text-amber-300">
                 100%
               </p>
               <p className="text-xs text-stone-400 mt-1 uppercase tracking-wider">
@@ -269,7 +269,7 @@ export function JazzCakesBespokeStorefront({
               </p>
             </div>
             <div>
-              <p className="text-2xl sm:text-3xl font-serif font-bold text-amber-300">
+              <p className="text-2xl sm:text-3xl  font-bold text-amber-300">
                 36 hrs
               </p>
               <p className="text-xs text-stone-400 mt-1 uppercase tracking-wider">
@@ -277,7 +277,7 @@ export function JazzCakesBespokeStorefront({
               </p>
             </div>
             <div>
-              <p className="text-2xl sm:text-3xl font-serif font-bold text-amber-300">
+              <p className="text-2xl sm:text-3xl  font-bold text-amber-300">
                 4.98 ★
               </p>
               <p className="text-xs text-stone-400 mt-1 uppercase tracking-wider">
@@ -285,7 +285,7 @@ export function JazzCakesBespokeStorefront({
               </p>
             </div>
             <div>
-              <p className="text-2xl sm:text-3xl font-serif font-bold text-amber-300">
+              <p className="text-2xl sm:text-3xl  font-bold text-amber-300">
                 White Glove
               </p>
               <p className="text-xs text-stone-400 mt-1 uppercase tracking-wider">
@@ -306,7 +306,7 @@ export function JazzCakesBespokeStorefront({
             <span className="text-xs uppercase tracking-widest text-amber-400 font-semibold font-mono">
               Live Atelier Studio
             </span>
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif font-bold text-white mt-2">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl  font-bold text-white mt-2">
               Custom Cake Configurator
             </h2>
             <p className="text-stone-400 text-sm sm:text-base mt-3">
@@ -486,7 +486,7 @@ export function JazzCakesBespokeStorefront({
               <div className="rounded-2xl border border-stone-800 bg-linear-to-b from-stone-900 to-stone-950 p-6 sm:p-8 shadow-2xl shadow-black/80 space-y-6">
                 <div className="flex items-center justify-between pb-4 border-b border-stone-800">
                   <div>
-                    <h3 className="font-serif font-bold text-lg text-white">
+                    <h3 className=" font-bold text-lg text-white">
                       Your Bespoke Creation
                     </h3>
                     <p className="text-xs text-stone-400">
@@ -606,7 +606,7 @@ export function JazzCakesBespokeStorefront({
               <span className="text-xs uppercase tracking-widest text-amber-400 font-semibold font-mono">
                 The Heritage Vault
               </span>
-              <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif font-bold text-white mt-2">
+              <h2 className="text-3xl sm:text-4xl md:text-5xl  font-bold text-white mt-2">
                 Celebrated Showpieces
               </h2>
             </div>
@@ -641,7 +641,7 @@ export function JazzCakesBespokeStorefront({
 
                 <div className="p-6 flex flex-col justify-between flex-1 space-y-4">
                   <div>
-                    <h3 className="font-serif font-bold text-xl text-white group-hover:text-amber-300 transition-colors">
+                    <h3 className=" font-bold text-xl text-white group-hover:text-amber-300 transition-colors">
                       {item.name}
                     </h3>
                     <p className="text-xs text-stone-400 mt-2 line-clamp-2 leading-relaxed">
@@ -689,7 +689,7 @@ export function JazzCakesBespokeStorefront({
               <span className="text-xs uppercase tracking-widest text-amber-400 font-semibold font-mono">
                 Private Appointment
               </span>
-              <h2 className="text-3xl sm:text-4xl font-serif font-bold text-white mt-2">
+              <h2 className="text-3xl sm:text-4xl  font-bold text-white mt-2">
                 Book a VIP Cake Tasting
               </h2>
               <p className="text-stone-400 text-xs sm:text-sm mt-2">

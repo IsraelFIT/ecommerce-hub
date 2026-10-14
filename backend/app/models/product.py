@@ -93,6 +93,9 @@ class Product(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     filters: Mapped[Dict[str, List[str]]] = mapped_column(JSON, default=dict, nullable=False)
     images: Mapped[List[str]] = mapped_column(JSON, default=list, nullable=False)
 
+    # Product Availability: "available" | "preorder"
+    availability: Mapped[Optional[str]] = mapped_column(String(50), default="available", nullable=True)
+
     # Legacy category name fallback
     category_name: Mapped[Optional[str]] = mapped_column(String(100), default="General", nullable=True)
     currency: Mapped[Optional[str]] = mapped_column(String(10), default="NGN", nullable=True)

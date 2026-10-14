@@ -1,16 +1,19 @@
 import uuid
-from typing import List, Optional
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
+from typing import List, Optional, Dict, Any
+from sqlalchemy import select, or_, func, cast
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import selectinload, defer
 from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.adapters.base import ProductRepositoryAdapter
-from app.models.product import Product, ProductVariant, ProductClass
+from app.models.product import Product, ProductVariant, ProductClass, Category
 from app.schemas.product import (
     ProductCreate,
     ProductUpdate,
     ProductResponse,
     ProductVariantResponse,
+    ProductSummaryResponse,
+    ProductVariantSummaryResponse,
 )
 
 
@@ -61,6 +64,7 @@ class PostgresAdapter(ProductRepositoryAdapter):
             category_id=product.category_id,
             category=product.category_str,
             images=product.images or [],
+            availability=getattr(product, "availability", "available") or "available",
             is_published=product.is_published,
             variants=variants_list,
             sku=sku,
@@ -69,6 +73,33 @@ class PostgresAdapter(ProductRepositoryAdapter):
             inventory_count=inventory_count,
             created_at=product.created_at,
             updated_at=product.updated_at,
+        )
+
+    def _to_summary_response(self, product: Product) -> ProductSummaryResponse:
+        """Transforms a Product model into a lightweight ProductSummaryResponse for catalog listings."""
+        variants_list = product.variants or []
+        primary_variant = variants_list[0] if variants_list else None
+        price = float(primary_variant.price) if primary_variant else (float(product.price) if product.price else 0.0)
+        inventory_count = sum(v.stock_quantity for v in variants_list if v.track_inventory) if variants_list else (product.inventory_count or 0)
+        prod_currency = product.currency or self.currency or "NGN"
+
+        first_img = product.images[0] if (product.images and len(product.images) > 0) else None
+        images = [first_img] if first_img else []
+
+        return ProductSummaryResponse(
+            id=product.id,
+            name=product.name,
+            slug=product.slug,
+            description=product.description,
+            product_class=product.product_class,
+            filters=product.filters or {},
+            category=product.category_str,
+            images=images,
+            availability=getattr(product, "availability", "available") or "available",
+            is_published=product.is_published,
+            price=price,
+            currency=prod_currency,
+            inventory_count=inventory_count,
         )
 
     async def get_by_id(self, product_id: uuid.UUID) -> Optional[ProductResponse]:
@@ -100,18 +131,104 @@ class PostgresAdapter(ProductRepositoryAdapter):
         skip: int = 0,
         limit: int = 50,
         published_only: bool = True,
-    ) -> List[ProductResponse]:
+        category: Optional[str] = None,
+        min_price: Optional[float] = None,
+        max_price: Optional[float] = None,
+        availability: Optional[str] = None,
+        search: Optional[str] = None,
+        filters: Optional[Dict[str, List[str]]] = None,
+        **kwargs,
+    ) -> List[ProductSummaryResponse]:
         query = (
             select(Product)
-            .options(selectinload(Product.variants), selectinload(Product.category))
+            .options(
+                defer(Product.specifications),
+                selectinload(Product.variants),
+                selectinload(Product.category),
+            )
         )
         if published_only:
             query = query.where(Product.is_published == True)
+
+        # 1. Category Filter
+        if category and category.strip() and category.strip().upper() != "ALL":
+            cat_val = category.strip().lower()
+            query = query.outerjoin(Product.category).where(
+                or_(
+                    func.lower(Category.name) == cat_val,
+                    func.lower(Product.category_name) == cat_val,
+                )
+            )
+
+        # 2. Availability Filter
+        if availability and availability.strip() and availability.strip().lower() != "all":
+            avail_val = availability.strip().lower()
+            if avail_val in ("schedule", "preorder"):
+                query = query.where(Product.availability.in_(["preorder", "schedule"]))
+            elif avail_val == "available":
+                query = query.where(
+                    or_(
+                        Product.availability == "available",
+                        Product.availability.is_(None),
+                    )
+                )
+
+        # 3. Search Filter
+        if search and search.strip():
+            s = f"%{search.strip()}%"
+            query = query.where(
+                or_(
+                    Product.name.ilike(s),
+                    Product.title.ilike(s),
+                    Product.description.ilike(s),
+                    Product.variants.any(ProductVariant.sku.ilike(s)),
+                )
+            )
+
+        # 4. Price Bounds Filter
+        if min_price is not None:
+            query = query.where(
+                Product.variants.any(ProductVariant.price >= min_price)
+            )
+        if max_price is not None:
+            query = query.where(
+                Product.variants.any(ProductVariant.price <= max_price)
+            )
+
+        # 5. Dynamic Filters (JSONB in PostgreSQL, string matching in SQLite)
+        if filters:
+            bind = getattr(self.session, "bind", None) or self.session.get_bind()
+            is_postgres = getattr(getattr(bind, "dialect", None), "name", "") == "postgresql"
+
+            for slug, options in filters.items():
+                if not options:
+                    continue
+                option_conds = []
+                for opt in options:
+                    if not opt:
+                        continue
+                    opt_str = str(opt).strip()
+                    if is_postgres:
+                        for variant in {opt_str, opt_str.lower(), opt_str.title(), opt_str.capitalize()}:
+                            option_conds.append(
+                                cast(Product.filters, JSONB).contains({slug: [variant]})
+                            )
+                            option_conds.append(
+                                cast(Product.filters, JSONB).contains({slug: variant})
+                            )
+                    else:
+                        from sqlalchemy import String
+                        option_conds.append(
+                            cast(Product.filters[slug], String).ilike(f"%{opt_str}%")
+                        )
+                if option_conds:
+                    query = query.where(or_(*option_conds))
+
         query = query.offset(skip).limit(limit)
 
         result = await self.session.execute(query)
         products = result.scalars().all()
-        return [self._to_response(p) for p in products]
+        return [self._to_summary_response(p) for p in products]
 
     async def create_product(self, product_in: ProductCreate) -> ProductResponse:
         resolved_name = product_in.name or product_in.title or "Untitled Product"
@@ -140,6 +257,7 @@ class PostgresAdapter(ProductRepositoryAdapter):
             specifications=product_in.specifications or {},
             filters=cleaned_filters,
             images=(product_in.images or [])[:5],
+            availability=product_in.availability or "available",
             is_published=product_in.is_published,
             category_id=product_in.category_id,
             category_name=category_name,

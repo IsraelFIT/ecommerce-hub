@@ -128,9 +128,7 @@ export function SessionMonitor() {
                 await createSession(
                   newAccessToken,
                   newRefreshToken,
-                  undefined,
                   authData.role,
-                  {},
                   ACCESS_TOKEN_MAX_AGE,
                 );
 

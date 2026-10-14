@@ -1,9 +1,20 @@
+import type { Metadata } from "next";
 import { CartView } from "@/components/pages/cart/cart-view";
+import { getTenantMeta } from "@/lib/api/server-tenant";
 
-export const metadata = {
-  title: "Your Cart Studio | Cakes by Bode",
-  description: "Review your custom custom cake orders.",
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ tenant: string }>;
+}): Promise<Metadata> {
+  const { tenant } = await params;
+  const { storeName, storeDescription } = await getTenantMeta(tenant);
+
+  return {
+    title: `Cart | ${storeName}`,
+    description: storeDescription,
+  };
+}
 
 export default function CartPage() {
   return (

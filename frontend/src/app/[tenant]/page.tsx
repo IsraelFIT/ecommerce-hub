@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import CoreDashboardLayout from "./(core)/layout";
 import CoreDashboardPage from "./(core)/core/page";
 import { DefaultStorefront } from "@/components/storefronts/default/default-storefront";
@@ -5,12 +6,31 @@ import {
   BESPOKE_STOREFRONTS,
   hasBespokeStorefront,
 } from "@/components/storefronts/bespoke";
-import { getTenantServerData } from "@/lib/api/server-tenant";
+import { getTenantServerData, getTenantMeta } from "@/lib/api/server-tenant";
 
 interface TenantPageProps {
   params: Promise<{
     tenant: string;
   }>;
+}
+
+export async function generateMetadata({
+  params,
+}: TenantPageProps): Promise<Metadata> {
+  const { tenant } = await params;
+  if (tenant === "core") {
+    return {
+      title: "Core Administration Console",
+      description: "Platform oversight, merchants, and governance console.",
+    };
+  }
+
+  const { storeName, storeDescription } = await getTenantMeta(tenant);
+
+  return {
+    title: storeName,
+    description: storeDescription,
+  };
 }
 
 export default async function TenantStorefrontPage({

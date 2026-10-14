@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useParams } from "next/navigation";
-import { Grid, List, Loader2, Star, ChevronDown } from "lucide-react";
+import { Grid, List, Loader2, Star, ChevronRight } from "lucide-react";
 import { Product, ProductCategory, ProductFilter } from "@/types/products";
 import { MenuCard, CardProduct } from "@/components/pages/menu/menu-card";
 import { useTenantTheme } from "@/components/providers/tenant-theme-provider";
@@ -12,12 +12,11 @@ import { useUserStore } from "@/store/user";
 import { formatCurrency, getTenantRoute } from "@/utils/helper";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getProducts } from "@/lib/api/products";
 import { getCategories } from "@/lib/api/categories";
 import { getFilters } from "@/lib/api/filters";
 import { cn } from "@/lib/utils";
-
-type SortOption = "popular" | "price-asc" | "price-desc" | "newest";
 
 export function MenuList() {
   const params = useParams();
@@ -26,7 +25,6 @@ export function MenuList() {
   const { branding, tenant } = useTenantTheme();
   const { user } = useUserStore();
   const tenantCurrency = tenant?.currency || user?.tenant_currency || "NGN";
-  const primaryAccent = branding?.primaryColor || "#eab308"; // Primary accent color
 
   const [products, setProducts] = useState<Product[]>([]);
   const [tenantCategories, setTenantCategories] = useState<ProductCategory[]>(
@@ -34,38 +32,69 @@ export function MenuList() {
   );
   const [tenantFilters, setTenantFilters] = useState<ProductFilter[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isFiltering, setIsFiltering] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "grid">("grid");
 
   // Filters State
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
+  const [catalogBounds, setCatalogBounds] = useState<{
+    minPrice: number;
+    maxCatalogPrice: number;
+  }>({ minPrice: 0, maxCatalogPrice: 100 });
   const [priceRange, setPriceRange] = useState<number>(100);
-  const [selectedSize, setSelectedSize] = useState<string>("all");
+  const [debouncedPriceRange, setDebouncedPriceRange] = useState<number>(100);
   const [selectedCustomFilters, setSelectedCustomFilters] = useState<
     Record<string, string[]>
   >({});
-  const [selectedDietary, setSelectedDietary] = useState<string[]>([]);
-  const [selectedMealTime, setSelectedMealTime] = useState<string[]>([]);
   const [selectedRating, setSelectedRating] = useState<number>(0);
   const [availability, setAvailability] = useState<
     "all" | "available" | "schedule"
   >("all");
-  const [sortBy, setSortBy] = useState<SortOption>("popular");
   const [, setCurrentPage] = useState<number>(1);
+  const isInitialMount = useRef(true);
 
+  // Debounce price range slider
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedPriceRange(priceRange);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [priceRange]);
+
+  // Initial Load: Categories, Tenant Filters, and Initial Products
   useEffect(() => {
     let isMounted = true;
     async function loadCatalogAndFilters() {
       try {
         setIsLoading(true);
         const [prodRes, catRes, filterRes] = await Promise.all([
-          getProducts({ tenantSlug, published_only: true }),
+          getProducts({ tenantSlug, published_only: true, per_page: 50 }),
           getCategories({ tenantSlug }),
           getFilters({ tenantSlug, active_only: true }),
         ]);
 
         if (isMounted) {
           if (prodRes.status === "success" && prodRes.data?.items) {
-            setProducts(prodRes.data.items);
+            const items = prodRes.data.items;
+            setProducts(items);
+
+            if (items.length > 0) {
+              let min = Infinity;
+              let max = 0;
+              items.forEach((p) => {
+                const pr = p.variants?.[0]?.price ?? p.price ?? 0;
+                if (pr < min) min = pr;
+                if (pr > max) max = pr;
+              });
+              const foundMin = min === Infinity ? 0 : Math.floor(min);
+              const foundMax = max > 0 ? Math.ceil(max) : 100;
+              setCatalogBounds({
+                minPrice: foundMin,
+                maxCatalogPrice: foundMax,
+              });
+              setPriceRange(foundMax);
+              setDebouncedPriceRange(foundMax);
+            }
           }
           if (catRes.status === "success" && catRes.data) {
             setTenantCategories(catRes.data);
@@ -77,7 +106,10 @@ export function MenuList() {
       } catch (err) {
         console.error("Error loading products/filters for menu:", err);
       } finally {
-        if (isMounted) setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+          isInitialMount.current = false;
+        }
       }
     }
     loadCatalogAndFilters();
@@ -86,7 +118,52 @@ export function MenuList() {
     };
   }, [tenantSlug]);
 
-  // Extract categories with counts
+  // Query Backend getProducts API with active sidebar filters
+  const fetchFilteredProducts = useCallback(async () => {
+    try {
+      setIsFiltering(true);
+      const res = await getProducts({
+        tenantSlug,
+        published_only: true,
+        per_page: 50,
+        category: selectedCategory !== "ALL" ? selectedCategory : undefined,
+        max_price:
+          debouncedPriceRange < catalogBounds.maxCatalogPrice
+            ? debouncedPriceRange
+            : undefined,
+        rating: selectedRating > 0 ? selectedRating : undefined,
+        availability: availability !== "all" ? availability : undefined,
+        filters:
+          Object.keys(selectedCustomFilters).length > 0
+            ? selectedCustomFilters
+            : undefined,
+      });
+
+      if (res.status === "success" && res.data?.items) {
+        setProducts(res.data.items);
+      }
+    } catch (err) {
+      console.error("Error querying filtered products from backend:", err);
+    } finally {
+      setIsFiltering(false);
+    }
+  }, [
+    tenantSlug,
+    selectedCategory,
+    debouncedPriceRange,
+    catalogBounds.maxCatalogPrice,
+    selectedRating,
+    availability,
+    selectedCustomFilters,
+  ]);
+
+  // Trigger backend query whenever filter parameters change after mount
+  useEffect(() => {
+    if (isInitialMount.current) return;
+    fetchFilteredProducts();
+  }, [fetchFilteredProducts]);
+
+  // Extract categories with counts from current product list
   const availableCategories = useMemo(() => {
     const map = new Map<string, number>();
     products.forEach((p) => {
@@ -107,53 +184,7 @@ export function MenuList() {
     }));
   }, [products, tenantCategories]);
 
-  // Extract unique sizes / options available across variants
-  const availableSizes = useMemo(() => {
-    const sizeSet = new Set<string>();
-    products.forEach((p) => {
-      if (p.variants && p.variants.length > 0) {
-        p.variants.forEach((v) => {
-          const sOpt = v.options?.Size || v.options?.size;
-          if (Array.isArray(sOpt)) {
-            sOpt.forEach((s) => sizeSet.add(String(s)));
-          } else if (sOpt) {
-            sizeSet.add(String(sOpt));
-          } else if (v.sku) {
-            sizeSet.add(v.sku);
-          }
-        });
-      }
-      if (p.specifications?.size && typeof p.specifications.size === "string") {
-        sizeSet.add(p.specifications.size);
-      }
-    });
-    const arr = Array.from(sizeSet);
-    return arr.length > 0 ? arr : ["Regular", "Large", "Family"];
-  }, [products]);
-
-  // Derive min and max prices from active products
-  const { minPrice, maxCatalogPrice } = useMemo(() => {
-    if (products.length === 0) return { minPrice: 0, maxCatalogPrice: 100 };
-    let min = Infinity;
-    let max = 0;
-    products.forEach((p) => {
-      const pr = p.variants?.[0]?.price ?? p.price ?? 0;
-      if (pr < min) min = pr;
-      if (pr > max) max = pr;
-    });
-    return {
-      minPrice: min === Infinity ? 0 : Math.floor(min),
-      maxCatalogPrice: max > 0 ? Math.ceil(max) : 100,
-    };
-  }, [products]);
-
-  // Set initial price slider when catalog loads
-  useEffect(() => {
-    if (maxCatalogPrice > 0) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setPriceRange(maxCatalogPrice);
-    }
-  }, [maxCatalogPrice]);
+  const { minPrice, maxCatalogPrice } = catalogBounds;
 
   const toggleCustomFilter = (filterSlug: string, option: string) => {
     setSelectedCustomFilters((prev) => {
@@ -161,153 +192,33 @@ export function MenuList() {
       const updated = current.includes(option)
         ? current.filter((o) => o !== option)
         : [...current, option];
-      return { ...prev, [filterSlug]: updated };
+      const next = { ...prev };
+      if (updated.length > 0) {
+        next[filterSlug] = updated;
+      } else {
+        delete next[filterSlug];
+      }
+      return next;
     });
-  };
-
-  const toggleDietary = (tag: string) => {
-    setSelectedDietary((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
-    );
-  };
-
-  const toggleMealTime = (meal: string) => {
-    setSelectedMealTime((prev) =>
-      prev.includes(meal) ? prev.filter((m) => m !== meal) : [...prev, meal],
-    );
+    setCurrentPage(1);
   };
 
   const handleClearAll = () => {
     setSelectedCategory("ALL");
-    setPriceRange(maxCatalogPrice);
-    setSelectedSize("all");
+    setPriceRange(catalogBounds.maxCatalogPrice);
+    setDebouncedPriceRange(catalogBounds.maxCatalogPrice);
     setSelectedCustomFilters({});
-    setSelectedDietary([]);
-    setSelectedMealTime([]);
     setSelectedRating(0);
     setAvailability("all");
     setCurrentPage(1);
   };
 
-  // Filter and Sort Pipeline
+  // Products are already filtered by the backend
   const filteredProducts = useMemo(() => {
-    return products
-      .filter((item) => {
-        // 1. Category
-        if (selectedCategory !== "ALL") {
-          const cat = (item.category || "General").toLowerCase();
-          if (cat !== selectedCategory.toLowerCase()) return false;
-        }
-
-        // 2. Price
-        const price = item.variants?.[0]?.price ?? item.price ?? 0;
-        if (price > priceRange && priceRange < maxCatalogPrice) return false;
-
-        // 3. Size
-        if (selectedSize !== "all") {
-          const matchesVariant = item.variants?.some(
-            (v) =>
-              v.options?.Size === selectedSize ||
-              v.options?.size === selectedSize ||
-              v.sku.toLowerCase().includes(selectedSize.toLowerCase()),
-          );
-          const matchesSpec =
-            item.specifications?.size === selectedSize ||
-            item.specifications?.Size === selectedSize;
-          if (!matchesVariant && !matchesSpec) return false;
-        }
-
-        // 4. Dynamic Custom Filters Configured in Backend
-        const activeFilterEntries = Object.entries(
-          selectedCustomFilters,
-        ).filter(([, selectedOpts]) => selectedOpts.length > 0);
-
-        for (const [slug, selectedOpts] of activeFilterEntries) {
-          const prodFilterValues = item.filters?.[slug] || [];
-          const specVal = item.specifications?.[slug];
-          const desc = String(item.description || "").toLowerCase();
-          const name = String(item.name || "").toLowerCase();
-
-          const matches = selectedOpts.some((opt) => {
-            const optLower = opt.toLowerCase();
-            if (prodFilterValues.some((pv) => pv.toLowerCase() === optLower)) {
-              return true;
-            }
-            if (
-              typeof specVal === "string" &&
-              specVal.toLowerCase().includes(optLower)
-            ) {
-              return true;
-            }
-            if (
-              Array.isArray(specVal) &&
-              specVal.some((v) => String(v).toLowerCase() === optLower)
-            ) {
-              return true;
-            }
-            return desc.includes(optLower) || name.includes(optLower);
-          });
-
-          if (!matches) return false;
-        }
-
-        // 5. Fallback Dietary filter (if no custom filters)
-        if (selectedDietary.length > 0) {
-          const specDietary = String(
-            item.specifications?.dietary || "",
-          ).toLowerCase();
-          const specAllergen = String(
-            item.specifications?.allergens || "",
-          ).toLowerCase();
-          const desc = String(item.description || "").toLowerCase();
-          const name = String(item.name || "").toLowerCase();
-          const combined = `${specDietary} ${specAllergen} ${desc} ${name}`;
-          const matchesAny = selectedDietary.some((tag) =>
-            combined.includes(tag.toLowerCase()),
-          );
-          if (!matchesAny) return false;
-        }
-
-        // 6. Fallback Meal Time filter (if no custom filters)
-        if (selectedMealTime.length > 0) {
-          const pClass = String(item.product_class || "").toLowerCase();
-          const pCat = String(item.category || "").toLowerCase();
-          const desc = String(item.description || "").toLowerCase();
-          const combined = `${pClass} ${pCat} ${desc}`;
-          const matchesAny = selectedMealTime.some((m) =>
-            combined.includes(m.toLowerCase()),
-          );
-          if (!matchesAny) return false;
-        }
-
-        // 7. Rating filter
-        if (selectedRating > 0) {
-          if (selectedRating > 4.5) return true;
-        }
-
-        return true;
-      })
-      .sort((a, b) => {
-        const priceA = a.variants?.[0]?.price ?? a.price ?? 0;
-        const priceB = b.variants?.[0]?.price ?? b.price ?? 0;
-        if (sortBy === "price-asc") return priceA - priceB;
-        if (sortBy === "price-desc") return priceB - priceA;
-        if (sortBy === "newest")
-          return (b.created_at || "").localeCompare(a.created_at || "");
-        return 0; // Popular / Default
-      });
-  }, [
-    products,
-    selectedCategory,
-    priceRange,
-    maxCatalogPrice,
-    selectedSize,
-    selectedCustomFilters,
-    selectedDietary,
-    selectedMealTime,
-    selectedRating,
-    sortBy,
-  ]);
+    return [...products].sort((a, b) => {
+      return (b.created_at || "").localeCompare(a.created_at || "");
+    });
+  }, [products]);
 
   // Dynamic categories to render
   const categoriesToRender = useMemo(() => {
@@ -341,11 +252,39 @@ export function MenuList() {
   return (
     <div className="bg-stone-100/60 min-h-screen py-8 md:py-12">
       <div className="container flex-col">
-        {/* 2-Column Layout matching Image 2 */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* ========================================= */}
-          {/* LEFT SIDEBAR: FILTERS                     */}
-          {/* ========================================= */}
+        {/* Breadcrumb Navigation */}
+        <nav className="flex items-center gap-2 text-sm text-foreground font-medium mb-6">
+          <Link
+            href={getTenantRoute(tenantSlug, "/")}
+            className="hover:text-stone-900 transition-colors text-stone-500"
+          >
+            Home
+          </Link>
+          <ChevronRight className="h-3.5 w-3.5 text-stone-400" />
+          <span
+            className={cn(
+              "font-semibold truncate max-w-xs",
+              selectedCategory === "ALL"
+                ? "text-stone-900"
+                : "text-stone-500 cursor-pointer hover:text-stone-900",
+            )}
+            onClick={() => {
+              if (selectedCategory !== "ALL") setSelectedCategory("ALL");
+            }}
+          >
+            Menu
+          </span>
+          {selectedCategory !== "ALL" && (
+            <>
+              <ChevronRight className="h-3.5 w-3.5 text-stone-400" />
+              <span className="text-stone-900 font-semibold truncate max-w-xs">
+                {selectedCategory}
+              </span>
+            </>
+          )}
+        </nav>
+
+        <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           <aside className="lg:col-span-3 bg-white rounded-2xl border border-stone-200/90 p-5 space-y-6 sticky top-24">
             {/* Header */}
             <div className="flex items-center justify-between pb-3 border-b border-stone-100">
@@ -362,51 +301,68 @@ export function MenuList() {
             <div className="space-y-3">
               <h6 className="font-bold text-stone-900">Category</h6>
               <div className="space-y-2">
-                <label className="flex items-center gap-2.5 text-xs text-foreground hover:text-stone-950 cursor-pointer select-none">
-                  <input
-                    type="radio"
-                    name="category"
-                    checked={selectedCategory === "ALL"}
-                    onChange={() => {
-                      setSelectedCategory("ALL");
-                      setCurrentPage(1);
-                    }}
-                    className="w-4 h-4 text-primary focus:ring-primary border-stone-300 accent-primary cursor-pointer"
-                  />
-                  <span
-                    className={cn(
-                      selectedCategory === "ALL" && "font-bold text-stone-950",
-                    )}
-                  >
-                    All
-                  </span>
-                </label>
-                {availableCategories.map((cat) => {
-                  const isChecked =
-                    selectedCategory.toLowerCase() === cat.name.toLowerCase();
-                  return (
-                    <label
-                      key={cat.name}
-                      className="flex items-center gap-2.5 text-xs text-foreground hover:text-stone-950 cursor-pointer select-none"
-                    >
+                {isLoading && availableCategories.length === 0 ? (
+                  <div className="space-y-2.5">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <div key={i} className="flex items-center gap-2.5">
+                        <Skeleton className="w-4 h-4 rounded" />
+                        <Skeleton className="h-3.5 w-24 rounded" />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <>
+                    <label className="flex items-center gap-2.5 text-xs text-foreground hover:text-stone-950 cursor-pointer select-none">
                       <input
                         type="radio"
                         name="category"
-                        checked={isChecked}
+                        checked={selectedCategory === "ALL"}
                         onChange={() => {
-                          setSelectedCategory(cat.name);
+                          setSelectedCategory("ALL");
                           setCurrentPage(1);
                         }}
                         className="w-4 h-4 text-primary focus:ring-primary border-stone-300 accent-primary cursor-pointer"
                       />
                       <span
-                        className={cn(isChecked && "font-bold text-stone-950")}
+                        className={cn(
+                          selectedCategory === "ALL" &&
+                            "font-bold text-stone-950",
+                        )}
                       >
-                        {cat.name}
+                        All
                       </span>
                     </label>
-                  );
-                })}
+                    {availableCategories.map((cat) => {
+                      const isChecked =
+                        selectedCategory.toLowerCase() ===
+                        cat.name.toLowerCase();
+                      return (
+                        <label
+                          key={cat.name}
+                          className="flex items-center gap-2.5 text-xs text-foreground hover:text-stone-950 cursor-pointer select-none"
+                        >
+                          <input
+                            type="radio"
+                            name="category"
+                            checked={isChecked}
+                            onChange={() => {
+                              setSelectedCategory(cat.name);
+                              setCurrentPage(1);
+                            }}
+                            className="w-4 h-4 text-primary focus:ring-primary border-stone-300 accent-primary cursor-pointer"
+                          />
+                          <span
+                            className={cn(
+                              isChecked && "font-bold text-stone-950",
+                            )}
+                          >
+                            {cat.name}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </>
+                )}
               </div>
             </div>
 
@@ -439,45 +395,21 @@ export function MenuList() {
 
             <div className="h-px bg-stone-100" />
 
-            {/* 3. Portion Size Pills */}
-            <div className="space-y-3">
-              <h6 className="font-bold text-stone-900">Portion Size</h6>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <button
-                  onClick={() => setSelectedSize("all")}
-                  className={cn(
-                    "px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer",
-                    selectedSize === "all"
-                      ? "bg-primary text-white border-primary shadow-xs"
-                      : "bg-white text-stone-600 border-stone-200 hover:border-stone-300",
-                  )}
-                >
-                  All
-                </button>
-                {availableSizes.map((sz) => {
-                  const isSelected = selectedSize === sz;
-                  return (
-                    <button
-                      key={sz}
-                      onClick={() => setSelectedSize(sz)}
-                      className={cn(
-                        "px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer",
-                        isSelected
-                          ? "bg-primary text-stone-950 border-primary shadow-xs"
-                          : "bg-white text-stone-600 border-stone-200 hover:border-stone-300",
-                      )}
-                    >
-                      {sz}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="h-px bg-stone-100" />
-
             {/* 4. Dynamic Filters configured by tenant admin */}
-            {tenantFilters.length > 0 ? (
+            {isLoading && tenantFilters.length === 0 ? (
+              <div className="space-y-3">
+                <Skeleton className="h-3.5 w-24 rounded" />
+                <div className="space-y-2">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="flex items-center gap-2.5">
+                      <Skeleton className="w-4 h-4 rounded" />
+                      <Skeleton className="h-3.5 w-20 rounded" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              tenantFilters.length > 0 &&
               tenantFilters.map((filter) => (
                 <div key={filter.id} className="space-y-3">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-stone-900">
@@ -515,80 +447,6 @@ export function MenuList() {
                   <div className="h-px bg-stone-100" />
                 </div>
               ))
-            ) : (
-              <>
-                {/* Fallback Dietary Checkboxes */}
-                <div className="space-y-3">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-stone-900">
-                    Dietary
-                  </h4>
-                  <div className="space-y-2">
-                    {["Vegetarian", "Vegan", "Spicy", "Gluten-Free"].map(
-                      (tag) => {
-                        const isChecked = selectedDietary.includes(tag);
-                        return (
-                          <label
-                            key={tag}
-                            className="flex items-center gap-2.5 text-xs text-foreground hover:text-stone-950 cursor-pointer select-none"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => toggleDietary(tag)}
-                              className="w-4 h-4 rounded text-primary focus:ring-primary border-stone-300 accent-primary cursor-pointer"
-                            />
-                            <span
-                              className={cn(
-                                isChecked && "font-bold text-stone-950",
-                              )}
-                            >
-                              {tag}
-                            </span>
-                          </label>
-                        );
-                      },
-                    )}
-                  </div>
-                </div>
-
-                <div className="h-px bg-stone-100" />
-
-                {/* Fallback Meal Time */}
-                <div className="space-y-3">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-stone-900">
-                    Meal Time
-                  </h4>
-                  <div className="space-y-2">
-                    {["Breakfast", "SNACKS", "Dinner", "Late Night"].map(
-                      (meal) => {
-                        const isChecked = selectedMealTime.includes(meal);
-                        return (
-                          <label
-                            key={meal}
-                            className="flex items-center gap-2.5 text-xs text-foreground hover:text-stone-950 cursor-pointer select-none"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => toggleMealTime(meal)}
-                              className="w-4 h-4 rounded text-primary focus:ring-primary border-stone-300 accent-primary cursor-pointer"
-                            />
-                            <span
-                              className={cn(
-                                isChecked && "font-bold text-stone-950",
-                              )}
-                            >
-                              {meal}
-                            </span>
-                          </label>
-                        );
-                      },
-                    )}
-                  </div>
-                </div>
-
-                <div className="h-px bg-stone-100" />
-              </>
             )}
 
             {/* 6. Rating */}
@@ -597,7 +455,7 @@ export function MenuList() {
                 Rating
               </h4>
               <div className="space-y-2">
-                {[5, 4].map((stars) => (
+                {[5, 4, 3, 2, 1].map((stars) => (
                   <label
                     key={stars}
                     className="flex items-center gap-2.5 text-xs text-foreground hover:text-stone-950 cursor-pointer select-none"
@@ -637,8 +495,24 @@ export function MenuList() {
                   <input
                     type="radio"
                     name="avail"
+                    checked={availability === "all"}
+                    onChange={() => {
+                      setAvailability("all");
+                      setCurrentPage(1);
+                    }}
+                    className="w-4 h-4 text-primary focus:ring-primary border-stone-300 accent-primary cursor-pointer"
+                  />
+                  <span>All Items</span>
+                </label>
+                <label className="flex items-center gap-2.5 text-xs text-foreground hover:text-stone-950 cursor-pointer select-none">
+                  <input
+                    type="radio"
+                    name="avail"
                     checked={availability === "available"}
-                    onChange={() => setAvailability("available")}
+                    onChange={() => {
+                      setAvailability("available");
+                      setCurrentPage(1);
+                    }}
                     className="w-4 h-4 text-primary focus:ring-primary border-stone-300 accent-primary cursor-pointer"
                   />
                   <span>Available Now</span>
@@ -648,10 +522,13 @@ export function MenuList() {
                     type="radio"
                     name="avail"
                     checked={availability === "schedule"}
-                    onChange={() => setAvailability("schedule")}
+                    onChange={() => {
+                      setAvailability("schedule");
+                      setCurrentPage(1);
+                    }}
                     className="w-4 h-4 text-primary focus:ring-primary border-stone-300 accent-primary cursor-pointer"
                   />
-                  <span>Schedule for Later</span>
+                  <span>Preorder</span>
                 </label>
               </div>
             </div>
@@ -659,33 +536,45 @@ export function MenuList() {
             {/* Apply Filters Button */}
             <Button
               size="default"
-              onClick={() => setCurrentPage(1)}
-              style={{ backgroundColor: primaryAccent, color: "#1c1917" }}
-              className="w-full font-bold text-xs h-10 rounded-xl transition-all shadow-xs cursor-pointer hover:opacity-90"
+              onClick={() => {
+                setCurrentPage(1);
+                fetchFilteredProducts();
+              }}
+              disabled={isFiltering}
+              className="w-full"
             >
-              Apply Filters
+              {isFiltering ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                  Applying...
+                </>
+              ) : (
+                "Apply Filters"
+              )}
             </Button>
           </aside>
 
-          {/* ========================================= */}
-          {/* RIGHT CONTENT: PRODUCT CATALOG            */}
-          {/* ========================================= */}
           <main className="lg:col-span-9 space-y-6">
-            {/* Top Bar: Count, View Mode & Sort Dropdown */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-2">
-              <h2 className="text-base font-bold text-stone-900">
-                {filteredProducts.length} Menu Items
-              </h2>
+            {/* Top Bar: Count & View Switcher */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <h4 className="font-bold text-stone-900">
+                  {filteredProducts.length} Menu Items
+                </h4>
+                {isFiltering && (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                )}
+              </div>
 
               <div className="flex items-center gap-3 self-end sm:self-auto">
                 {/* View Switcher */}
-                <div className="flex items-center border border-stone-200 bg-white p-1 rounded-xl select-none shadow-2xs">
+                <div className="flex items-center border border-stone-200 bg-white p-1 rounded-lg select-none shadow-2xs">
                   <button
                     onClick={() => setViewMode("list")}
                     className={cn(
-                      "p-1.5 rounded-lg transition-all cursor-pointer",
+                      "p-1.5 rounded-md transition-all cursor-pointer",
                       viewMode === "list"
-                        ? "bg-stone-950 text-white shadow-xs"
+                        ? "bg-primary text-white"
                         : "text-stone-400 hover:text-stone-950",
                     )}
                     aria-label="List view"
@@ -695,9 +584,9 @@ export function MenuList() {
                   <button
                     onClick={() => setViewMode("grid")}
                     className={cn(
-                      "p-1.5 rounded-lg transition-all cursor-pointer",
+                      "p-1.5 rounded-md transition-all cursor-pointer",
                       viewMode === "grid"
-                        ? "bg-stone-950 text-white shadow-xs"
+                        ? "bg-primary text-white"
                         : "text-stone-400 hover:text-stone-950",
                     )}
                     aria-label="Grid view"
@@ -705,36 +594,58 @@ export function MenuList() {
                     <Grid className="h-4 w-4" />
                   </button>
                 </div>
-
-                {/* Sort Dropdown */}
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs text-stone-500 font-medium hidden sm:inline">
-                    Sort by:
-                  </span>
-                  <div className="relative">
-                    <select
-                      value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value as SortOption)}
-                      className="appearance-none bg-white border border-stone-200 text-stone-800 text-xs font-semibold rounded-xl pl-3 pr-8 py-2 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer shadow-2xs"
-                    >
-                      <option value="popular">Popular</option>
-                      <option value="price-asc">Price: Low to High</option>
-                      <option value="price-desc">Price: High to Low</option>
-                      <option value="newest">Newest</option>
-                    </select>
-                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-stone-400 pointer-events-none" />
-                  </div>
-                </div>
               </div>
             </div>
 
             {/* Loading or Empty State */}
             {isLoading ? (
-              <div className="flex flex-col items-center justify-center py-24 gap-3 bg-white rounded-2xl border border-stone-200">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="text-xs text-stone-500 font-medium">
-                  Loading delicious creations...
-                </p>
+              <div className="space-y-8">
+                <div>
+                  <div className="flex items-start justify-between mb-6">
+                    <div className="space-y-2">
+                      <Skeleton className="h-6 w-44 rounded-lg" />
+                      <Skeleton className="h-3.5 w-28 rounded-md" />
+                    </div>
+                    <Skeleton className="h-10 w-12 rounded-md hidden sm:block" />
+                  </div>
+                  {viewMode === "grid" ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                      {Array.from({ length: 6 }).map((_, i) => (
+                        <div
+                          key={i}
+                          className="rounded-2xl bg-white border border-stone-200/80 p-3.5 space-y-3"
+                        >
+                          <Skeleton className="aspect-square w-full rounded-xl" />
+                          <div className="space-y-2 pt-1">
+                            <Skeleton className="h-4 w-3/4 rounded-md" />
+                            <Skeleton className="h-3 w-1/2 rounded-md" />
+                          </div>
+                          <div className="flex items-center justify-between pt-2">
+                            <Skeleton className="h-5 w-16 rounded-md" />
+                            <Skeleton className="h-8 w-20 rounded-xl" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {Array.from({ length: 4 }).map((_, i) => (
+                        <div
+                          key={i}
+                          className="flex flex-col sm:flex-row items-center gap-5 p-4 rounded-xl bg-white border border-stone-100"
+                        >
+                          <Skeleton className="aspect-4/3 w-full sm:w-32 sm:h-28 rounded-xl shrink-0" />
+                          <div className="grow space-y-2 w-full">
+                            <Skeleton className="h-5 w-1/3 rounded-md" />
+                            <Skeleton className="h-3.5 w-2/3 rounded-md" />
+                            <Skeleton className="h-4 w-20 rounded-md" />
+                          </div>
+                          <Skeleton className="h-9 w-28 rounded-xl shrink-0" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             ) : filteredProducts.length === 0 ? (
               <div className="p-12 text-center bg-white rounded-2xl border border-stone-200 space-y-3 shadow-xs">
@@ -790,7 +701,7 @@ export function MenuList() {
                               : "Items Available"}
                           </p>
                         </div>
-                        <span className="text-stone-200 font-semibold text-4xl md:text-5xl leading-none hidden sm:block select-none font-serif">
+                        <span className="text-stone-200 font-semibold text-4xl md:text-5xl leading-none hidden sm:block select-none">
                           {categoryCode}
                         </span>
                       </div>
@@ -891,7 +802,7 @@ export function MenuList() {
         {/* ========================================= */}
         {recentlyViewed.length > 0 && (
           <section className="pt-10 border-t border-stone-200/80 space-y-6">
-            <h3 className="text-xl md:text-2xl font-bold font-serif text-stone-900 tracking-tight">
+            <h3 className="text-xl md:text-2xl font-bold  text-stone-900 tracking-tight">
               Recently Viewed
             </h3>
 

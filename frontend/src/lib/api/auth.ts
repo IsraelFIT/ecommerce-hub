@@ -190,3 +190,53 @@ export async function getCurrentUserProfile(token?: string): Promise<User> {
     createdAt: data.created_at,
   };
 }
+
+export interface UpdateUserProfilePayload {
+  first_name?: string;
+  last_name?: string;
+  phone_number?: string;
+}
+
+export interface ChangeUserPasswordPayload {
+  current_password: string;
+  new_password: string;
+  confirm_password: string;
+}
+
+/**
+ * Update current user's profile details.
+ */
+export async function updateUserProfile(
+  payload: UpdateUserProfilePayload,
+): Promise<User> {
+  const response = await apiRequest<UserProfileData>("/auth/me", {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+  const data = response.data;
+  return {
+    id: data.id,
+    email: data.email,
+    name: data.full_name || `${data.first_name} ${data.last_name}`,
+    first_name: data.first_name,
+    last_name: data.last_name,
+    full_name: data.full_name,
+    role: data.role,
+    tenant_slug: data.tenant_slug,
+    tenant_name: data.tenant_name,
+    tenantId: data.tenant_id,
+    createdAt: data.created_at,
+  };
+}
+
+/**
+ * Change authenticated user's password.
+ */
+export async function changeUserPassword(
+  payload: ChangeUserPasswordPayload,
+): Promise<void> {
+  await apiRequest<void>("/auth/change-password", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}

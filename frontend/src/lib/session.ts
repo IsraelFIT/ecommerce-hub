@@ -15,6 +15,7 @@ export interface ClientSession {
   accessToken?: string;
   refreshToken?: string;
   role?: UserRole | string;
+  tenantSlug?: string;
 }
 
 /**
@@ -97,10 +98,29 @@ export async function getSession(): Promise<ClientSession | null> {
     return null;
   }
 
+  let tenantSlug: string | undefined;
+  try {
+    const parts = accessToken.split(".");
+    if (parts.length >= 2) {
+      const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+      const jsonStr = decodeURIComponent(
+        atob(base64)
+          .split("")
+          .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+          .join(""),
+      );
+      const payload = JSON.parse(jsonStr);
+      tenantSlug = payload.tenant_slug || payload.tenantSlug;
+    }
+  } catch {
+    // Ignore malformed token decode
+  }
+
   return {
     accessToken,
     refreshToken,
     role,
+    tenantSlug,
   };
 }
 
@@ -113,9 +133,7 @@ export async function getSession(): Promise<ClientSession | null> {
 export async function createSession(
   accessToken: string,
   refreshToken?: string,
-  customToken?: string,
   role?: string,
-  extra?: Record<string, unknown>,
   expiresInSeconds: number = ACCESS_TOKEN_MAX_AGE,
 ): Promise<void> {
   const accessCookieOptions = {

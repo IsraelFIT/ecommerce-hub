@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useUserStore } from "@/store/user";
 import { getTenantSubdomainUrl } from "@/utils/helper";
@@ -360,6 +361,50 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
         );
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6 w-full pb-12">
+        {/* Header Skeleton */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-border">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-6 w-56 rounded-md" />
+              <Skeleton className="h-5 w-24 rounded-full" />
+            </div>
+            <Skeleton className="h-4 w-96 rounded-md" />
+          </div>
+          <Skeleton className="h-9 w-40 rounded-lg" />
+        </div>
+
+        {/* Content Skeleton Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-7 space-y-5">
+            <div className="rounded-2xl border border-border bg-card p-6 space-y-4">
+              <Skeleton className="h-5 w-48 rounded-md" />
+              <div className="grid grid-cols-2 gap-4">
+                <Skeleton className="h-24 rounded-xl" />
+                <Skeleton className="h-24 rounded-xl" />
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-card p-6 space-y-4">
+              <Skeleton className="h-5 w-40 rounded-md" />
+              <Skeleton className="h-10 w-full rounded-lg" />
+              <Skeleton className="h-10 w-full rounded-lg" />
+            </div>
+          </div>
+
+          <div className="lg:col-span-5 space-y-5">
+            <div className="rounded-2xl border border-border bg-card p-6 space-y-4">
+              <Skeleton className="h-5 w-32 rounded-md" />
+              <Skeleton className="h-64 w-full rounded-xl" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 w-full pb-12 animate-fadeIn">

@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableHeader,
@@ -263,14 +264,39 @@ export default function TenantUsersAdminPage() {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow className="border-border">
-                <TableCell
-                  colSpan={7}
-                  className="h-32 text-center text-xs text-muted-foreground"
-                >
-                  Loading users & customers...
-                </TableCell>
-              </TableRow>
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={`user-skel-${i}`} className="border-border">
+                  <TableCell className="py-3">
+                    <div className="flex items-center gap-3">
+                      <Skeleton className="h-9 w-9 rounded-full shrink-0" />
+                      <div className="space-y-1.5">
+                        <Skeleton className="h-3.5 w-28 rounded-md" />
+                        <Skeleton className="h-3 w-36 rounded-md" />
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="py-3">
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                  </TableCell>
+                  <TableCell className="py-3">
+                    <Skeleton className="h-3.5 w-24 rounded-md" />
+                  </TableCell>
+                  <TableCell className="py-3">
+                    <Skeleton className="h-3.5 w-8 rounded-md" />
+                  </TableCell>
+                  <TableCell className="py-3">
+                    <Skeleton className="h-3.5 w-16 rounded-md" />
+                  </TableCell>
+                  <TableCell className="py-3">
+                    <Skeleton className="h-3.5 w-20 rounded-md" />
+                  </TableCell>
+                  <TableCell className="py-3 text-right">
+                    <div className="flex justify-end">
+                      <Skeleton className="h-5 w-14 rounded-full" />
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
             ) : paginatedUsers.length === 0 ? (
               <TableRow className="border-border">
                 <TableCell

@@ -72,7 +72,7 @@ export interface ProductVariant {
   compare_at_price?: number | null;
   track_inventory: boolean;
   stock_quantity: number;
-  options: Record<string, string | string[]>;
+  options?: Record<string, string | string[]>;
 }
 
 export interface ProductVariantInput {
@@ -90,15 +90,16 @@ export interface Product {
   tenant_id?: string;
   name?: string;
   title?: string; // Backwards-compatible alias for name
-  slug: string;
+  slug?: string;
   description?: string | null;
   product_class?: ProductClass;
-  is_published: boolean;
+  is_published?: boolean;
   specifications?: Record<string, unknown>; // Flexible JSONB metadata: { "author": "Tolkien", "brand": "Sony" }
   filters?: Record<string, string[]>; // Dynamic assigned filter values: { "dietary": ["Vegan", "Gluten-Free"], "occasion": ["Birthday"] }
   category_id?: string | null;
   category?: string | null;
   images: string[];
+  availability?: "available" | "preorder" | string;
   variants?: ProductVariant[];
 
   // Backwards-compatible fields for components expecting flat attributes
@@ -128,6 +129,7 @@ export interface CreateProductInput {
   category_id?: string;
   category?: string;
   images?: string[];
+  availability?: "available" | "preorder" | string;
   is_published?: boolean;
   variants?: ProductVariantInput[];
 
@@ -149,6 +151,7 @@ export interface UpdateProductInput {
   category_id?: string;
   category?: string;
   images?: string[];
+  availability?: "available" | "preorder" | string;
   is_published?: boolean;
   variants?: ProductVariantInput[];
 

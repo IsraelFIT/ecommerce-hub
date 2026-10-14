@@ -1,17 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import {
-  ArrowLeft,
   CheckCircle,
   CreditCard,
   Calendar,
   Clock,
   MapPin,
   Truck,
+  ChevronRight,
+  ShoppingBag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,11 +26,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCartStore } from "@/store/cart";
+import { formatCurrency, getTenantRoute } from "@/utils/helper";
 import { toast } from "sonner";
 
 export default function CheckoutPage() {
   const router = useRouter();
+  const params = useParams();
+  const tenantSlug = (params?.tenant as string) || "store";
   const { items, getCartTotal, clearCart } = useCartStore();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
 
   // Form States
   const [firstName, setFirstName] = useState("");
@@ -96,45 +106,67 @@ export default function CheckoutPage() {
   const handleCloseSuccess = () => {
     clearCart();
     setIsSuccess(false);
-    router.push("/");
+    router.push(getTenantRoute(tenantSlug, "/"));
   };
+
+  if (!mounted) {
+    return (
+      <div className="py-32 bg-stone-50 flex items-center justify-center min-h-[50vh]">
+        <div className="animate-pulse flex flex-col items-center gap-4">
+          <div className="w-12 h-12 bg-muted rounded-full" />
+          <div className="h-4 w-32 bg-muted rounded" />
+        </div>
+      </div>
+    );
+  }
 
   // If cart is empty and not checked out, show redirect button
   if (items.length === 0 && !isSuccess) {
     return (
-      <div className="py-32 bg-stone-50 text-center flex flex-col items-center justify-center min-h-[70vh]">
-        <h2 className="font-serif text-3xl font-bold text-stone-950 mb-3">
-          No Items to Checkout
-        </h2>
-        <p className="text-stone-500 text-sm max-w-sm leading-relaxed mb-8 font-light">
+      <div className="py-32 bg-stone-50 text-center flex flex-col items-center justify-center">
+        <div className="w-16 h-16 bg-stone-100 rounded-full flex items-center justify-center text-stone-400 mb-6">
+          <ShoppingBag className="h-8 w-8" />
+        </div>
+        <h2 className="font-bold text-stone-950 mb-3">No Items to Checkout</h2>
+        <p className="text-stone-500 max-w-sm mb-8 font-light">
           Your cart is empty. Please add confections from our menu before
           checking out.
         </p>
-        <Link href="/menu">
-          <Button className="bg-stone-950 text-white font-bold tracking-wider hover:bg-stone-800 transition-colors uppercase h-12 px-8 rounded-none">
-            Browse Menu
-          </Button>
+        <Link href={getTenantRoute(tenantSlug, "/menu")}>
+          <Button>Browse Menu</Button>
         </Link>
       </div>
     );
   }
 
   return (
-    <div className="py-24 bg-stone-50 text-stone-900 min-h-screen relative">
+    <div className="py-8 bg-stone-50 text-foreground min-h-screen relative">
       <div className="container flex-col">
-        {/* Header navigation */}
-        <div className="mb-12">
+        {/* Breadcrumb Navigation */}
+        <nav className="w-full flex items-center gap-2 text-sm text-foreground font-medium mb-8">
           <Link
-            href="/cart"
-            className="inline-flex items-center gap-2 text-stone-500 hover:text-stone-900 transition-colors uppercase tracking-wider text-xs font-bold mb-4"
+            href={getTenantRoute(tenantSlug, "/")}
+            className="hover:text-stone-900 transition-colors text-stone-500"
           >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Cart
+            Home
           </Link>
-          <h1 className="font-serif font-medium text-stone-950 text-4xl md:text-5xl">
-            Secure Checkout
-          </h1>
-          <p className="text-stone-500 text-sm mt-2 font-light">
+          <ChevronRight className="h-3.5 w-3.5 text-stone-400" />
+          <Link
+            href={getTenantRoute(tenantSlug, "/cart")}
+            className="hover:text-stone-900 transition-colors text-stone-500"
+          >
+            Cart
+          </Link>
+          <ChevronRight className="h-3.5 w-3.5 text-stone-400" />
+          <span className="text-stone-900 font-semibold truncate max-w-xs">
+            Checkout
+          </span>
+        </nav>
+
+        {/* Title */}
+        <div className="w-full mb-8">
+          <h3 className="font-bold text-foreground">Secure Checkout</h3>
+          <p className="text-muted-foreground mt-2 font-light">
             Enter your fulfillment timeline, billing coordinates, and gift
             options below.
           </p>
@@ -143,17 +175,17 @@ export default function CheckoutPage() {
         {/* Success Modal Overlay */}
         {isSuccess && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white max-w-lg w-full p-8 md:p-12 text-center rounded-none shadow-2xl flex flex-col items-center animate-in fade-in zoom-in-95 duration-200">
+            <div className="bg-white max-w-lg w-full p-8 md:p-12 text-center rounded-lg shadow-2xl flex flex-col items-center animate-in fade-in zoom-in-95 duration-200">
               <CheckCircle className="h-16 w-16 text-emerald-600 mb-6" />
 
-              <h2 className="font-serif text-3xl font-bold text-stone-950 mb-2">
+              <h2 className="text-2xl font-bold text-stone-950 mb-2">
                 Order Confirmed!
               </h2>
               <p className="text-xs text-primary font-bold tracking-wider uppercase mb-6">
                 Order Number: {orderNumber}
               </p>
 
-              <div className="w-full bg-stone-100 p-6 mb-8 text-left text-xs font-light text-stone-600 flex flex-col gap-2">
+              <div className="w-full bg-stone-100 rounded-md p-6 mb-8 text-left text-xs font-light text-stone-600 flex flex-col gap-2">
                 <p>
                   <span className="font-semibold text-stone-900">Client:</span>{" "}
                   {firstName} {lastName}
@@ -164,9 +196,7 @@ export default function CheckoutPage() {
                 </p>
                 <p>
                   <span className="font-semibold text-stone-900">Method:</span>{" "}
-                  {fulfillmentType === "pickup"
-                    ? "Studio Pickup"
-                    : "White-Glove Delivery"}
+                  {fulfillmentType === "pickup" ? "Pickup" : "Delivery"}
                 </p>
                 <p>
                   <span className="font-semibold text-stone-900">
@@ -182,9 +212,9 @@ export default function CheckoutPage() {
                     {address}, {city}, {zip}
                   </p>
                 )}
-                <div className="border-t border-stone-200 mt-3 pt-3 flex justify-between font-serif text-sm font-bold text-stone-950">
+                <div className="border-t border-stone-200 mt-3 pt-3 flex justify-between text-sm font-bold text-stone-950">
                   <span>Amount Charged</span>
-                  <span>${total.toFixed(2)}</span>
+                  <span>{formatCurrency(total.toFixed(2))}</span>
                 </div>
               </div>
 
@@ -195,7 +225,7 @@ export default function CheckoutPage() {
 
               <Button
                 onClick={handleCloseSuccess}
-                className="w-full bg-stone-950 text-white font-bold tracking-wider hover:bg-stone-800 transition-colors uppercase h-12 rounded-none cursor-pointer"
+                className="w-full cursor-pointer"
               >
                 Return to Studio Home
               </Button>
@@ -209,15 +239,15 @@ export default function CheckoutPage() {
           className="grid grid-cols-1 lg:grid-cols-3 gap-12 items-start w-full"
         >
           {/* Left Columns: Checkout Fields */}
-          <div className="lg:col-span-2 flex flex-col gap-8 w-full">
+          <div className="lg:col-span-2 flex flex-col gap-6 w-full">
             {/* 1. Client details */}
-            <div className="bg-white border border-stone-200 p-8 shadow-xs">
-              <h3 className="font-serif text-xl font-bold text-stone-950 mb-6 pb-2 border-b border-stone-100 flex items-center gap-2">
+            <div className="bg-white border border-stone-200 rounded-lg p-6 shadow-xs">
+              <h4 className="font-bold font-secondary text-foreground mb-4 pb-2 border-b border-stone-100 flex items-center gap-2">
                 <span className="inline-flex w-6 h-6 rounded-full bg-stone-100 text-foreground items-center justify-center text-xs font-bold">
                   1
                 </span>
                 Contact Coordinates
-              </h3>
+              </h4>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="flex flex-col gap-2">
@@ -233,7 +263,7 @@ export default function CheckoutPage() {
                     required
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
-                    className="h-10 px-4 border border-stone-200 focus:border-stone-950 rounded-none bg-stone-50/50 text-sm"
+                    className="h-10"
                   />
                 </div>
                 <div className="flex flex-col gap-2">
@@ -249,7 +279,7 @@ export default function CheckoutPage() {
                     required
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
-                    className="h-10 px-4 border border-stone-200 focus:border-stone-950 rounded-none bg-stone-50/50 text-sm"
+                    className="h-10"
                   />
                 </div>
                 <div className="flex flex-col gap-2">
@@ -265,7 +295,7 @@ export default function CheckoutPage() {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="h-10 px-4 border border-stone-200 focus:border-stone-950 rounded-none bg-stone-50/50 text-sm"
+                    className="h-10"
                   />
                 </div>
                 <div className="flex flex-col gap-2">
@@ -281,46 +311,46 @@ export default function CheckoutPage() {
                     required
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="h-10 px-4 border border-stone-200 focus:border-stone-950 rounded-none bg-stone-50/50 text-sm"
+                    className="h-10"
                   />
                 </div>
               </div>
             </div>
 
             {/* 2. Fulfillment selection */}
-            <div className="bg-white border border-stone-200 p-8 shadow-xs">
-              <h3 className="font-serif text-xl font-bold text-stone-950 mb-6 pb-2 border-b border-stone-100 flex items-center gap-2">
+            <div className="bg-white border border-stone-200 rounded-lg p-6 shadow-xs">
+              <h4 className="font-bold font-secondary text-foreground mb-4 pb-2 border-b border-stone-100 flex items-center gap-2">
                 <span className="inline-flex w-6 h-6 rounded-full bg-stone-100 text-foreground items-center justify-center text-xs font-bold">
                   2
                 </span>
                 Fulfillment Logistics
-              </h3>
+              </h4>
 
               {/* Selector */}
-              <div className="flex gap-4 p-2 bg-stone-100 mb-6">
+              <div className="grid grid-cols-2 gap-2 mb-6">
                 <button
                   type="button"
                   onClick={() => setFulfillmentType("pickup")}
-                  className={`flex-1 py-3 text-center text-xs font-bold tracking-wide uppercase cursor-pointer flex items-center justify-center gap-2 ${
+                  className={`py-3 text-center text-xs font-bold tracking-wide uppercase cursor-pointer rounded-md border flex items-center justify-center gap-2 ${
                     fulfillmentType === "pickup"
-                      ? "bg-white text-stone-950 shadow-xs"
-                      : "text-stone-500 hover:text-stone-950"
+                      ? "border-primary bg-primary text-white"
+                      : "border-border hover:border-border/40 bg-card text-foreground"
                   }`}
                 >
                   <MapPin className="h-4 w-4" />
-                  Studio Pickup
+                  Pickup
                 </button>
                 <button
                   type="button"
                   onClick={() => setFulfillmentType("delivery")}
-                  className={`flex-1 py-3 text-center text-xs font-bold tracking-wide uppercase cursor-pointer flex items-center justify-center gap-2 ${
+                  className={`py-3 text-center text-xs font-bold tracking-wide uppercase cursor-pointer rounded-md border flex items-center justify-center gap-2 ${
                     fulfillmentType === "delivery"
-                      ? "bg-white text-stone-950 shadow-xs"
-                      : "text-stone-500 hover:text-stone-950"
+                      ? "border-primary bg-primary text-white"
+                      : "border-border hover:border-border/40 bg-card text-foreground"
                   }`}
                 >
                   <Truck className="h-4 w-4" />
-                  White-Glove Delivery
+                  Delivery
                 </button>
               </div>
 
@@ -340,7 +370,7 @@ export default function CheckoutPage() {
                       required={fulfillmentType === "delivery"}
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
-                      className="h-10 px-4 border border-stone-200 focus:border-stone-950 rounded-none bg-stone-50/50 text-sm"
+                      className="h-10"
                     />
                   </div>
                   <div className="flex flex-col gap-2 md:col-span-2">
@@ -356,7 +386,7 @@ export default function CheckoutPage() {
                       required={fulfillmentType === "delivery"}
                       value={city}
                       onChange={(e) => setCity(e.target.value)}
-                      className="h-10 px-4 border border-stone-200 focus:border-stone-950 rounded-none bg-stone-50/50 text-sm"
+                      className="h-10"
                     />
                   </div>
                   <div className="flex flex-col gap-2">
@@ -372,12 +402,12 @@ export default function CheckoutPage() {
                       required={fulfillmentType === "delivery"}
                       value={zip}
                       onChange={(e) => setZip(e.target.value)}
-                      className="h-10 px-4 border border-stone-200 focus:border-stone-950 rounded-none bg-stone-50/50 text-sm"
+                      className="h-10"
                     />
                   </div>
                 </div>
               ) : (
-                <div className="bg-stone-50 p-4 border border-stone-200 mb-6 text-stone-600 text-xs leading-relaxed font-light">
+                <div className="bg-stone-50 p-4 border border-stone-200 rounded-md mb-6 text-stone-600 text-xs leading-relaxed font-light">
                   <p className="font-semibold text-stone-950 mb-1">
                     Pickup Location:
                   </p>
@@ -404,7 +434,7 @@ export default function CheckoutPage() {
                     required
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
-                    className="h-10 px-4 border border-stone-200 focus:border-stone-950 rounded-none bg-stone-50/50 text-sm"
+                    className="h-10"
                   />
                 </div>
                 <div className="flex flex-col gap-2">
@@ -415,7 +445,7 @@ export default function CheckoutPage() {
                     <Clock className="h-3.5 w-3.5" /> Delivery / Collection Time
                   </Label>
                   <Select value={timeSlot} onValueChange={setTimeSlot}>
-                    <SelectTrigger className="w-full h-10 px-4 border border-stone-200 rounded-none text-sm bg-white">
+                    <SelectTrigger className="w-full h-11">
                       <SelectValue placeholder="Select a time slot" />
                     </SelectTrigger>
                     <SelectContent>
@@ -438,13 +468,13 @@ export default function CheckoutPage() {
             </div>
 
             {/* 3. Payment Details */}
-            <div className="bg-white border border-stone-200 p-8 shadow-xs">
-              <h3 className="font-serif text-xl font-bold text-stone-950 mb-6 pb-2 border-b border-stone-100 flex items-center gap-2">
+            <div className="bg-white border border-stone-200 rounded-lg p-6 shadow-xs">
+              <h4 className="font-bold font-secondary text-foreground mb-4 pb-2 border-b border-stone-100 flex items-center gap-2">
                 <span className="inline-flex w-6 h-6 rounded-full bg-stone-100 text-foreground items-center justify-center text-xs font-bold">
                   3
                 </span>
                 Secure Payment Details
-              </h3>
+              </h4>
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div className="flex flex-col gap-2 md:col-span-4">
@@ -461,7 +491,7 @@ export default function CheckoutPage() {
                     value={cardName}
                     onChange={(e) => setCardName(e.target.value)}
                     placeholder="John Doe"
-                    className="h-10 px-4 border border-stone-200 focus:border-stone-950 rounded-none bg-stone-50/50 text-sm"
+                    className="h-10"
                   />
                 </div>
                 <div className="flex flex-col gap-2 md:col-span-2">
@@ -479,7 +509,7 @@ export default function CheckoutPage() {
                     onChange={(e) => setCardNumber(e.target.value)}
                     placeholder="•••• •••• •••• ••••"
                     maxLength={16}
-                    className="h-10 px-4 border border-stone-200 focus:border-stone-950 rounded-none bg-stone-50/50 text-sm"
+                    className="h-10"
                   />
                 </div>
                 <div className="flex flex-col gap-2">
@@ -497,7 +527,7 @@ export default function CheckoutPage() {
                     onChange={(e) => setCardExpiry(e.target.value)}
                     placeholder="MM/YY"
                     maxLength={5}
-                    className="h-10 px-4 border border-stone-200 focus:border-stone-950 rounded-none bg-stone-50/50 text-sm"
+                    className="h-10"
                   />
                 </div>
                 <div className="flex flex-col gap-2">
@@ -515,21 +545,21 @@ export default function CheckoutPage() {
                     onChange={(e) => setCardCvv(e.target.value)}
                     placeholder="•••"
                     maxLength={3}
-                    className="h-10 px-4 border border-stone-200 focus:border-stone-950 rounded-none bg-stone-50/50 text-sm"
+                    className="h-10"
                   />
                 </div>
               </div>
             </div>
 
             {/* Gift Options */}
-            <div className="bg-white border border-stone-200 p-8 shadow-xs">
-              <h3 className="font-serif text-xl font-bold text-stone-950 mb-4 pb-2 border-b border-stone-100">
+            <div className="bg-white border border-stone-200 rounded-lg p-6 shadow-xs">
+              <h4 className="font-bold font-secondary text-foreground mb-4 pb-2 border-b border-stone-100">
                 Gift Message & Custom Requests (Optional)
-              </h3>
+              </h4>
               <div className="flex flex-col gap-2">
                 <Label
                   htmlFor="giftMessage"
-                  className="text-xs font-bold uppercase tracking-wider text-stone-500"
+                  className="text-xs  font-bold uppercase tracking-wider text-stone-500"
                 >
                   Message for Complimentary Card
                 </Label>
@@ -539,23 +569,22 @@ export default function CheckoutPage() {
                   onChange={(e) => setGiftMessage(e.target.value)}
                   placeholder="E.g., 'Happy Anniversary Sarah! With love, Mark.' or write any special instructions for cake presentation..."
                   rows={4}
-                  className="p-4 border border-stone-200 focus:border-stone-950 rounded-none bg-stone-50/50 text-sm resize-y"
                 />
               </div>
             </div>
           </div>
 
           {/* Right Column: Checkout Summary Box */}
-          <div className="bg-white border border-stone-200 p-8 flex flex-col w-full shadow-xs sticky top-24">
-            <h3 className="font-serif text-xl font-bold text-stone-950 mb-6 border-b border-stone-200 pb-4">
-              Consultation Cart
-            </h3>
+          <div className="bg-white border border-stone-200 rounded-lg p-6 flex flex-col w-full shadow-xs sticky top-24">
+            <h4 className="font-bold font-secondary text-foreground mb-4 border-b border-stone-200 pb-4">
+              Order Summary
+            </h4>
 
             {/* Items Summary list */}
             <div className="flex flex-col gap-4 mb-6 max-h-60 overflow-y-auto no-scrollbar">
               {items.map((item, idx) => (
                 <div key={idx} className="flex gap-4 items-center">
-                  <div className="relative aspect-square w-12 h-12 bg-stone-100 shrink-0">
+                  <div className="relative aspect-square w-12 h-12 bg-stone-100 rounded-md shrink-0 overflow-hidden">
                     <Image
                       src={item.image}
                       alt={item.name}
@@ -565,15 +594,15 @@ export default function CheckoutPage() {
                     />
                   </div>
                   <div className="min-w-0 grow text-xs">
-                    <h4 className="font-bold text-stone-950 truncate">
+                    <h5 className="font-bold text-foreground truncate">
                       {item.name}
-                    </h4>
-                    <p className="text-stone-400 font-medium">
-                      Qty: {item.quantity} • {item.size}
+                    </h5>
+                    <p className="text-muted-foreground font-medium">
+                      Qty: {item.quantity} {item.size ? `• ${item.size}` : ""}
                     </p>
                   </div>
-                  <span className="font-serif font-bold text-xs text-stone-950 shrink-0">
-                    ${(item.price * item.quantity).toFixed(2)}
+                  <span className="font-bold text-xs text-foreground shrink-0">
+                    {formatCurrency((item.price * item.quantity).toFixed(2))}
                   </span>
                 </div>
               ))}
@@ -583,39 +612,41 @@ export default function CheckoutPage() {
 
             {/* Summary figures */}
             <div className="flex flex-col gap-4 mb-8">
-              <div className="flex justify-between text-sm text-stone-500 font-light">
-                <span>Subtotal</span>
-                <span className="font-medium text-stone-950">
-                  ${subtotal.toFixed(2)}
+              <div className="flex justify-between text-xs text-stone-500 font-medium">
+                <span>Items Subtotal</span>
+                <span className="font-semibold text-sm text-foreground">
+                  {formatCurrency(subtotal.toFixed(2))}
                 </span>
               </div>
 
-              <div className="flex justify-between text-sm text-stone-500 font-light">
+              <div className="flex justify-between text-xs text-stone-500 font-medium">
                 <span>Fulfillment Fee</span>
                 {fulfillmentType === "pickup" ? (
                   <span className="text-emerald-600 font-semibold uppercase text-xs tracking-wider">
                     Free Pickup
                   </span>
                 ) : (
-                  <span className="font-medium text-stone-950">$45.00</span>
+                  <span className="font-semibold text-sm text-foreground">
+                    {formatCurrency(deliveryFee.toFixed(2))}
+                  </span>
                 )}
               </div>
 
-              <div className="flex justify-between text-sm text-stone-500 font-light">
+              <div className="flex justify-between text-xs text-stone-500 font-medium">
                 <span>Sales Tax (8.25%)</span>
-                <span className="font-medium text-stone-950">
-                  ${estTax.toFixed(2)}
+                <span className="font-semibold text-sm text-foreground">
+                  {formatCurrency(estTax.toFixed(2))}
                 </span>
               </div>
 
               <div className="w-full h-px bg-stone-200 my-2" />
 
-              <div className="flex justify-between items-baseline font-serif">
-                <span className="text-base font-bold text-stone-950">
+              <div className="flex justify-between items-baseline">
+                <span className="text-base font-bold text-foreground">
                   Grand Total
                 </span>
-                <span className="text-2xl font-bold text-stone-950">
-                  ${total.toFixed(2)}
+                <span className="text-2xl font-bold text-foreground">
+                  {formatCurrency(total.toFixed(2))}
                 </span>
               </div>
             </div>
@@ -623,7 +654,7 @@ export default function CheckoutPage() {
             {/* Place Order CTA button */}
             <Button
               type="submit"
-              className="w-full bg-stone-950 text-white font-bold tracking-wider hover:bg-stone-800 transition-colors uppercase h-12 rounded-none gap-2 flex items-center justify-center cursor-pointer"
+              className="w-full gap-2 flex items-center justify-center cursor-pointer"
             >
               <CreditCard className="h-5 w-5" />
               Place Order & Book Date

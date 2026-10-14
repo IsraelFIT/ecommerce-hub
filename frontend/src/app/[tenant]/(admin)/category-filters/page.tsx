@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -428,17 +429,28 @@ export default function CategoryFiltersAdminPage() {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow className="border-border">
-                    <TableCell
-                      colSpan={4}
-                      className="h-36 text-center text-xs text-muted-foreground"
-                    >
-                      <div className="flex flex-col items-center justify-center gap-2">
-                        <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
-                        <span>Loading product categories...</span>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={`cat-skel-${i}`} className="border-border">
+                      <TableCell className="py-3">
+                        <div className="space-y-1.5">
+                          <Skeleton className="h-3.5 w-32 rounded-md" />
+                          <Skeleton className="h-3 w-20 rounded-md" />
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-3">
+                        <Skeleton className="h-5 w-16 rounded-full" />
+                      </TableCell>
+                      <TableCell className="py-3">
+                        <Skeleton className="h-3.5 w-48 rounded-md" />
+                      </TableCell>
+                      <TableCell className="py-3 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Skeleton className="h-7 w-7 rounded-md" />
+                          <Skeleton className="h-7 w-7 rounded-md" />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
                 ) : filteredCategories.length === 0 ? (
                   <TableRow className="border-border">
                     <TableCell
@@ -570,17 +582,37 @@ export default function CategoryFiltersAdminPage() {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow className="border-border">
-                    <TableCell
-                      colSpan={5}
-                      className="h-36 text-center text-xs text-muted-foreground"
-                    >
-                      <div className="flex flex-col items-center justify-center gap-2">
-                        <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
-                        <span>Loading product filters...</span>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={`filt-skel-${i}`} className="border-border">
+                      <TableCell className="py-3">
+                        <div className="space-y-1.5">
+                          <Skeleton className="h-3.5 w-28 rounded-md" />
+                          <Skeleton className="h-3 w-36 rounded-md" />
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-3">
+                        <Skeleton className="h-5 w-16 rounded-full" />
+                      </TableCell>
+                      <TableCell className="py-3">
+                        <div className="flex gap-1.5 flex-wrap">
+                          <Skeleton className="h-5 w-14 rounded-full" />
+                          <Skeleton className="h-5 w-14 rounded-full" />
+                          <Skeleton className="h-5 w-14 rounded-full" />
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-3 text-center">
+                        <div className="flex justify-center">
+                          <Skeleton className="h-3.5 w-6 rounded-md" />
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-3 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Skeleton className="h-7 w-7 rounded-md" />
+                          <Skeleton className="h-7 w-7 rounded-md" />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
                 ) : filteredFilters.length === 0 ? (
                   <TableRow className="border-border">
                     <TableCell

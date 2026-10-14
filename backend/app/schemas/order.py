@@ -1,5 +1,5 @@
 import uuid
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from app.models.order import OrderStatus
@@ -27,6 +27,7 @@ class OrderCreate(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
+                "user_id": "5223232f-9c0c-4847-ae88-a64ccc9dff7d",
                 "customer_email": "jane@example.com",
                 "customer_name": "Jane Doe",
                 "items": [
@@ -42,6 +43,7 @@ class OrderCreate(BaseModel):
         }
     )
 
+    user_id: Optional[uuid.UUID] = None
     customer_email: EmailStr
     customer_name: str = Field(..., min_length=2)
     items: List[OrderItem] = Field(..., min_length=1)
@@ -55,6 +57,7 @@ class OrderResponse(BaseModel):
             "example": {
                 "id": "18492048-e230-4131-b841-382947192301",
                 "tenant_id": "948a3f81-e230-4131-b841-382947192301",
+                "user_id": "5223232f-9c0c-4847-ae88-a64ccc9dff7d",
                 "customer_email": "jane@example.com",
                 "customer_name": "Jane Doe",
                 "total_amount": 140.0,
@@ -84,6 +87,7 @@ class OrderResponse(BaseModel):
 
     id: uuid.UUID
     tenant_id: uuid.UUID
+    user_id: Optional[uuid.UUID] = None
     customer_email: str
     customer_name: str
     total_amount: float

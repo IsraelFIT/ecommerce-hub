@@ -247,3 +247,25 @@ class MessageResponse(BaseModel):
     message: str
     detail: Optional[str] = None
     dev_otp: Optional[str] = None
+
+class UpdateProfileRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    first_name: Optional[str] = Field(None, min_length=1, max_length=100)
+    last_name: Optional[str] = Field(None, min_length=1, max_length=100)
+    phone_number: Optional[str] = Field(None, max_length=50)
+
+
+class ChangePasswordRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    current_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=6)
+    confirm_password: str = Field(..., min_length=6)
+
+    @model_validator(mode="after")
+    def validate_passwords(self) -> "ChangePasswordRequest":
+        if self.new_password != self.confirm_password:
+            raise ValueError("New password and confirmation password do not match")
+        return self
+

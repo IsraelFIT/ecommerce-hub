@@ -1,6 +1,7 @@
 import uuid
 from typing import AsyncGenerator, Optional
-from fastapi import Depends, Header, HTTPException, status
+from urllib.parse import urlparse
+from fastapi import Depends, Header, HTTPException, Request, status
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,14 +19,16 @@ from app.core.security import decode_access_token
 
 
 async def get_tenant_context(
+    request: Request,
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
     x_tenant_slug: Optional[str] = Header(None, alias="X-Tenant-Slug"),
     authorization: Optional[str] = Header(None, alias="Authorization"),
     db: AsyncSession = Depends(get_db),
 ) -> Tenant:
     """
-    Extracts tenant identity from request headers (X-Tenant-ID / X-Tenant-Slug)
-    or falls back to extracting tenant claims from Bearer access token.
+    Extracts tenant identity from request headers (X-Tenant-ID / X-Tenant-Slug),
+    falls back to Bearer access token claims, query parameters, referer URL,
+    or customer email profile resolution.
     """
     tenant: Optional[Tenant] = None
 
@@ -58,6 +61,52 @@ async def get_tenant_context(
             if not tenant and token_tenant_slug:
                 result = await db.execute(select(Tenant).where(Tenant.slug == str(token_tenant_slug).lower()))
                 tenant = result.scalar_one_or_none()
+
+    # Fallback 1: Query parameters (tenant_slug or tenant)
+    if not tenant:
+        query_slug = request.query_params.get("tenant_slug") or request.query_params.get("tenant")
+        if query_slug:
+            result = await db.execute(select(Tenant).where(Tenant.slug == query_slug.strip().lower()))
+            tenant = result.scalar_one_or_none()
+
+    # Fallback 2: Referer header (when proxied from frontend browser)
+    if not tenant:
+        referer = request.headers.get("referer")
+        if referer:
+            try:
+                parsed_ref = urlparse(referer)
+                if parsed_ref.hostname:
+                    host_parts = parsed_ref.hostname.split(".")
+                    if len(host_parts) > 1 and host_parts[0] not in ("localhost", "127", "www", "app"):
+                        subdomain = host_parts[0].lower()
+                        result = await db.execute(select(Tenant).where(Tenant.slug == subdomain))
+                        tenant = result.scalar_one_or_none()
+
+                if not tenant and parsed_ref.path:
+                    path_segs = [s for s in parsed_ref.path.split("/") if s]
+                    reserved = {"api", "core", "login", "signup", "dashboard", "_next", "static", "favicon.ico"}
+                    if path_segs and path_segs[0].lower() not in reserved:
+                        slug_cand = path_segs[0].lower()
+                        result = await db.execute(select(Tenant).where(Tenant.slug == slug_cand))
+                        tenant = result.scalar_one_or_none()
+            except Exception:
+                pass
+
+    # Fallback 3: Customer email resolution if querying customer orders
+    if not tenant:
+        customer_email = request.query_params.get("customer_email")
+        if customer_email:
+            try:
+                from app.models.user import User
+                user_res = await db.execute(
+                    select(User).where(User.email == customer_email.strip().lower())
+                )
+                user_record = user_res.scalar_one_or_none()
+                if user_record and user_record.tenant_id:
+                    result = await db.execute(select(Tenant).where(Tenant.id == user_record.tenant_id))
+                    tenant = result.scalar_one_or_none()
+            except Exception:
+                pass
 
     if not tenant:
         raise HTTPException(

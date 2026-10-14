@@ -1,23 +1,44 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, Trash2, Plus, Minus, CreditCard, Gift } from "lucide-react";
+import { useParams } from "next/navigation";
+import { Trash2, Plus, Minus, CreditCard, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCartStore } from "@/store/cart";
+import { formatCurrency, getTenantRoute } from "@/utils/helper";
 
 export function CartView() {
+  const params = useParams();
+  const tenantSlug = (params?.tenant as string) || "store";
   const { items, updateQuantity, removeFromCart, getCartTotal } =
     useCartStore();
   const [shippingMethod, setShippingMethod] = useState<"pickup" | "delivery">(
     "pickup",
   );
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
 
   const subtotal = getCartTotal();
   const deliveryFee = shippingMethod === "delivery" ? 45 : 0; // White-Glove cake delivery is premium!
   const estTax = subtotal * 0.0825; // 8.25% NY tax
   const total = subtotal + deliveryFee + estTax;
+
+  if (!mounted) {
+    return (
+      <div className="py-32 bg-stone-50 flex items-center justify-center min-h-[50vh]">
+        <div className="animate-pulse flex flex-col items-center gap-4">
+          <div className="w-12 h-12 bg-muted rounded-full" />
+          <div className="h-4 w-32 bg-muted rounded" />
+        </div>
+      </div>
+    );
+  }
 
   if (items.length === 0) {
     return (
@@ -25,38 +46,48 @@ export function CartView() {
         <div className="w-16 h-16 bg-stone-100 rounded-full flex items-center justify-center text-stone-400 mb-6">
           <ShoppingBagIcon />
         </div>
-        <h2 className="font-serif text-3xl font-bold text-stone-950 mb-3">
+        <h2 className="font-bold text-stone-950 mb-3">
           Your Cart Studio is Empty
         </h2>
-        <p className="text-stone-500 text-sm max-w-sm leading-relaxed mb-8 font-light">
+        <p className="text-stone-500 max-w-sm mb-8 font-light">
           You haven&apos;t added any celebration cakes or artisanal pastries
           yet. Let&apos;s design something sweet.
         </p>
-        <Link href="/menu">
-          <Button className="bg-stone-950 text-white font-bold tracking-wider hover:bg-stone-800 transition-colors uppercase h-12 px-8 rounded-none">
-            Browse Menu
-          </Button>
+        <Link href={getTenantRoute(tenantSlug, "/menu")}>
+          <Button>Browse Menu</Button>
         </Link>
       </div>
     );
   }
 
   return (
-    <div className="py-24 bg-stone-50 text-stone-900">
+    <div className="py-8 bg-stone-50 text-foreground">
       <div className="container flex-col">
-        {/* Title */}
-        <div className="mb-12">
+        {/* Breadcrumb Navigation */}
+        <nav className="w-full flex items-center gap-2 text-sm text-foreground font-medium mb-8">
           <Link
-            href="/menu"
-            className="inline-flex items-center gap-2 text-stone-500 hover:text-stone-900 transition-colors uppercase tracking-wider text-xs font-bold mb-4"
+            href={getTenantRoute(tenantSlug, "/")}
+            className="hover:text-stone-900 transition-colors text-stone-500"
           >
-            <ArrowLeft className="h-4 w-4" />
-            Continue Browsing
+            Home
           </Link>
-          <h1 className="font-serif font-medium text-stone-950 text-4xl md:text-5xl">
-            Your Cart Studio
-          </h1>
-          <p className="text-stone-500 text-sm mt-2 font-light">
+          <ChevronRight className="h-3.5 w-3.5 text-stone-400" />
+          <Link
+            href={getTenantRoute(tenantSlug, "/menu")}
+            className="hover:text-stone-900 transition-colors text-stone-500"
+          >
+            Menu
+          </Link>
+          <ChevronRight className="h-3.5 w-3.5 text-stone-400" />
+          <span className="text-stone-900 font-semibold truncate max-w-xs">
+            Cart
+          </span>
+        </nav>
+
+        {/* Title */}
+        <div className="w-full mb-8">
+          <h3 className="font-bold text-foreground">Your Cart Studio</h3>
+          <p className="text-muted-foreground mt-2 font-light">
             Review your custom confections and choose delivery or studio pickup.
           </p>
         </div>
@@ -72,7 +103,7 @@ export function CartView() {
                   className="py-6 flex flex-col md:flex-row gap-6 items-start"
                 >
                   {/* Thumbnail */}
-                  <div className="relative aspect-square w-24 h-24 bg-stone-100 shrink-0 overflow-hidden">
+                  <div className="relative aspect-square w-24 h-24 bg-stone-100 rounded-md shrink-0 overflow-hidden">
                     <Image
                       src={item.image}
                       alt={item.name}
@@ -84,16 +115,16 @@ export function CartView() {
 
                   {/* Details */}
                   <div className="grow min-w-0">
-                    <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-serif text-lg font-bold text-stone-950">
-                        {item.name}
-                      </h3>
-                      <span className="font-serif font-bold text-stone-950">
-                        ${(item.price * item.quantity).toFixed(2)}
+                    <div className="flex justify-between items-start mb-1">
+                      <h4 className="font-bold text-foreground">{item.name}</h4>
+                      <span className="font-bold text-foreground">
+                        {formatCurrency(
+                          (item.price * item.quantity).toFixed(2),
+                        )}
                       </span>
                     </div>
 
-                    <div className="flex flex-col gap-1 mb-4 text-xs text-stone-500">
+                    <div className="flex flex-col gap-1 mb-4 text-sm text-stone-500">
                       {item.size && (
                         <div>
                           <span className="font-semibold text-foreground">
@@ -102,23 +133,15 @@ export function CartView() {
                           {item.size}
                         </div>
                       )}
-                      {item.flavor && (
-                        <div>
-                          <span className="font-semibold text-foreground">
-                            Flavor:
-                          </span>{" "}
-                          {item.flavor}
-                        </div>
-                      )}
-                      <div className="text-[10px] text-stone-400 font-bold mt-1">
-                        UNIT PRICE: ${item.price.toFixed(2)}
+                      <div className="text-muted-foreground text-xs font-bold mt-1">
+                        Unit Price: {formatCurrency(item.price.toFixed(2))}
                       </div>
                     </div>
 
                     {/* Controls Row */}
                     <div className="flex items-center justify-between">
                       {/* Quantity selector */}
-                      <div className="flex items-center justify-between border border-stone-200 bg-white w-28 h-8 px-2 select-none">
+                      <div className="flex items-center justify-between border border-border bg-white rounded-md w-24 h-8.5 px-0.5 select-none">
                         <button
                           onClick={() =>
                             updateQuantity(
@@ -128,7 +151,7 @@ export function CartView() {
                               item.flavor,
                             )
                           }
-                          className="text-stone-500 hover:text-stone-900 transition-colors p-1"
+                          className="text-stone-500 hover:text-stone-900 hover:bg-secondary rounded-md transition-colors p-2 cursor-pointer"
                           aria-label="Decrease quantity"
                         >
                           <Minus className="h-3 w-3" />
@@ -145,7 +168,7 @@ export function CartView() {
                               item.flavor,
                             )
                           }
-                          className="text-stone-500 hover:text-stone-900 transition-colors p-1"
+                          className="text-stone-500 hover:text-stone-900 hover:bg-secondary rounded-md transition-colors p-2 cursor-pointer"
                           aria-label="Increase quantity"
                         >
                           <Plus className="h-3 w-3" />
@@ -157,7 +180,7 @@ export function CartView() {
                         onClick={() =>
                           removeFromCart(item.id, item.size, item.flavor)
                         }
-                        className="text-stone-400 hover:text-rose-600 transition-colors flex items-center gap-1 text-xs"
+                        className="text-stone-400 hover:text-rose-600 transition-colors flex items-center gap-1 text-xs cursor-pointer"
                       >
                         <Trash2 className="h-4 w-4" />
                         <span>Remove</span>
@@ -169,7 +192,7 @@ export function CartView() {
             </div>
 
             {/* Gift option helper banner */}
-            <div className="flex items-start gap-4 p-5 bg-stone-100/50 border border-stone-200/50">
+            {/* <div className="flex items-start gap-4 p-5 bg-stone-100/50 border border-stone-200/50">
               <Gift className="h-5 w-5 text-primary shrink-0 mt-0.5" />
               <div>
                 <h4 className="text-xs font-bold tracking-wider uppercase text-stone-900 mb-1">
@@ -180,86 +203,91 @@ export function CartView() {
                   to enter your message during the checkout process.
                 </p>
               </div>
-            </div>
+            </div> */}
           </div>
 
           {/* Right Column: Checkout Summary Box */}
-          <div className="bg-white border border-stone-200 p-8 flex flex-col w-full shadow-xs">
-            <h3 className="font-serif text-xl font-bold text-stone-950 mb-6 border-b border-stone-200 pb-4">
+          <div className="bg-white border border-stone-200 rounded-lg p-6 flex flex-col w-full shadow-xs">
+            <h4 className="font-bold font-secondary text-foreground mb-4 border-b border-stone-200 pb-4">
               Studio Summary
-            </h3>
+            </h4>
 
             {/* Shipping selection tabs */}
             <div className="w-full mb-6">
-              <h4 className="text-xs font-bold tracking-wider uppercase text-stone-500 mb-3">
+              <p className="font-bold text-xs tracking-wider uppercase text-stone-400 mb-3">
                 Fulfillment Mode
-              </h4>
+              </p>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => setShippingMethod("pickup")}
-                  className={`py-3 text-center text-xs font-bold tracking-wide uppercase cursor-pointer border ${
+                  className={`py-3 text-center text-xs font-bold tracking-wide uppercase cursor-pointer rounded-md border ${
                     shippingMethod === "pickup"
-                      ? "border-stone-950 bg-stone-950 text-white"
-                      : "border-stone-200 hover:border-stone-400 bg-white text-foreground"
+                      ? "border-primary bg-primary text-white"
+                      : "border-border hover:border-border/40 bg-card text-foreground"
                   }`}
                 >
-                  Studio Pickup
+                  Pickup
                 </button>
                 <button
                   onClick={() => setShippingMethod("delivery")}
-                  className={`py-3 text-center text-xs font-bold tracking-wide uppercase cursor-pointer border ${
+                  className={`py-3 text-center text-xs font-bold tracking-wide uppercase cursor-pointer rounded-md border ${
                     shippingMethod === "delivery"
-                      ? "border-stone-950 bg-stone-950 text-white"
-                      : "border-stone-200 hover:border-stone-400 bg-white text-foreground"
+                      ? "border-primary bg-primary text-white"
+                      : "border-border hover:border-border/40 bg-card text-foreground"
                   }`}
                 >
-                  White-Glove Delivery
+                  Delivery
                 </button>
               </div>
             </div>
 
             {/* Summary figures */}
             <div className="flex flex-col gap-4 mb-8">
-              <div className="flex justify-between text-sm text-stone-500 font-light">
+              <div className="flex justify-between text-xs text-stone-500 font-medium">
                 <span>Items Subtotal</span>
-                <span className="font-medium text-stone-950">
-                  ${subtotal.toFixed(2)}
+                <span className="font-semibold text-sm text-foreground">
+                  {formatCurrency(subtotal.toFixed(2))}
                 </span>
               </div>
 
-              <div className="flex justify-between text-sm text-stone-500 font-light">
+              <div className="flex justify-between text-xs text-stone-500 font-medium">
                 <span>Fulfillment Fee</span>
                 {shippingMethod === "pickup" ? (
                   <span className="text-emerald-600 font-semibold uppercase text-xs tracking-wider">
                     Free Pickup
                   </span>
                 ) : (
-                  <span className="font-medium text-stone-950">$45.00</span>
+                  <span className="font-semibold text-sm text-foreground">
+                    $45.00
+                  </span>
                 )}
               </div>
 
-              <div className="flex justify-between text-sm text-stone-500 font-light">
+              <div className="flex justify-between text-xs text-stone-500 font-medium">
                 <span>Estimated Sales Tax</span>
-                <span className="font-medium text-stone-950">
-                  ${estTax.toFixed(2)}
+                <span className="font-semibold text-sm text-foreground">
+                  {formatCurrency(estTax.toFixed(2))}
                 </span>
               </div>
 
               <div className="w-full h-px bg-stone-200 my-2" />
 
-              <div className="flex justify-between items-baseline font-serif">
-                <span className="text-base font-bold text-stone-950">
+              <div className="flex justify-between items-baseline">
+                <span className="text-base font-bold text-foreground">
                   Grand Total
                 </span>
-                <span className="text-2xl font-bold text-stone-950">
-                  ${total.toFixed(2)}
+                <span className="text-2xl font-bold text-foreground">
+                  {formatCurrency(total.toFixed(2))}
                 </span>
               </div>
             </div>
 
             {/* Checkout Link button */}
-            <Link href="/checkout" className="w-full">
-              <Button className="w-full bg-stone-950 text-white font-bold tracking-wider hover:bg-stone-800 transition-colors uppercase h-12 rounded-none gap-2 flex items-center justify-center cursor-pointer">
+            <Link
+              href={getTenantRoute(tenantSlug, "/checkout")}
+              className="w-full"
+            >
+              <Button className="w-full">
                 <CreditCard className="h-5 w-5" />
                 Proceed to Checkout
               </Button>

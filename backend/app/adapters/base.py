@@ -1,7 +1,7 @@
 import uuid
 from abc import ABC, abstractmethod
-from typing import List, Optional
-from app.schemas.product import ProductCreate, ProductUpdate, ProductResponse
+from typing import List, Optional, Union
+from app.schemas.product import ProductCreate, ProductUpdate, ProductResponse, ProductSummaryResponse
 
 
 class ProductRepositoryAdapter(ABC):
@@ -26,8 +26,15 @@ class ProductRepositoryAdapter(ABC):
         skip: int = 0,
         limit: int = 50,
         published_only: bool = True,
-    ) -> List[ProductResponse]:
-        """List products with pagination."""
+        category: Optional[str] = None,
+        min_price: Optional[float] = None,
+        max_price: Optional[float] = None,
+        availability: Optional[str] = None,
+        search: Optional[str] = None,
+        filters: Optional[dict] = None,
+        **kwargs,
+    ) -> List[Union[ProductResponse, ProductSummaryResponse]]:
+        """List products with pagination and optional filtering."""
         pass
 
     @abstractmethod

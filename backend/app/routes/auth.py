@@ -26,6 +26,8 @@ from app.schemas.auth import (
     RefreshTokenRequest,
     UserResponse,
     AuthResponse,
+    UpdateProfileRequest,
+    ChangePasswordRequest,
 )
 from app.schemas.response import success_response, ApiResponse, ErrorResponse
 from app.dependencies import get_current_user
@@ -505,3 +507,56 @@ async def get_me(
         data=user_data,
         message="User details retrieved successfully",
     )
+
+@router.patch(
+    "/me",
+    status_code=status.HTTP_200_OK,
+    response_model=ApiResponse[Dict[str, Any]],
+    summary="Update profile of currently authenticated user",
+)
+async def update_me(
+    payload: UpdateProfileRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    if payload.first_name is not None and payload.first_name.strip():
+        current_user.first_name = payload.first_name.strip()
+    if payload.last_name is not None and payload.last_name.strip():
+        current_user.last_name = payload.last_name.strip()
+    if payload.phone_number is not None:
+        current_user.phone_number = payload.phone_number.strip() or None
+
+    await db.commit()
+    await db.refresh(current_user)
+
+    user_data = UserResponse.model_validate(current_user).model_dump(mode="json")
+    user_data["full_name"] = f"{current_user.first_name} {current_user.last_name}"
+    return success_response(
+        data=user_data,
+        message="Profile updated successfully",
+    )
+
+
+@router.post(
+    "/change-password",
+    status_code=status.HTTP_200_OK,
+    response_model=ApiResponse[Dict[str, Any]],
+    summary="Change password for current authenticated user",
+)
+async def change_password(
+    payload: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    if not verify_password(payload.current_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect",
+        )
+    current_user.hashed_password = hash_password(payload.new_password)
+    await db.commit()
+    return success_response(
+        data={},
+        message="Password changed successfully",
+    )
+

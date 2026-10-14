@@ -17,9 +17,11 @@ import {
   Loader2,
   Plus,
   X,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -41,6 +43,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   getProductById,
+  createProduct,
   updateProduct,
   deleteProduct,
   uploadProductImage,
@@ -51,6 +54,7 @@ import {
   Product,
   ProductClass,
   ProductVariantInput,
+  CreateProductInput,
   UpdateProductInput,
   ProductCategory,
   ProductFilter,
@@ -91,6 +95,7 @@ export default function TenantProductDetailPage({
 }: ProductDetailPageProps) {
   const unwrappedParams = use(params);
   const { tenant: rawTenant, id: productId } = unwrappedParams;
+  const isCreating = productId === "new" || productId === "create";
   const router = useRouter();
   const { user } = useUserStore();
   const { tenant } = useTenantTheme();
@@ -111,6 +116,7 @@ export default function TenantProductDetailPage({
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("General");
   const [productClass, setProductClass] = useState<ProductClass>("physical");
+  const [availability, setAvailability] = useState<string>("available");
   const [currency, setCurrency] = useState(
     tenant?.currency || user?.tenant_currency || "NGN",
   );
@@ -169,6 +175,34 @@ export default function TenantProductDetailPage({
 
   // Fetch product data
   const loadProduct = useCallback(async () => {
+    if (isCreating) {
+      setIsLoading(false);
+      setProduct(null);
+      setName("");
+      setSlug("");
+      setDescription("");
+      setCategory("General");
+      setSelectedCategoryId("");
+      setSelectedFilters({});
+      setProductClass("physical");
+      setAvailability("available");
+      setCurrency(tenant?.currency || user?.tenant_currency || "NGN");
+      setIsPublished(true);
+      setImages([]);
+      setSpecifications([{ key: "", value: "" }]);
+      setVariants([
+        {
+          sku: `SKU-${Date.now().toString().slice(-4)}`,
+          price: "100",
+          compare_at_price: "",
+          track_inventory: true,
+          stock_quantity: "10",
+          options: [],
+        },
+      ]);
+      return;
+    }
+
     try {
       setIsLoading(true);
       const res = await getProductById(productId, activeTenantSlug);
@@ -180,6 +214,7 @@ export default function TenantProductDetailPage({
         setDescription(p.description || "");
         setCategory(p.category || "General");
         setSelectedCategoryId(p.category_id || "");
+        setAvailability(p.availability || "available");
 
         // Comprehensive normalization for filters & tags
         const loadedFilters: Record<string, string[]> = {};
@@ -696,7 +731,7 @@ export default function TenantProductDetailPage({
         }
       });
 
-      const payload: UpdateProductInput = {
+      const payload: CreateProductInput & UpdateProductInput = {
         name: name.trim(),
         title: name.trim(),
         slug: slug.trim(),
@@ -708,6 +743,7 @@ export default function TenantProductDetailPage({
         filters: cleanedFilters,
         variants: variantsPayload,
         images: images.slice(0, 5),
+        availability,
         is_published: isPublished,
         // Legacy fallbacks
         sku: primaryVariant.sku,
@@ -716,25 +752,35 @@ export default function TenantProductDetailPage({
         inventory_count: primaryVariant.stock_quantity,
       };
 
-      const res = await updateProduct(productId, payload, activeTenantSlug);
-      if (res.status === "success" && res.data) {
-        setProduct(res.data);
-        if (res.data.filters) {
-          const loadedFilters: Record<string, string[]> = {};
-          Object.entries(res.data.filters).forEach(([k, v]) => {
-            if (Array.isArray(v)) {
-              loadedFilters[k] = (v as unknown[]).map(String);
-            }
-          });
-          setSelectedFilters(loadedFilters);
+      if (isCreating) {
+        const res = await createProduct(payload, activeTenantSlug);
+        if (res.status === "success" && res.data) {
+          toast.success("Product created successfully!");
+          router.push(getTenantRoute(activeTenantSlug, "/products"));
+        } else {
+          toast.error(res.message || "Failed to create product");
         }
-        toast.success("Product updated successfully");
       } else {
-        toast.error(res.message || "Failed to update product");
+        const res = await updateProduct(productId, payload, activeTenantSlug);
+        if (res.status === "success" && res.data) {
+          setProduct(res.data);
+          if (res.data.filters) {
+            const loadedFilters: Record<string, string[]> = {};
+            Object.entries(res.data.filters).forEach(([k, v]) => {
+              if (Array.isArray(v)) {
+                loadedFilters[k] = (v as unknown[]).map(String);
+              }
+            });
+            setSelectedFilters(loadedFilters);
+          }
+          toast.success("Product updated successfully");
+        } else {
+          toast.error(res.message || "Failed to update product");
+        }
       }
     } catch (err: unknown) {
-      console.error("Error updating product:", err);
-      toast.error("An error occurred while updating product");
+      console.error("Error saving product:", err);
+      toast.error("An error occurred while saving product");
     } finally {
       setIsSaving(false);
     }
@@ -744,6 +790,14 @@ export default function TenantProductDetailPage({
   const handleToggleStatus = async () => {
     const nextState = !isPublished;
     setIsPublished(nextState);
+    if (isCreating) {
+      toast.success(
+        nextState
+          ? "Product will be published when created"
+          : "Product will be saved as draft",
+      );
+      return;
+    }
     try {
       const res = await updateProduct(
         productId,
@@ -829,13 +883,84 @@ export default function TenantProductDetailPage({
 
   if (isLoading) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-stone-400" />
+      <div className="w-full flex flex-col gap-5 pb-16 text-foreground">
+        {/* Top Navigation & Actions Skeleton */}
+        <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-border">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-8 w-8 rounded-lg" />
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-6 w-44 rounded-md" />
+                <Skeleton className="h-5 w-16 rounded-full" />
+              </div>
+              <Skeleton className="h-3 w-56 rounded-md" />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-8 w-28 rounded-lg" />
+            <Skeleton className="h-8 w-32 rounded-lg" />
+          </div>
+        </div>
+
+        {/* Form Grid Skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column (Core + Specs) */}
+          <div className="lg:col-span-2 space-y-6">
+            <div className="p-5 bg-card rounded-xl border border-border space-y-4">
+              <Skeleton className="h-4 w-32 rounded-md" />
+              <div className="space-y-2">
+                <Skeleton className="h-3.5 w-24 rounded-md" />
+                <Skeleton className="h-9 w-full rounded-lg" />
+              </div>
+              <div className="space-y-2">
+                <Skeleton className="h-3.5 w-24 rounded-md" />
+                <Skeleton className="h-20 w-full rounded-lg" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Skeleton className="h-3.5 w-20 rounded-md" />
+                  <Skeleton className="h-9 w-full rounded-lg" />
+                </div>
+                <div className="space-y-2">
+                  <Skeleton className="h-3.5 w-20 rounded-md" />
+                  <Skeleton className="h-9 w-full rounded-lg" />
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5 bg-card rounded-xl border border-border space-y-4">
+              <Skeleton className="h-4 w-36 rounded-md" />
+              <div className="space-y-3">
+                <Skeleton className="h-10 w-full rounded-lg" />
+                <Skeleton className="h-10 w-full rounded-lg" />
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column (Images + Category) */}
+          <div className="space-y-6">
+            <div className="p-5 bg-card rounded-xl border border-border space-y-4">
+              <Skeleton className="h-4 w-28 rounded-md" />
+              <Skeleton className="aspect-square w-full rounded-xl" />
+              <div className="flex gap-2">
+                <Skeleton className="h-14 w-14 rounded-lg" />
+                <Skeleton className="h-14 w-14 rounded-lg" />
+                <Skeleton className="h-14 w-14 rounded-lg" />
+              </div>
+            </div>
+
+            <div className="p-5 bg-card rounded-xl border border-border space-y-4">
+              <Skeleton className="h-4 w-32 rounded-md" />
+              <Skeleton className="h-9 w-full rounded-lg" />
+              <Skeleton className="h-9 w-full rounded-lg" />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
-  if (!product) {
+  if (!isCreating && !product) {
     return (
       <div className="max-w-md mx-auto my-16 p-8 bg-card rounded-2xl border border-border text-center space-y-4 shadow-xs text-foreground">
         <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto text-muted-foreground">
@@ -882,7 +1007,7 @@ export default function TenantProductDetailPage({
           <div className="flex flex-col gap-0.5">
             <div className="flex items-center gap-2">
               <h4 className="font-bold font-secondary text-foreground">
-                {name || "Edit Product"}
+                {isCreating ? name || "Create Product" : name || "Edit Product"}
               </h4>
               <Badge
                 variant="outline"
@@ -896,7 +1021,20 @@ export default function TenantProductDetailPage({
               >
                 {productClass}
               </Badge>
+              {availability === "preorder" && (
+                <Badge
+                  variant="outline"
+                  className="text-[10px] bg-amber-50 text-amber-700 border-amber-200"
+                >
+                  Preorder
+                </Badge>
+              )}
             </div>
+            <p className="text-xs text-muted-foreground">
+              {isCreating
+                ? "Add a new product to your catalog"
+                : "Manage attributes, variants, and availability"}
+            </p>
           </div>
         </div>
 
@@ -911,14 +1049,16 @@ export default function TenantProductDetailPage({
             <span>{isPublished ? "Set to Draft" : "Publish Live"}</span>
           </Button>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsDeleteDialogOpen(true)}
-            className="text-xs h-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
+          {!isCreating && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsDeleteDialogOpen(true)}
+              className="text-xs h-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          )}
 
           <Button
             size="sm"
@@ -928,10 +1068,12 @@ export default function TenantProductDetailPage({
           >
             {isSaving ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : isCreating ? (
+              <Plus className="h-3.5 w-3.5" />
             ) : (
               <Save className="h-3.5 w-3.5" />
             )}
-            <span>Save Changes</span>
+            <span>{isCreating ? "Create Product" : "Save Changes"}</span>
           </Button>
         </div>
       </div>
@@ -957,7 +1099,7 @@ export default function TenantProductDetailPage({
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-foreground">
                   Product Class *
@@ -971,13 +1113,13 @@ export default function TenantProductDetailPage({
                   </SelectTrigger>
                   <SelectContent className="bg-card border-border text-foreground">
                     <SelectItem value="physical">
-                      Physical (Requires inventory & shipping)
+                      Physical (Requires inventory)
                     </SelectItem>
                     <SelectItem value="digital">
-                      Digital (Requires download access)
+                      Digital (Download access)
                     </SelectItem>
                     <SelectItem value="service">
-                      Service (Requires booking & scheduling)
+                      Service (Booking/schedule)
                     </SelectItem>
                   </SelectContent>
                 </Select>
@@ -993,7 +1135,7 @@ export default function TenantProductDetailPage({
                     onClick={() => setIsAddCategoryOpen(true)}
                     className="text-xs text-primary hover:underline font-semibold flex items-center gap-1 cursor-pointer"
                   >
-                    <Plus className="h-3 w-3" /> New Category
+                    <Plus className="h-3 w-3" /> New
                   </button>
                 </div>
 
@@ -1037,7 +1179,7 @@ export default function TenantProductDetailPage({
                       }}
                     >
                       <SelectTrigger className="w-full h-9 bg-background border-border text-foreground">
-                        <SelectValue placeholder="Select a category" />
+                        <SelectValue placeholder="Select category" />
                       </SelectTrigger>
                       <SelectContent className="bg-card border-border text-foreground">
                         {tenantCategories.map((cat) => (
@@ -1079,6 +1221,34 @@ export default function TenantProductDetailPage({
                     </Select>
                   );
                 })()}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-foreground">
+                  Availability *
+                </Label>
+                <Select
+                  value={availability}
+                  onValueChange={(val: string) => setAvailability(val)}
+                >
+                  <SelectTrigger className="w-full h-9 bg-background border-border text-foreground">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border-border text-foreground">
+                    <SelectItem value="available">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                        <span>Available Now (In Stock)</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="preorder">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                        <span>Preorder (Made to order)</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -1158,13 +1328,13 @@ export default function TenantProductDetailPage({
                             key={opt}
                             type="button"
                             onClick={() => toggleFilterOption(filter, opt)}
-                            className={`text-xs px-3 py-1.5 rounded-lg font-medium border transition-all cursor-pointer ${
+                            className={`flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg font-medium border transition-all cursor-pointer ${
                               isSelected
-                                ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
+                                ? "bg-primary text-white border-primary"
                                 : "bg-background text-foreground border-border hover:border-foreground/40"
                             }`}
                           >
-                            {isSelected && "✓ "}
+                            {isSelected && <Check className="h-4 w-4" />}
                             {opt}
                           </button>
                         );
@@ -1213,9 +1383,10 @@ export default function TenantProductDetailPage({
                                 return { ...prev, [filterKey]: updated };
                               });
                             }}
-                            className="text-xs px-3 py-1.5 rounded-lg font-medium border transition-all cursor-pointer bg-emerald-600 text-white border-emerald-600 shadow-xs"
+                            className="flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg font-medium border transition-all cursor-pointer bg-primary text-white border-primary"
                           >
-                            ✓ {opt} <span className="opacity-70 ml-1">×</span>
+                            <Check className="h-4 w-4" /> {opt}
+                            <span className="opacity-70 ml-1">×</span>
                           </button>
                         ))}
                       </div>

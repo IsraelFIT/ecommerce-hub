@@ -35,3 +35,23 @@ export async function getTenantServerData(
     return null;
   }
 }
+
+/**
+ * Returns formatted store name and description for SEO metadata across tenant routes.
+ */
+export async function getTenantMeta(slug: string) {
+  const tenantData = await getTenantServerData(slug);
+  const storeName =
+    tenantData?.name ||
+    slug
+      .split("-")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+
+  const storeDescription =
+    tenantData?.branding_config?.tagline ||
+    tenantData?.branding_config?.storeHeadline ||
+    "Explore our collection of custom celebration cakes and pastries.";
+
+  return { storeName, storeDescription, tenantData };
+}

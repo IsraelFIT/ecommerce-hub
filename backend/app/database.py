@@ -68,6 +68,7 @@ async def init_db():
                 await conn.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS category_name VARCHAR(100) DEFAULT 'General';"))
                 await conn.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS category VARCHAR(100) DEFAULT 'General';"))
                 await conn.execute(text("UPDATE products SET category_name = category WHERE category_name IS NULL AND category IS NOT NULL;"))
+                await conn.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS availability VARCHAR(50) DEFAULT 'available';"))
                 await conn.execute(text("ALTER TABLE categories ADD COLUMN IF NOT EXISTS description TEXT;"))
                 await conn.execute(text("ALTER TABLE categories ADD COLUMN IF NOT EXISTS icon VARCHAR(100);"))
                 await conn.execute(text("ALTER TABLE categories ADD COLUMN IF NOT EXISTS display_order INTEGER DEFAULT 0;"))
@@ -124,6 +125,9 @@ async def init_db():
                 await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_product_likes_product_id ON product_likes (product_id);"))
                 await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_product_likes_user_id ON product_likes (user_id);"))
                 await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_product_likes_session_id ON product_likes (session_id);"))
+
+                await conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id) ON DELETE SET NULL;"))
+                await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_orders_user_id ON orders (user_id);"))
 
                 await conn.execute(text("""
                     DO $$ BEGIN

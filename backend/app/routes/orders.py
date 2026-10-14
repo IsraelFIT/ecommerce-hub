@@ -1,14 +1,15 @@
 import uuid
 import secrets
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.dependencies import get_tenant_context, get_rls_db_session
 from app.models.tenant import Tenant
 from app.models.order import Order, OrderStatus
+from app.models.user import User
 from app.schemas.order import OrderCreate, OrderResponse
 from app.schemas.response import success_response, PaginationMeta, ApiResponse, PaginatedData, ErrorResponse
 
@@ -41,9 +42,18 @@ async def create_order(
 
     gateway_ref = f"ECH-{tenant.slug.upper()}-{secrets.token_hex(6).upper()}"
 
+    # Auto-resolve user_id if customer_email matches an existing user
+    user_id = order_in.user_id
+    if not user_id and order_in.customer_email:
+        user_res = await db.execute(
+            select(User.id).where(User.email == order_in.customer_email.strip().lower())
+        )
+        user_id = user_res.scalar_one_or_none()
+
     order = Order(
         tenant_id=tenant.id,
-        customer_email=order_in.customer_email,
+        user_id=user_id,
+        customer_email=order_in.customer_email.strip().lower(),
         customer_name=order_in.customer_name,
         total_amount=total_amount,
         platform_fee=platform_fee,
@@ -77,16 +87,33 @@ async def create_order(
 async def list_orders(
     page: int = 1,
     per_page: int = 15,
+    customer_email: Optional[str] = None,
+    user_id: Optional[uuid.UUID] = None,
     db: AsyncSession = Depends(get_rls_db_session),
 ) -> Dict[str, Any]:
     offset = (page - 1) * per_page
 
-    total_query = await db.execute(select(func.count(Order.id)))
+    query_count = select(func.count(Order.id))
+    query_items = select(Order).order_by(Order.created_at.desc())
+
+    if user_id and customer_email:
+        condition = or_(
+            Order.user_id == user_id,
+            Order.customer_email == customer_email.strip().lower(),
+        )
+        query_count = query_count.where(condition)
+        query_items = query_items.where(condition)
+    elif user_id:
+        query_count = query_count.where(Order.user_id == user_id)
+        query_items = query_items.where(Order.user_id == user_id)
+    elif customer_email:
+        query_count = query_count.where(Order.customer_email == customer_email.strip().lower())
+        query_items = query_items.where(Order.customer_email == customer_email.strip().lower())
+
+    total_query = await db.execute(query_count)
     total = total_query.scalar() or 0
 
-    result = await db.execute(
-        select(Order).order_by(Order.created_at.desc()).offset(offset).limit(per_page)
-    )
+    result = await db.execute(query_items.offset(offset).limit(per_page))
     orders = result.scalars().all()
 
     last_page = max(1, (total + per_page - 1) // per_page)

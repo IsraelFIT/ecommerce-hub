@@ -1,6 +1,6 @@
 import uuid
 import enum
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from sqlalchemy import String, Numeric, Enum, ForeignKey, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -25,6 +25,12 @@ class Order(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         nullable=False,
         index=True,
     )
+    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     customer_email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     customer_name: Mapped[str] = mapped_column(String(255), nullable=False)
     
@@ -46,3 +52,5 @@ class Order(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     metadata_json: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
 
     tenant = relationship("Tenant", back_populates="orders")
+    user = relationship("User", back_populates="orders")
+

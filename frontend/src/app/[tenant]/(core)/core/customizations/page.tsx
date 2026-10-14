@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
@@ -375,7 +376,49 @@ export default function CoreCustomizationsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredBrandings.length === 0 ? (
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow
+                    key={`branding-skel-${i}`}
+                    className="border-border"
+                  >
+                    <TableCell className="py-3.5">
+                      <div className="flex items-center gap-3">
+                        <Skeleton className="size-8.5 rounded-xl shrink-0" />
+                        <div className="space-y-1.5 min-w-0">
+                          <Skeleton className="h-3.5 w-28 rounded-md" />
+                          <Skeleton className="h-3 w-36 rounded-md" />
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-3.5">
+                      <div className="flex items-center gap-2">
+                        <Skeleton className="size-4 rounded-full" />
+                        <Skeleton className="h-3.5 w-14 rounded-md" />
+                        <Skeleton className="size-4 rounded-full ml-2" />
+                        <Skeleton className="h-3.5 w-14 rounded-md" />
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-3.5">
+                      <Skeleton className="h-5 w-20 rounded-full" />
+                    </TableCell>
+                    <TableCell className="py-3.5">
+                      <Skeleton className="h-5 w-16 rounded-md" />
+                    </TableCell>
+                    <TableCell className="py-3.5">
+                      <div className="space-y-1">
+                        <Skeleton className="h-3.5 w-32 rounded-md" />
+                        <Skeleton className="h-3 w-24 rounded-md" />
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-3.5 text-right">
+                      <div className="flex justify-end gap-1.5">
+                        <Skeleton className="h-7 w-20 rounded-md" />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : filteredBrandings.length === 0 ? (
                 <TableRow>
                   <TableCell
                     colSpan={6}
@@ -555,7 +598,41 @@ export default function CoreCustomizationsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredRequests.length === 0 ? (
+                {isLoading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={`req-skel-${i}`} className="border-border">
+                      <TableCell className="py-3.5">
+                        <div className="space-y-1.5">
+                          <Skeleton className="h-3.5 w-28 rounded-md" />
+                          <Skeleton className="h-3 w-16 rounded-md" />
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-3.5">
+                        <div className="space-y-1.5">
+                          <Skeleton className="h-3.5 w-32 rounded-md" />
+                          <Skeleton className="h-3 w-20 rounded-md" />
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-3.5 max-w-xs">
+                        <Skeleton className="h-3.5 w-48 rounded-md" />
+                      </TableCell>
+                      <TableCell className="py-3.5">
+                        <div className="flex items-center gap-1.5">
+                          <Skeleton className="size-4 rounded-full" />
+                          <Skeleton className="size-4 rounded-full" />
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-3.5">
+                        <Skeleton className="h-5 w-20 rounded-full" />
+                      </TableCell>
+                      <TableCell className="py-3.5 text-right">
+                        <div className="flex justify-end gap-1.5">
+                          <Skeleton className="h-7 w-20 rounded-md" />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : filteredRequests.length === 0 ? (
                   <TableRow>
                     <TableCell
                       colSpan={6}

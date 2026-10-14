@@ -50,11 +50,11 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { useUserStore } from "@/store/user";
 import { useTenantTheme } from "@/components/providers/tenant-theme-provider";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   getProducts,
   createProduct,
@@ -764,17 +764,18 @@ export default function TenantProductsPage({ params }: ProductsPageProps) {
             />
             <span>Refresh</span>
           </Button>
+          <Button
+            asChild
+            size="md"
+            className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-9 cursor-pointer shadow-xs"
+          >
+            <Link href={getTenantRoute(activeTenantSlug, "/products/new")}>
+              <Plus className="h-4 w-4" />
+              <span>Add Product</span>
+            </Link>
+          </Button>
 
           <Dialog open={isAddProductOpen} onOpenChange={setIsAddProductOpen}>
-            <DialogTrigger asChild>
-              <Button
-                size="md"
-                className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-9 cursor-pointer shadow-xs"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Add Product</span>
-              </Button>
-            </DialogTrigger>
             <DialogContent className="max-w-2xl bg-card p-6 rounded-2xl border border-border max-h-[90vh] overflow-y-auto text-foreground">
               <DialogHeader>
                 <DialogTitle className="text-lg font-bold text-foreground flex items-center gap-2">
@@ -1722,14 +1723,40 @@ export default function TenantProductsPage({ params }: ProductsPageProps) {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow className="border-border">
-                <TableCell
-                  colSpan={7}
-                  className="h-32 text-center text-xs text-muted-foreground"
-                >
-                  Loading catalog products...
-                </TableCell>
-              </TableRow>
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i} className="border-border">
+                  <TableCell className="py-3">
+                    <div className="flex items-center gap-3">
+                      <Skeleton className="w-10 h-10 rounded-lg shrink-0" />
+                      <div className="space-y-1.5 min-w-0">
+                        <Skeleton className="h-4 w-36" />
+                        <Skeleton className="h-3 w-20" />
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-24" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-16" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-20" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Skeleton className="h-7 w-12 rounded-md" />
+                      <Skeleton className="h-7 w-7 rounded-md" />
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
             ) : paginatedItems.length === 0 ? (
               <TableRow className="border-border">
                 <TableCell
@@ -1746,10 +1773,14 @@ export default function TenantProductsPage({ params }: ProductsPageProps) {
                 const variantsList = p.variants || [];
                 const primaryVariant = variantsList[0];
                 const displayPrice = primaryVariant?.price ?? p.price ?? 0;
-                const totalStock = variantsList.reduce(
-                  (acc, v) => acc + (v.track_inventory ? v.stock_quantity : 0),
-                  0,
-                );
+                const totalStock =
+                  variantsList.length > 0
+                    ? variantsList.reduce(
+                        (acc, v) =>
+                          acc + (v.track_inventory ? v.stock_quantity : 0),
+                        0,
+                      )
+                    : (p.inventory_count ?? 0);
                 const hasInfiniteStock =
                   pClass === "digital" ||
                   pClass === "service" ||

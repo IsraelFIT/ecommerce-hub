@@ -56,6 +56,7 @@ class ProductBase(BaseModel):
     category_id: Optional[uuid.UUID] = None
     category: Optional[str] = Field(default="General", description="Category name alias")
     images: List[str] = Field(default_factory=list, max_length=5, description="Product image URLs (max 5)")
+    availability: Optional[str] = Field(default="available", description="Product availability: 'available' or 'preorder'")
     is_published: bool = Field(default=True, description="Publish status")
 
     @field_validator("images")
@@ -77,6 +78,7 @@ class ProductCreate(BaseModel):
     category_id: Optional[uuid.UUID] = None
     category: Optional[str] = "General"
     images: List[str] = Field(default_factory=list, max_length=5, description="Product image URLs (max 5)")
+    availability: Optional[str] = "available"
     is_published: bool = True
     variants: List[ProductVariantCreate] = Field(default_factory=list)
 
@@ -135,6 +137,7 @@ class ProductUpdate(BaseModel):
     category_id: Optional[uuid.UUID] = None
     category: Optional[str] = None
     images: Optional[List[str]] = Field(default=None, max_length=5, description="Product image URLs (max 5)")
+    availability: Optional[str] = None
     is_published: Optional[bool] = None
     variants: Optional[List[ProductVariantUpdate]] = None
 
@@ -167,6 +170,7 @@ class ProductResponse(BaseModel):
     category_id: Optional[uuid.UUID] = None
     category: Optional[str] = None
     images: List[str] = Field(default_factory=list, max_length=5, description="Product image URLs (max 5)")
+    availability: Optional[str] = "available"
     is_published: bool = True
     variants: List[ProductVariantResponse] = Field(default_factory=list)
 
@@ -185,3 +189,58 @@ class ProductResponse(BaseModel):
     likes_count: Optional[int] = 0
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ProductVariantSummaryResponse(BaseModel):
+    id: uuid.UUID
+    sku: Optional[str] = None
+    price: float
+    track_inventory: bool = True
+    stock_quantity: int = 0
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ProductMenuSummaryResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    description: Optional[str] = None
+    product_class: ProductClass = ProductClass.PHYSICAL
+    category: Optional[str] = None
+    images: List[str] = Field(default_factory=list, description="Primary product image URL (max 1)")
+    price: Optional[float] = None
+    currency: Optional[str] = "NGN"
+    inventory_count: Optional[int] = None
+
+    # Ratings and Likes
+    average_rating: Optional[float] = 0.0
+    reviews_count: Optional[int] = 0
+    is_liked: Optional[bool] = False
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ProductSummaryResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    slug: str
+    description: Optional[str] = None
+    product_class: ProductClass = ProductClass.PHYSICAL
+    category: Optional[str] = None
+    images: List[str] = Field(default_factory=list, description="Product image URLs")
+    availability: Optional[str] = "available"
+    is_published: bool = True
+    filters: Dict[str, List[str]] = Field(default_factory=dict)
+    price: Optional[float] = None
+    currency: Optional[str] = "NGN"
+    inventory_count: Optional[int] = None
+
+    # Ratings and Likes
+    average_rating: Optional[float] = 0.0
+    reviews_count: Optional[int] = 0
+    is_liked: Optional[bool] = False
+    likes_count: Optional[int] = 0
+
+    model_config = ConfigDict(from_attributes=True)
+
+

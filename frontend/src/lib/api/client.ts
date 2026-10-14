@@ -80,11 +80,41 @@ export const apiRequest = async <T = unknown>(
         ? localStorage.getItem("ecommerce_guest_session_id")
         : null;
 
+    // Detect tenant slug in browser if available
+    let autoTenantSlug: string | null = null;
+    if (typeof window !== "undefined") {
+      const hostname = window.location.hostname.toLowerCase();
+      if (
+        hostname.includes(".localhost") &&
+        !hostname.startsWith("localhost")
+      ) {
+        autoTenantSlug = hostname.split(".localhost")[0];
+      } else {
+        const segs = window.location.pathname.split("/").filter(Boolean);
+        const reserved = [
+          "api",
+          "core",
+          "login",
+          "signup",
+          "dashboard",
+          "_next",
+          "static",
+        ];
+        if (segs.length > 0 && !reserved.includes(segs[0])) {
+          autoTenantSlug = segs[0];
+        }
+      }
+    }
+    if (!autoTenantSlug && session?.tenantSlug) {
+      autoTenantSlug = session.tenantSlug;
+    }
+
     // Prepare headers with JSON default (unless FormData) and Bearer authorization
     const headers: HeadersInit = {
       ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       ...(guestId ? { "X-Session-ID": guestId } : {}),
+      ...(autoTenantSlug ? { "X-Tenant-Slug": autoTenantSlug } : {}),
       ...options.headers,
     };
 
@@ -166,9 +196,7 @@ export const apiRequest = async <T = unknown>(
               await createSession(
                 newAccessToken,
                 newRefreshToken,
-                undefined,
                 authData.role,
-                {},
                 ACCESS_TOKEN_MAX_AGE,
               );
 

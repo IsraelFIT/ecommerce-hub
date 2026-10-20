@@ -6,7 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.tenant import Tenant
+from app.models.user import User
 from app.models.customization_request import CustomizationRequest
+from app.dependencies import get_current_user, get_current_super_admin
 from app.schemas.customization import (
     CustomLandingPageRequestCreate,
     CustomizationRequestUpdate,
@@ -41,6 +43,7 @@ router = APIRouter(
 async def submit_landing_page_request(
     payload: CustomLandingPageRequestCreate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     # 1. Resolve Tenant
     tenant = None
@@ -58,6 +61,13 @@ async def submit_landing_page_request(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Tenant could not be found to submit customization request.",
         )
+
+    if current_user.role != "super_admin":
+        if current_user.role not in ["admin", "tenant_admin"] or current_user.tenant_id != tenant.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have administrative access to this tenant store.",
+            )
 
     # 2. Check for existing pending/in_progress request for this tenant
     req_query = await db.execute(
@@ -143,6 +153,7 @@ async def set_landing_page_type(
         "default", pattern="^(default|custom)$", description="Landing page mode"
     ),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     t_res = await db.execute(
         select(Tenant).where(Tenant.slug == tenant_slug.lower())
@@ -152,6 +163,13 @@ async def set_landing_page_type(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found"
         )
+
+    if current_user.role != "super_admin":
+        if current_user.role not in ["admin", "tenant_admin"] or current_user.tenant_id != tenant.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have administrative access to this tenant store.",
+            )
 
     cfg = dict(tenant.branding_config or {})
     cfg["landingPageType"] = landing_page_type
@@ -181,6 +199,7 @@ async def list_customization_requests(
     page: int = Query(1, ge=1),
     per_page: int = Query(15, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_super_admin),
 ) -> Dict[str, Any]:
     query = select(CustomizationRequest)
 
@@ -238,6 +257,7 @@ async def update_customization_request(
     request_id: uuid.UUID,
     payload: CustomizationRequestUpdate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_super_admin),
 ) -> Dict[str, Any]:
     req_res = await db.execute(
         select(CustomizationRequest).where(CustomizationRequest.id == request_id)
@@ -290,6 +310,7 @@ async def list_tenant_brandings(
     page: int = Query(1, ge=1),
     per_page: int = Query(15, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_super_admin),
 ) -> Dict[str, Any]:
     # 1. Fetch Tenants
     query = select(Tenant)
@@ -381,6 +402,7 @@ async def list_tenant_brandings(
 async def get_tenant_customization_status(
     slug: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     t_res = await db.execute(select(Tenant).where(Tenant.slug == slug.lower()))
     tenant = t_res.scalar_one_or_none()
@@ -388,6 +410,13 @@ async def get_tenant_customization_status(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found"
         )
+
+    if current_user.role != "super_admin":
+        if current_user.role not in ["admin", "tenant_admin"] or current_user.tenant_id != tenant.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have administrative access to this tenant store.",
+            )
 
     req_query = await db.execute(
         select(CustomizationRequest)

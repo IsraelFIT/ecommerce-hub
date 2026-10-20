@@ -5,9 +5,10 @@ from fastapi import APIRouter, Depends, HTTPException, Header, Query, Request, s
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
-from app.dependencies import get_product_adapter
+from app.dependencies import get_product_adapter, get_current_tenant_admin
 from app.adapters.base import ProductRepositoryAdapter
 from app.core.security import decode_access_token
+from app.models.user import User
 from app.models.review import Review
 from app.models.like import ProductLike
 from app.schemas.product import (
@@ -53,29 +54,6 @@ def _extract_user_id(
             except ValueError:
                 return None
     return None
-
-
-async def _verify_tenant_write_permission(
-    adapter: ProductRepositoryAdapter,
-    authorization: Optional[str] = None,
-    request: Optional[Request] = None,
-    db: Optional[AsyncSession] = None,
-) -> None:
-    if not db:
-        return
-    user_id = _extract_user_id(authorization, request)
-    if user_id:
-        from app.models.user import User
-        user_res = await db.execute(select(User).where(User.id == user_id))
-        user = user_res.scalar_one_or_none()
-        if user:
-            adapter_tenant_id = getattr(adapter, "tenant_id", None)
-            if user.role not in ("super_admin", "admin"):
-                if user.role == "tenant_admin" and adapter_tenant_id and user.tenant_id != adapter_tenant_id:
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail="You do not have administrative access to manage products for this tenant store.",
-                    )
 
 
 async def enrich_products_metadata(
@@ -352,14 +330,9 @@ async def get_product(
 )
 async def create_product(
     product_in: ProductCreate,
-    request: Request,
-    authorization: Optional[str] = Header(None, alias="Authorization"),
+    current_user: User = Depends(get_current_tenant_admin),
     adapter: ProductRepositoryAdapter = Depends(get_product_adapter),
-    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
-    await _verify_tenant_write_permission(
-        adapter=adapter, authorization=authorization, request=request, db=db
-    )
     product = await adapter.create_product(product_in)
     return success_response(
         data=product.model_dump(mode="json") if hasattr(product, "model_dump") else product,
@@ -380,14 +353,9 @@ async def create_product(
 async def update_product(
     product_id: uuid.UUID,
     product_in: ProductUpdate,
-    request: Request,
-    authorization: Optional[str] = Header(None, alias="Authorization"),
+    current_user: User = Depends(get_current_tenant_admin),
     adapter: ProductRepositoryAdapter = Depends(get_product_adapter),
-    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
-    await _verify_tenant_write_permission(
-        adapter=adapter, authorization=authorization, request=request, db=db
-    )
     product = await adapter.update_product(product_id, product_in)
     if not product:
         raise HTTPException(
@@ -407,14 +375,9 @@ async def update_product(
 )
 async def delete_product(
     product_id: uuid.UUID,
-    request: Request,
-    authorization: Optional[str] = Header(None, alias="Authorization"),
+    current_user: User = Depends(get_current_tenant_admin),
     adapter: ProductRepositoryAdapter = Depends(get_product_adapter),
-    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
-    await _verify_tenant_write_permission(
-        adapter=adapter, authorization=authorization, request=request, db=db
-    )
     success = await adapter.delete_product(product_id)
     if not success:
         raise HTTPException(

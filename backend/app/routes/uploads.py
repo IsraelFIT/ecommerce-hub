@@ -12,6 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.database import get_db
 from app.models.tenant import Tenant, BackendType
+from app.models.user import User
+from app.dependencies import get_current_user
 from app.schemas.response import success_response, ErrorResponse
 
 router = APIRouter(
@@ -64,6 +66,7 @@ async def upload_image(
     file: UploadFile = File(...),
     x_tenant_slug: Optional[str] = Header(None, alias="X-Tenant-Slug"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     content_type = file.content_type or mimetypes.guess_type(file.filename or "")[0]
     if not content_type or content_type.lower() not in ALLOWED_IMAGE_TYPES:
@@ -84,6 +87,13 @@ async def upload_image(
     if x_tenant_slug:
         result = await db.execute(select(Tenant).where(Tenant.slug == x_tenant_slug.lower()))
         tenant = result.scalar_one_or_none()
+
+    if tenant and current_user.role != "super_admin":
+        if current_user.tenant_id != tenant.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to upload assets for this tenant store.",
+            )
 
     # 2. If tenant uses Sanity CMS and has credentials, upload to Sanity Asset CDN
     if tenant and tenant.backend_type == BackendType.SANITY:

@@ -205,20 +205,32 @@ security_scheme = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> User:
     """
     Extracts and validates JWT Bearer token, retrieving the authenticated user from DB.
+    Supports Authorization Bearer header, request headers, and session cookies.
     """
-    if not credentials or not credentials.credentials:
+    token: Optional[str] = None
+    if credentials and credentials.credentials:
+        token = credentials.credentials.strip()
+    elif request:
+        auth_header = request.headers.get("authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split("Bearer ")[1].strip()
+        else:
+            token = request.cookies.get("auth_session") or request.cookies.get("auth_token")
+
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required. Please provide a valid Bearer token.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    payload = decode_access_token(credentials.credentials)
+    payload = decode_access_token(token)
     if not payload or "sub" not in payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -263,5 +275,36 @@ async def get_current_admin_user(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Insufficient administrative privileges",
+        )
+    return user
+
+
+async def get_current_tenant_admin(
+    tenant: Tenant = Depends(get_tenant_context),
+    user: User = Depends(get_current_admin_user),
+) -> User:
+    """
+    Ensures that the authenticated user possesses admin privileges
+    AND belongs to this specific tenant store (unless super_admin).
+    """
+    if user.role != "super_admin":
+        if user.tenant_id != tenant.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have administrative access to this tenant store.",
+            )
+    return user
+
+
+async def get_current_super_admin(
+    user: User = Depends(get_current_user),
+) -> User:
+    """
+    Ensures that the authenticated user possesses super_admin privileges.
+    """
+    if user.role not in ["super_admin", "admin"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Platform super administrative privileges required.",
         )
     return user

@@ -3,8 +3,9 @@ from typing import Dict, Any, List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.dependencies import get_tenant_context, get_rls_db_session
+from app.dependencies import get_tenant_context, get_rls_db_session, get_current_tenant_admin
 from app.models.tenant import Tenant
+from app.models.user import User
 from app.models.product import Category, Product
 from app.schemas.category import CategoryCreate, CategoryUpdate, CategoryResponse
 from app.schemas.response import success_response, ApiResponse, ErrorResponse
@@ -140,6 +141,7 @@ async def get_category(
 async def create_category(
     category_in: CategoryCreate,
     tenant: Tenant = Depends(get_tenant_context),
+    current_user: User = Depends(get_current_tenant_admin),
     db: AsyncSession = Depends(get_rls_db_session),
 ) -> Dict[str, Any]:
     # Check if slug exists in this tenant, if so append random suffix
@@ -196,6 +198,7 @@ async def update_category(
     category_id: uuid.UUID,
     category_in: CategoryUpdate,
     tenant: Tenant = Depends(get_tenant_context),
+    current_user: User = Depends(get_current_tenant_admin),
     db: AsyncSession = Depends(get_rls_db_session),
 ) -> Dict[str, Any]:
     query = select(Category).where(
@@ -250,6 +253,7 @@ async def update_category(
 async def delete_category(
     category_id: uuid.UUID,
     tenant: Tenant = Depends(get_tenant_context),
+    current_user: User = Depends(get_current_tenant_admin),
     db: AsyncSession = Depends(get_rls_db_session),
 ) -> Dict[str, Any]:
     query = select(Category).where(

@@ -11,6 +11,7 @@ from app.models.review import Review
 from app.models.order import Order, OrderStatus
 from app.schemas.tenant import TenantCreate, TenantUpdate, TenantResponse
 from app.schemas.response import success_response, PaginationMeta, ApiResponse, PaginatedData, ErrorResponse
+from app.dependencies import get_current_user, get_current_super_admin
 from app.services.provisioning import provision_new_tenant
 
 router = APIRouter(
@@ -85,6 +86,7 @@ async def update_tenant_by_slug(
     slug: str,
     tenant_update: TenantUpdate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     result = await db.execute(
         select(Tenant).where(Tenant.slug == slug.lower(), Tenant.is_deleted == False)
@@ -95,6 +97,13 @@ async def update_tenant_by_slug(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Tenant '{slug}' not found or does not exist",
         )
+
+    if current_user.role != "super_admin":
+        if current_user.role not in ["admin", "tenant_admin"] or current_user.tenant_id != tenant.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have administrative access to this tenant store.",
+            )
 
     update_dict = tenant_update.model_dump(exclude_unset=True)
     if "branding_config" in update_dict and update_dict["branding_config"]:
@@ -144,6 +153,7 @@ async def update_tenant(
     tenant_id: uuid.UUID,
     tenant_update: TenantUpdate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     result = await db.execute(
         select(Tenant).where(Tenant.id == tenant_id, Tenant.is_deleted == False)
@@ -154,6 +164,13 @@ async def update_tenant(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Tenant not found or does not exist",
         )
+
+    if current_user.role != "super_admin":
+        if current_user.role not in ["admin", "tenant_admin"] or current_user.tenant_id != tenant.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have administrative access to this tenant store.",
+            )
 
     update_dict = tenant_update.model_dump(exclude_unset=True)
     if "branding_config" in update_dict and update_dict["branding_config"]:
@@ -179,6 +196,7 @@ async def list_tenants(
     page: int = 1,
     per_page: int = 15,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_super_admin),
 ) -> Dict[str, Any]:
     offset = (page - 1) * per_page
 
@@ -267,6 +285,7 @@ async def get_tenant_seller_stats(
 async def list_tenant_users(
     slug_or_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     tenant = None
     try:
@@ -285,6 +304,13 @@ async def list_tenant_users(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Tenant not found",
         )
+
+    if current_user.role != "super_admin":
+        if current_user.role not in ["admin", "tenant_admin"] or current_user.tenant_id != tenant.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have administrative access to this tenant store.",
+            )
 
     # Fetch users where tenant_id == tenant.id
     user_query = select(User).where(User.tenant_id == tenant.id).order_by(User.created_at.desc())

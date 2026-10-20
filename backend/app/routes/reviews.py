@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.dependencies import get_tenant_context
+from app.dependencies import get_tenant_context, get_current_tenant_admin
 from app.models.tenant import Tenant
 from app.models.product import Product
 from app.models.review import Review
@@ -263,6 +263,7 @@ async def update_review_status(
     payload: ReviewUpdateStatus,
     tenant: Tenant = Depends(get_tenant_context),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_tenant_admin),
 ) -> Dict[str, Any]:
     result = await db.execute(
         select(Review).where(Review.id == review_id, Review.tenant_id == tenant.id).options(selectinload(Review.product))
@@ -297,6 +298,7 @@ async def delete_review(
     review_id: uuid.UUID,
     tenant: Tenant = Depends(get_tenant_context),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_tenant_admin),
 ) -> Dict[str, Any]:
     result = await db.execute(
         select(Review).where(

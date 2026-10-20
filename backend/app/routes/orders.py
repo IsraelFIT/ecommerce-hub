@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.dependencies import get_tenant_context, get_rls_db_session
+from app.dependencies import get_tenant_context, get_rls_db_session, get_current_user, get_current_tenant_admin
 from app.models.tenant import Tenant
 from app.models.order import Order, OrderStatus
 from app.models.user import User
@@ -114,31 +114,49 @@ async def list_orders(
     per_page: int = 15,
     customer_email: Optional[str] = None,
     user_id: Optional[uuid.UUID] = None,
+    tenant: Tenant = Depends(get_tenant_context),
     db: AsyncSession = Depends(get_rls_db_session),
+    current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     offset = (page - 1) * per_page
 
-    query_count = select(func.count(Order.id)).where(Order.is_deleted == False)
+    query_count = select(func.count(Order.id)).where(
+        Order.tenant_id == tenant.id,
+        Order.is_deleted == False,
+    )
     query_items = (
         select(Order)
-        .where(Order.is_deleted == False)
+        .where(Order.tenant_id == tenant.id, Order.is_deleted == False)
         .options(selectinload(Order.user))
         .order_by(Order.created_at.desc())
     )
 
-    if user_id and customer_email:
-        condition = or_(
-            Order.user_id == user_id,
-            Order.customer_email == customer_email.strip().lower(),
+    is_admin = (
+        current_user.role == "super_admin"
+        or (current_user.role in ("admin", "tenant_admin") and current_user.tenant_id == tenant.id)
+    )
+
+    if is_admin:
+        if user_id and customer_email:
+            condition = or_(
+                Order.user_id == user_id,
+                Order.customer_email == customer_email.strip().lower(),
+            )
+            query_count = query_count.where(condition)
+            query_items = query_items.where(condition)
+        elif user_id:
+            query_count = query_count.where(Order.user_id == user_id)
+            query_items = query_items.where(Order.user_id == user_id)
+        elif customer_email:
+            query_count = query_count.where(Order.customer_email == customer_email.strip().lower())
+            query_items = query_items.where(Order.customer_email == customer_email.strip().lower())
+    else:
+        cust_condition = or_(
+            Order.user_id == current_user.id,
+            Order.customer_email == current_user.email.strip().lower(),
         )
-        query_count = query_count.where(condition)
-        query_items = query_items.where(condition)
-    elif user_id:
-        query_count = query_count.where(Order.user_id == user_id)
-        query_items = query_items.where(Order.user_id == user_id)
-    elif customer_email:
-        query_count = query_count.where(Order.customer_email == customer_email.strip().lower())
-        query_items = query_items.where(Order.customer_email == customer_email.strip().lower())
+        query_count = query_count.where(cust_condition)
+        query_items = query_items.where(cust_condition)
 
     total_query = await db.execute(query_count)
     total = total_query.scalar() or 0
@@ -233,6 +251,7 @@ async def get_order(
 async def delete_order(
     order_id: uuid.UUID,
     db: AsyncSession = Depends(get_rls_db_session),
+    current_user: User = Depends(get_current_tenant_admin),
 ) -> Dict[str, Any]:
     result = await db.execute(
         select(Order).where(Order.id == order_id, Order.is_deleted == False)

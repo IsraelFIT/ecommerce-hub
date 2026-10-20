@@ -54,7 +54,11 @@ export function isTokenExpired(token: string | undefined): boolean {
 function getCookieDomain(): string | undefined {
   if (typeof window === "undefined") return undefined;
   const hostname = window.location.hostname;
-  if (hostname.endsWith("localhost") || hostname === "127.0.0.1") {
+  if (
+    hostname.endsWith("localhost") ||
+    hostname === "127.0.0.1" ||
+    hostname.endsWith(".vercel.app")
+  ) {
     return undefined;
   }
   const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || "ecommerce-hub.com";

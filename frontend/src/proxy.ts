@@ -126,6 +126,7 @@ export async function proxy(request: NextRequest) {
     const cookieDomain =
       !hostname.endsWith("localhost") &&
       hostname !== "127.0.0.1" &&
+      !hostname.endsWith(".vercel.app") &&
       (hostname === rootDomain || hostname.endsWith(`.${rootDomain}`))
         ? `.${rootDomain}`
         : undefined;

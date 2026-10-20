@@ -91,22 +91,39 @@ export function getTenantSubdomainUrl(
   } else if (cleanPath === `/${tenantSlug}`) {
     cleanPath = "/";
   }
-  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || "ecommerce-hub.com";
+  const rootDomain = (
+    process.env.NEXT_PUBLIC_ROOT_DOMAIN || "ecommerce-hub.com"
+  ).toLowerCase();
 
   if (typeof window !== "undefined") {
-    const host = window.location.hostname;
+    const host = window.location.hostname.toLowerCase();
     const port = window.location.port ? `:${window.location.port}` : "";
     const protocol = window.location.protocol;
 
     if (host.endsWith("localhost") || host === "127.0.0.1") {
       return `http://${tenantSlug}.localhost${port}${cleanPath}`;
     }
+
+    // On *.vercel.app or domains that don't support wildcard subdomains, use path-based URLs
+    if (host.endsWith(".vercel.app") || rootDomain.endsWith(".vercel.app")) {
+      const tenantBase = tenantSlug === "core" ? "/core" : `/${tenantSlug}`;
+      const suffix = cleanPath === "/" ? "" : cleanPath;
+      return `${protocol}//${host}${tenantBase}${suffix}`;
+    }
+
     return `${protocol}//${tenantSlug}.${rootDomain}${cleanPath}`;
   }
 
   if (process.env.NODE_ENV === "development") {
     return `http://${tenantSlug}.localhost:3000${cleanPath}`;
   }
+
+  if (rootDomain.endsWith(".vercel.app")) {
+    const tenantBase = tenantSlug === "core" ? "/core" : `/${tenantSlug}`;
+    const suffix = cleanPath === "/" ? "" : cleanPath;
+    return `https://${rootDomain}${tenantBase}${suffix}`;
+  }
+
   return `https://${tenantSlug}.${rootDomain}${cleanPath}`;
 }
 
@@ -119,6 +136,11 @@ export function isSubdomainEnv(): boolean {
   const rootDomain = (
     process.env.NEXT_PUBLIC_ROOT_DOMAIN || "ecommerce-hub.com"
   ).toLowerCase();
+
+  // *.vercel.app never supports wildcard tenant subdomains
+  if (host.endsWith(".vercel.app")) {
+    return false;
+  }
 
   const isDevSub = host.endsWith(".localhost") && host !== "localhost";
   const isProdSub =
@@ -133,8 +155,8 @@ export function isSubdomainEnv(): boolean {
 
 /**
  * Returns the appropriate local route path for navigation within a tenant space.
- * Ensures consistent routing on both SSR and Client, avoiding React hydration mismatch.
- * On tenant subdomains and within tenant layouts, internal paths are always clean: e.g. "/admin", "/products", "/orders"
+ * On tenant subdomains: clean path like "/admin", "/menu", "/cart"
+ * On path-based domains (e.g. *.vercel.app): prefixed path like "/[tenant]/admin", "/[tenant]/cart"
  */
 export function getTenantRoute(
   tenantSlug: string,
@@ -146,13 +168,23 @@ export function getTenantRoute(
       : `/${subPath}`
     : "/";
 
-  // Strip leading tenant slug if present in subPath (e.g. /jazz-cakes-ltd/products -> /products)
+  // Strip leading tenant slug if already present in subPath (e.g. /pressctrl/admin -> /admin)
   if (
     tenantSlug &&
     (cleanSubPath === `/${tenantSlug}` ||
       cleanSubPath.startsWith(`/${tenantSlug}/`))
   ) {
     cleanSubPath = cleanSubPath.slice(`/${tenantSlug}`.length) || "/";
+  }
+
+  // If running on a true subdomain (e.g. jazz-cakes-ltd.localhost or jazz-cakes-ltd.mycustomdomain.com)
+  if (isSubdomainEnv()) {
+    return cleanSubPath;
+  }
+
+  // In path-based routing (e.g. *.vercel.app or localhost:3000/pressctrl/...)
+  if (tenantSlug && tenantSlug !== "general" && tenantSlug !== "core") {
+    return `/${tenantSlug}${cleanSubPath === "/" ? "" : cleanSubPath}`;
   }
 
   return cleanSubPath;

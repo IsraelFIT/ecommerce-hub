@@ -1,10 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { Search } from "lucide-react";
+import { useState, useEffect, use } from "react";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { Search, Loader2, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableHeader,
@@ -29,6 +33,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { UserAvatar } from "@/components/shared/user-avatar";
+import { apiRequest } from "@/lib/api/client";
+import { formatCurrency, formatDate, getTenantRoute } from "@/utils/helper";
 
 interface OrdersPageProps {
   params?: Promise<{
@@ -36,97 +42,71 @@ interface OrdersPageProps {
   }>;
 }
 
-interface OrderItem {
+interface ApiOrder {
   id: string;
-  customerName: string;
-  customerEmail: string;
-  customerAvatar?: string;
-  itemsCount: number;
-  grossAmount: number;
-  netPayout: number;
-  platformFee: number;
-  gateway: "Stripe Connect" | "Paystack Split";
-  status: "paid" | "processing" | "shipped" | "delivered";
-  createdAt: string;
+  tenant_id: string;
+  user_id?: string | null;
+  customer_email: string;
+  customer_name: string;
+  customer_avatar_url?: string | null;
+  total_amount: number;
+  platform_fee: number;
+  tenant_payout_amount: number;
+  currency: string;
+  status: string;
+  payment_gateway: string;
+  gateway_reference: string;
+  items: any[];
+  metadata_json?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
 }
 
-export default function TenantOrdersPage({}: OrdersPageProps) {
-  const [orders, setOrders] = useState<OrderItem[]>([
-    {
-      id: "ORD-9421",
-      customerName: "Sarah Jenkins",
-      customerEmail: "sarah.j@example.com",
-      customerAvatar:
-        "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80",
-      itemsCount: 2,
-      grossAmount: 448.0,
-      netPayout: 436.8,
-      platformFee: 11.2,
-      gateway: "Stripe Connect",
-      status: "processing",
-      createdAt: "10 mins ago",
-    },
-    {
-      id: "ORD-9420",
-      customerName: "Tunde Adeyemi",
-      customerEmail: "tunde.a@example.com",
-      customerAvatar:
-        "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80",
-      itemsCount: 1,
-      grossAmount: 149.0,
-      netPayout: 145.28,
-      platformFee: 3.72,
-      gateway: "Paystack Split",
-      status: "paid",
-      createdAt: "45 mins ago",
-    },
-    {
-      id: "ORD-9419",
-      customerName: "Marcus Vance",
-      customerEmail: "marcus.v@example.com",
-      customerAvatar:
-        "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80",
-      itemsCount: 3,
-      grossAmount: 241.0,
-      netPayout: 234.97,
-      platformFee: 6.03,
-      gateway: "Stripe Connect",
-      status: "shipped",
-      createdAt: "3 hours ago",
-    },
-    {
-      id: "ORD-9418",
-      customerName: "Elena Rostova",
-      customerEmail: "elena.r@example.com",
-      customerAvatar:
-        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80",
-      itemsCount: 1,
-      grossAmount: 299.0,
-      netPayout: 291.52,
-      platformFee: 7.48,
-      gateway: "Stripe Connect",
-      status: "delivered",
-      createdAt: "Yesterday",
-    },
-    {
-      id: "ORD-9417",
-      customerName: "Liam O'Connor",
-      customerEmail: "liam.oc@example.com",
-      itemsCount: 2,
-      grossAmount: 180.0,
-      netPayout: 175.5,
-      platformFee: 4.5,
-      gateway: "Paystack Split",
-      status: "delivered",
-      createdAt: "2 days ago",
-    },
-  ]);
+export default function TenantOrdersPage({ params }: OrdersPageProps) {
+  const unwrappedParams = params ? use(params) : null;
+  const routeParams = useParams();
+
+  const tenantSlug =
+    unwrappedParams?.tenant || (routeParams?.tenant as string) || "store";
+
+  const [orders, setOrders] = useState<ApiOrder[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   // Filters & Search
   const [orderSearch, setOrderSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 4;
+  const pageSize = 10;
+
+  const fetchOrders = async () => {
+    setIsLoading(true);
+    try {
+      const res = await apiRequest<{ items: ApiOrder[]; total?: number }>(
+        "/orders?per_page=100",
+        {
+          headers: {
+            "X-Tenant-Slug": tenantSlug,
+          },
+        },
+      );
+      if (res.data?.items) {
+        setOrders(res.data.items);
+      } else {
+        setOrders([]);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load orders");
+      setOrders([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchOrders();
+  }, [tenantSlug]);
 
   const handleSearchChange = (val: string) => {
     setOrderSearch(val);
@@ -138,23 +118,50 @@ export default function TenantOrdersPage({}: OrdersPageProps) {
     setCurrentPage(1);
   };
 
-  const handleUpdateOrderStatus = (
+  const handleUpdateOrderStatus = async (
     orderId: string,
-    nextStatus: OrderItem["status"],
+    nextStatus: string,
   ) => {
-    setOrders(
-      orders.map((o) => (o.id === orderId ? { ...o, status: nextStatus } : o)),
-    );
-    toast.success(`Order ${orderId} updated to ${nextStatus}`);
+    setUpdatingId(orderId);
+    try {
+      const res = await apiRequest<ApiOrder>(`/orders/${orderId}/status`, {
+        method: "PATCH",
+        headers: {
+          "X-Tenant-Slug": tenantSlug,
+        },
+        body: JSON.stringify({
+          status: nextStatus,
+        }),
+      });
+
+      if (res.data) {
+        setOrders((prev) =>
+          prev.map((o) =>
+            o.id === orderId ? { ...o, status: nextStatus } : o,
+          ),
+        );
+        toast.success(`Order status updated to ${nextStatus}`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update order status");
+    } finally {
+      setUpdatingId(null);
+    }
   };
 
   const filteredOrders = orders.filter((o) => {
+    const q = orderSearch.toLowerCase();
     const matchesSearch =
-      o.id.toLowerCase().includes(orderSearch.toLowerCase()) ||
-      o.customerName.toLowerCase().includes(orderSearch.toLowerCase()) ||
-      o.customerEmail.toLowerCase().includes(orderSearch.toLowerCase()) ||
-      o.gateway.toLowerCase().includes(orderSearch.toLowerCase());
-    const matchesStatus = statusFilter === "all" || o.status === statusFilter;
+      o.id.toLowerCase().includes(q) ||
+      (o.gateway_reference && o.gateway_reference.toLowerCase().includes(q)) ||
+      o.customer_name.toLowerCase().includes(q) ||
+      o.customer_email.toLowerCase().includes(q) ||
+      o.payment_gateway.toLowerCase().includes(q);
+
+    const matchesStatus =
+      statusFilter === "all" ||
+      o.status.toLowerCase() === statusFilter.toLowerCase();
+
     return matchesSearch && matchesStatus;
   });
 
@@ -166,10 +173,10 @@ export default function TenantOrdersPage({}: OrdersPageProps) {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-3 h-3.5 w-3.5 text-muted-foreground z-10 pointer-events-none" />
             <Input
-              placeholder="Search order ID, customer or gateway..."
+              placeholder="Search order ID, reference, customer or gateway..."
               value={orderSearch}
               onChange={(e) => handleSearchChange(e.target.value)}
-              className="pl-8 h-9 bg-background border-border text-foreground"
+              className="pl-8 h-9 bg-background border-border text-foreground text-xs"
             />
           </div>
 
@@ -177,15 +184,17 @@ export default function TenantOrdersPage({}: OrdersPageProps) {
             value={statusFilter}
             onValueChange={(val) => handleStatusChange(val)}
           >
-            <SelectTrigger className="h-9 w-40 bg-background border-border text-foreground">
+            <SelectTrigger className="h-9 w-40 bg-background border-border text-foreground text-xs">
               <SelectValue placeholder="All Statuses" />
             </SelectTrigger>
             <SelectContent className="bg-card border-border text-foreground">
               <SelectItem value="all">All Statuses</SelectItem>
               <SelectItem value="paid">Paid</SelectItem>
-              <SelectItem value="processing">Processing</SelectItem>
-              <SelectItem value="shipped">Shipped</SelectItem>
+              <SelectItem value="accepted">Accepted</SelectItem>
+              <SelectItem value="processing">In Progress</SelectItem>
+              <SelectItem value="shipped">On the Way</SelectItem>
               <SelectItem value="delivered">Delivered</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -203,7 +212,7 @@ export default function TenantOrdersPage({}: OrdersPageProps) {
           <TableHeader className="bg-muted/60 border-b border-border">
             <TableRow className="border-border hover:bg-transparent">
               <TableHead className="p-4 text-xs font-semibold text-foreground">
-                Order ID
+                Order ID / Ref
               </TableHead>
               <TableHead className="p-4 text-xs font-semibold text-foreground">
                 Customer
@@ -224,16 +233,51 @@ export default function TenantOrdersPage({}: OrdersPageProps) {
                 Fulfillment Status
               </TableHead>
               <TableHead className="p-4 text-xs font-semibold text-foreground text-right">
-                Update
+                Actions
               </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody className="divide-y divide-border">
-            {filteredOrders.length === 0 ? (
+            {isLoading ? (
+              Array.from({ length: 4 }).map((_, idx) => (
+                <TableRow key={idx} className="border-border">
+                  <TableCell className="p-4">
+                    <Skeleton className="h-4 w-24" />
+                  </TableCell>
+                  <TableCell className="p-4">
+                    <div className="flex items-center gap-3">
+                      <Skeleton className="h-8 w-8 rounded-full" />
+                      <div className="space-y-1">
+                        <Skeleton className="h-3.5 w-28" />
+                        <Skeleton className="h-3 w-36" />
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="p-4">
+                    <Skeleton className="h-5 w-20 rounded-md" />
+                  </TableCell>
+                  <TableCell className="p-4">
+                    <Skeleton className="h-4 w-16" />
+                  </TableCell>
+                  <TableCell className="p-4">
+                    <Skeleton className="h-4 w-16" />
+                  </TableCell>
+                  <TableCell className="p-4">
+                    <Skeleton className="h-4 w-12" />
+                  </TableCell>
+                  <TableCell className="p-4">
+                    <Skeleton className="h-5 w-20 rounded-full" />
+                  </TableCell>
+                  <TableCell className="p-4 text-right">
+                    <Skeleton className="h-8 w-28 ml-auto rounded-md" />
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : filteredOrders.length === 0 ? (
               <TableRow className="border-border">
                 <TableCell
                   colSpan={8}
-                  className="p-8 text-center text-muted-foreground"
+                  className="p-12 text-center text-muted-foreground"
                 >
                   No orders found matching your filter criteria.
                 </TableCell>
@@ -241,93 +285,135 @@ export default function TenantOrdersPage({}: OrdersPageProps) {
             ) : (
               filteredOrders
                 .slice((currentPage - 1) * pageSize, currentPage * pageSize)
-                .map((ord) => (
-                  <TableRow
-                    key={ord.id}
-                    className="border-border hover:bg-muted/40 transition-colors"
-                  >
-                    <TableCell className="p-4  font-bold text-foreground text-xs">
-                      {ord.id}
-                    </TableCell>
-                    <TableCell className="p-4">
-                      <div className="flex items-center gap-3">
-                        <UserAvatar
-                          src={ord.customerAvatar}
-                          name={ord.customerName}
-                          email={ord.customerEmail}
-                          size="sm"
-                          shape="rounded"
-                        />
-                        <div className="min-w-0">
-                          <div className="font-semibold text-foreground text-xs truncate">
-                            {ord.customerName}
-                          </div>
-                          <div className="text-[11px] text-muted-foreground truncate">
-                            {ord.customerEmail}
+                .map((ord) => {
+                  const displayId =
+                    ord.gateway_reference || `#${ord.id.slice(0, 8)}`;
+                  const orderDetailUrl = getTenantRoute(
+                    tenantSlug,
+                    `/orders/${ord.id}`,
+                  );
+
+                  return (
+                    <TableRow
+                      key={ord.id}
+                      className="border-border hover:bg-muted/40 transition-colors group"
+                    >
+                      <TableCell className="p-4 font-bold text-foreground text-xs">
+                        <Link
+                          href={orderDetailUrl}
+                          className="hover:text-primary hover:underline transition-colors block"
+                        >
+                          {displayId}
+                        </Link>
+                        <span className="text-[10px] text-muted-foreground font-normal block mt-0.5">
+                          {formatDate(ord.created_at)}
+                        </span>
+                      </TableCell>
+
+                      <TableCell className="p-4">
+                        <div className="flex items-center gap-3">
+                          <UserAvatar
+                            src={ord.customer_avatar_url || undefined}
+                            name={ord.customer_name}
+                            email={ord.customer_email}
+                            size="sm"
+                            shape="rounded"
+                          />
+                          <div className="min-w-0">
+                            <div className="font-semibold text-foreground text-xs truncate">
+                              {ord.customer_name}
+                            </div>
+                            <div className="text-[11px] text-muted-foreground truncate">
+                              {ord.customer_email}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="p-4">
-                      <Badge className="bg-muted border border-border px-2 py-1 text-xs font-medium text-foreground">
-                        {ord.gateway}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="p-4 font-bold text-foreground">
-                      ${ord.grossAmount.toFixed(2)}
-                    </TableCell>
-                    <TableCell className="p-4 font-bold text-emerald-600 dark:text-emerald-400">
-                      ${ord.netPayout.toFixed(2)}
-                    </TableCell>
-                    <TableCell className="p-4 text-muted-foreground">
-                      ${ord.platformFee.toFixed(2)}
-                    </TableCell>
-                    <TableCell className="p-4">
-                      <Badge
-                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold transition-transform cursor-pointer capitalize ${
-                          ord.status === "delivered"
-                            ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
-                            : ord.status === "shipped"
-                              ? "bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20"
-                              : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20"
-                        }`}
-                      >
-                        <span
-                          className={`text-xs ${
-                            ord.status === "delivered"
-                              ? "text-emerald-600 dark:text-emerald-400"
+                      </TableCell>
+
+                      <TableCell className="p-4">
+                        <Badge className="bg-muted border border-border px-2 py-1 text-xs font-medium text-foreground capitalize">
+                          {ord.payment_gateway}
+                        </Badge>
+                      </TableCell>
+
+                      <TableCell className="p-4 font-bold text-foreground text-xs">
+                        {formatCurrency(ord.total_amount, ord.currency)}
+                      </TableCell>
+
+                      <TableCell className="p-4 font-bold text-emerald-600 dark:text-emerald-400 text-xs">
+                        {formatCurrency(ord.tenant_payout_amount, ord.currency)}
+                      </TableCell>
+
+                      <TableCell className="p-4 text-muted-foreground text-xs">
+                        {formatCurrency(ord.platform_fee, ord.currency)}
+                      </TableCell>
+
+                      <TableCell className="p-4">
+                        <Badge
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold capitalize ${
+                            ord.status === "delivered" ||
+                            ord.status === "fulfilled"
+                              ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
                               : ord.status === "shipped"
-                                ? "text-blue-600 dark:text-blue-400"
-                                : "text-amber-600 dark:text-amber-400"
+                                ? "bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20"
+                                : ord.status === "cancelled" ||
+                                    ord.status === "failed"
+                                  ? "bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/20"
+                                  : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20"
                           }`}
                         >
                           {ord.status}
-                        </span>
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="p-4 text-right">
-                      <Select
-                        value={ord.status}
-                        onValueChange={(val) =>
-                          handleUpdateOrderStatus(
-                            ord.id,
-                            val as OrderItem["status"],
-                          )
-                        }
-                      >
-                        <SelectTrigger className="h-8 w-32 text-xs bg-background border-border text-foreground ml-auto">
-                          <SelectValue placeholder="Status" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-card border-border text-foreground">
-                          <SelectItem value="paid">Paid</SelectItem>
-                          <SelectItem value="processing">Processing</SelectItem>
-                          <SelectItem value="shipped">Shipped</SelectItem>
-                          <SelectItem value="delivered">Delivered</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                  </TableRow>
-                ))
+                        </Badge>
+                      </TableCell>
+
+                      <TableCell className="p-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Select
+                            value={ord.status.toLowerCase()}
+                            disabled={updatingId === ord.id}
+                            onValueChange={(val) =>
+                              handleUpdateOrderStatus(ord.id, val)
+                            }
+                          >
+                            <SelectTrigger className="h-8 w-28 text-xs bg-background border-border text-foreground">
+                              {updatingId === ord.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" />
+                              ) : (
+                                <SelectValue placeholder="Status" />
+                              )}
+                            </SelectTrigger>
+                            <SelectContent className="bg-card border-border text-foreground">
+                              <SelectItem value="pending">Pending</SelectItem>
+                              <SelectItem value="paid">Paid</SelectItem>
+                              <SelectItem value="accepted">Accepted</SelectItem>
+                              <SelectItem value="processing">
+                                Processing
+                              </SelectItem>
+                              <SelectItem value="shipped">Shipped</SelectItem>
+                              <SelectItem value="delivered">
+                                Delivered
+                              </SelectItem>
+                              <SelectItem value="cancelled">
+                                Cancelled
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            asChild
+                            className="h-8 w-8 p-0 rounded-lg text-muted-foreground hover:text-foreground"
+                          >
+                            <Link href={orderDetailUrl} title="View Details">
+                              <ArrowRight className="w-4 h-4" />
+                            </Link>
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
             )}
           </TableBody>
         </Table>

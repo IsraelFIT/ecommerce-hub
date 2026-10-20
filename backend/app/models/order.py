@@ -11,6 +11,10 @@ from app.models.base import UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin
 class OrderStatus(str, enum.Enum):
     PENDING = "pending"
     PAID = "paid"
+    ACCEPTED = "accepted"
+    PROCESSING = "processing"
+    SHIPPED = "shipped"
+    DELIVERED = "delivered"
     FAILED = "failed"
     FULFILLED = "fulfilled"
     CANCELLED = "cancelled"

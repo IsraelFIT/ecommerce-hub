@@ -11,7 +11,7 @@ import {
   ChevronRight,
   Loader2,
 } from "lucide-react";
-import { getTenantRoute } from "@/utils/helper";
+import { getTenantRoute, formatCurrency } from "@/utils/helper";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,100 +54,41 @@ interface OrderItemDisplay {
 
 interface OrderDisplay {
   id: string;
+  gatewayReference: string;
   orderNumber: string;
   totalPayment: number;
+  currency: string;
   paymentMethod: string;
   dateLabel: string;
   dateValue: string;
-  status: "Accepted" | "Delivered" | "Processing" | "Cancelled";
+  status: "Accepted" | "Delivered" | "Processing" | "On the Way" | "Cancelled";
   statusDescription: string;
   items: OrderItemDisplay[];
 }
 
 interface ApiOrderItem {
+  product_id?: string;
   product_title?: string;
   title?: string;
   quantity?: number;
+  image?: string;
   image_url?: string;
+  images?: string[];
   unit_price?: number | string;
+  options?: Record<string, unknown>;
 }
 
 interface ApiOrder {
   id: string;
   gateway_reference?: string;
   total_amount?: number | string;
+  currency?: string;
   payment_gateway?: string;
   created_at?: string;
   status?: string;
   items?: ApiOrderItem[];
+  metadata_json?: Record<string, unknown>;
 }
-
-const SAMPLE_ORDERS: OrderDisplay[] = [
-  {
-    id: "ord-1",
-    orderNumber: "SDGT1254FD",
-    totalPayment: 640.0,
-    paymentMethod: "Paypal",
-    dateLabel: "Estimated Delivery Date",
-    dateValue: "24 April 2026",
-    status: "Accepted",
-    statusDescription: "Your Order has been Accepted",
-    items: [
-      {
-        id: "item-1",
-        title: "Wooden Sofa Chair",
-        specs: "Color: Grey | 4 Qty.",
-        image:
-          "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=400&q=80",
-        price: 160.0,
-      },
-      {
-        id: "item-2",
-        title: "Red Gaming Chair",
-        specs: "Color: Black | 2 Qty.",
-        image:
-          "https://images.unsplash.com/photo-1580481077195-c3a821a58875?w=400&q=80",
-        price: 240.0,
-      },
-      {
-        id: "item-3",
-        title: "Swivel Chair",
-        specs: "Color: Light Brown | 1 Qty.",
-        image:
-          "https://images.unsplash.com/photo-1567538096630-e0c55bd6374c?w=400&q=80",
-        price: 120.0,
-      },
-      {
-        id: "item-4",
-        title: "Circular Sofa Chair",
-        specs: "Color: Brown | 2 Qty.",
-        image:
-          "https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=400&q=80",
-        price: 120.0,
-      },
-    ],
-  },
-  {
-    id: "ord-2",
-    orderNumber: "SDGT7412DF",
-    totalPayment: 48.0,
-    paymentMethod: "Cash",
-    dateLabel: "Delivered Date",
-    dateValue: "12 February 2026",
-    status: "Delivered",
-    statusDescription: "Your Order has been Delivered",
-    items: [
-      {
-        id: "item-5",
-        title: "Bar Stool",
-        specs: "Color: Brown | Qty. 1",
-        image:
-          "https://images.unsplash.com/photo-1503602642458-232111445657?w=400&q=80",
-        price: 48.0,
-      },
-    ],
-  },
-];
 
 function ProfileContent() {
   const params = useParams();
@@ -277,77 +218,102 @@ function ProfileContent() {
 
   // Orders State
   const [orderFilter, setOrderFilter] = useState<string>("All");
-  const [orders, setOrders] = useState<OrderDisplay[]>(SAMPLE_ORDERS);
+  const [orders, setOrders] = useState<OrderDisplay[]>([]);
   const [isLoadingOrders, setIsLoadingOrders] = useState(false);
 
   useEffect(() => {
     async function fetchUserOrders() {
-      if (!user?.email) return;
+      if (!user) return;
       setIsLoadingOrders(true);
       try {
-        const queryParams = new URLSearchParams({
-          customer_email: user.email,
-          tenant_slug: tenant,
-        });
-        if (user.id) {
-          queryParams.append("user_id", user.id);
-        }
-        const res = await apiRequest<{ items: ApiOrder[] }>(
-          `/orders?${queryParams.toString()}`,
-          {
-            headers: {
-              "X-Tenant-Slug": tenant,
-            },
+        const res = await apiRequest<{ items: ApiOrder[] }>(`/orders`, {
+          headers: {
+            "X-Tenant-Slug": tenant,
           },
-        );
-        if (res.data?.items && res.data.items.length > 0) {
-          const mapped: OrderDisplay[] = res.data.items.map((o: ApiOrder) => ({
-            id: o.id,
-            orderNumber: o.gateway_reference || o.id.slice(0, 8).toUpperCase(),
-            totalPayment: Number(o.total_amount) || 0,
-            paymentMethod: o.payment_gateway || "Online",
-            dateLabel:
-              o.status === "delivered"
-                ? "Delivered Date"
-                : "Estimated Delivery Date",
-            dateValue: o.created_at
-              ? new Date(o.created_at).toLocaleDateString("en-US", {
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
-                })
-              : "Pending",
-            status:
-              o.status === "delivered"
-                ? "Delivered"
-                : o.status === "accepted"
-                  ? "Accepted"
-                  : "Processing",
-            statusDescription:
-              o.status === "delivered"
-                ? "Your Order has been Delivered"
-                : "Your Order has been Accepted",
-            items: (o.items || []).map((it: ApiOrderItem, idx: number) => ({
-              id: `${o.id}-${idx}`,
-              title: it.product_title || it.title || "Product Item",
-              specs: `Qty. ${it.quantity || 1}`,
-              image:
-                it.image_url ||
-                "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=400&q=80",
-              price: Number(it.unit_price) || 0,
-            })),
-          }));
+        });
+        if (res.data?.items) {
+          const mapped: OrderDisplay[] = res.data.items.map((o: ApiOrder) => {
+            const rawStatus = (o.status || "pending").toLowerCase();
+            let displayStatus: OrderDisplay["status"] = "Processing";
+            let statusDesc = "Your order is being prepared";
+            if (rawStatus === "delivered" || rawStatus === "fulfilled") {
+              displayStatus = "Delivered";
+              statusDesc = "Your order has been delivered";
+            } else if (rawStatus === "shipped") {
+              displayStatus = "On the Way";
+              statusDesc = "Your order is on the way";
+            } else if (rawStatus === "accepted" || rawStatus === "paid") {
+              displayStatus = "Accepted";
+              statusDesc = "Your order has been accepted";
+            } else if (rawStatus === "cancelled" || rawStatus === "failed") {
+              displayStatus = "Cancelled";
+              statusDesc = "Your order has been cancelled";
+            }
+
+            const items: OrderItemDisplay[] = (o.items || []).map(
+              (it: ApiOrderItem, idx: number) => {
+                const itemImg =
+                  it.image ||
+                  it.image_url ||
+                  (Array.isArray(it.images) && it.images[0]) ||
+                  "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=400&q=80";
+
+                const optionsStr = it.options
+                  ? Object.entries(it.options)
+                      .map(
+                        ([k, v]) =>
+                          `${k.charAt(0).toUpperCase() + k.slice(1)}: ${v}`,
+                      )
+                      .join(" | ")
+                  : "";
+                const specs = optionsStr
+                  ? `${optionsStr} | ${it.quantity || 1} Qty.`
+                  : `${it.quantity || 1} Qty.`;
+
+                return {
+                  id: `${o.id}-${idx}`,
+                  title: it.product_title || it.title || "Product Item",
+                  specs,
+                  image: itemImg,
+                  price: Number(it.unit_price) || 0,
+                };
+              },
+            );
+
+            return {
+              id: o.id,
+              gatewayReference: o.gateway_reference || o.id,
+              orderNumber:
+                o.gateway_reference || o.id.slice(0, 8).toUpperCase(),
+              totalPayment: Number(o.total_amount) || 0,
+              currency: o.currency || "NGN",
+              paymentMethod: (o.payment_gateway || "Online").toUpperCase(),
+              dateLabel:
+                displayStatus === "Delivered"
+                  ? "Delivered Date"
+                  : "Estimated Delivery Date",
+              dateValue: o.created_at
+                ? new Date(o.created_at).toLocaleDateString("en-US", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })
+                : "Pending",
+              status: displayStatus,
+              statusDescription: statusDesc,
+              items,
+            };
+          });
           setOrders(mapped);
         }
-      } catch {
-        // Fallback to sample orders
+      } catch (err) {
+        console.error("Failed to load user orders:", err);
       } finally {
         setIsLoadingOrders(false);
       }
     }
     fetchUserOrders();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.email]);
+  }, [user, tenant]);
 
   const filteredOrders = orders.filter((ord) => {
     if (orderFilter === "All") return true;
@@ -836,7 +802,10 @@ function ProfileContent() {
                               Total Payment
                             </p>
                             <p className="font-bold">
-                              {order.totalPayment.toFixed(2)}
+                              {formatCurrency(
+                                order.totalPayment,
+                                order.currency,
+                              )}
                             </p>
                           </div>
                           <div className="flex flex-col">
@@ -879,7 +848,7 @@ function ProfileContent() {
                               </div>
                               <div className="text-right">
                                 <p className="text-sm font-bold text-foreground">
-                                  ${item.price.toFixed(2)}
+                                  {formatCurrency(item.price, order.currency)}
                                 </p>
                               </div>
                             </div>
@@ -894,7 +863,13 @@ function ProfileContent() {
                                 "px-2.5 py-0.5 rounded-full text-xs font-semibold border",
                                 order.status === "Delivered"
                                   ? "bg-emerald-100 text-emerald-800 border-emerald-300"
-                                  : "bg-amber-100 text-amber-800 border-amber-300",
+                                  : order.status === "On the Way"
+                                    ? "bg-blue-100 text-blue-800 border-blue-300"
+                                    : order.status === "Accepted"
+                                      ? "bg-amber-100 text-amber-800 border-amber-300"
+                                      : order.status === "Cancelled"
+                                        ? "bg-rose-100 text-rose-800 border-rose-300"
+                                        : "bg-muted text-muted-foreground border-border",
                               )}
                             >
                               {order.status}
@@ -905,44 +880,47 @@ function ProfileContent() {
                           </div>
 
                           <div className="flex items-center gap-2.5">
-                            {order.status === "Delivered" ? (
-                              <Button
-                                size="sm"
-                                className="h-9 px-4 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-semibold cursor-pointer"
-                              >
-                                Add Review
-                              </Button>
-                            ) : (
-                              <Button
-                                size="sm"
-                                className="h-9 px-4 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-semibold cursor-pointer"
-                              >
-                                Track Order
-                              </Button>
-                            )}
+                            <Button
+                              size="sm"
+                              onClick={() =>
+                                router.push(
+                                  getTenantRoute(tenant, `/track/${order.id}`),
+                                )
+                              }
+                              className="h-9 px-4 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-semibold cursor-pointer"
+                            >
+                              Track Order
+                            </Button>
 
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() =>
-                                toast.success("Invoice downloaded")
-                              }
+                              onClick={() => {
+                                const invoiceRef =
+                                  order.gatewayReference || order.orderNumber;
+                                const invoiceUrl = getTenantRoute(
+                                  tenant,
+                                  `/orders/confirmation?reference=${encodeURIComponent(invoiceRef)}&print=true`,
+                                );
+                                window.open(invoiceUrl, "_blank");
+                              }}
                               className="h-9 px-4 rounded-full border-border text-foreground hover:bg-muted text-xs font-semibold cursor-pointer"
                             >
                               Invoice
                             </Button>
 
-                            {order.status !== "Delivered" && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  toast.info("Order cancellation requested")
-                                }
-                                className="text-xs font-semibold text-rose-500 hover:text-rose-600 transition-colors ml-2 cursor-pointer"
-                              >
-                                Cancel Order
-                              </button>
-                            )}
+                            {order.status !== "Delivered" &&
+                              order.status !== "Cancelled" && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    toast.info("Order cancellation requested")
+                                  }
+                                  className="text-xs font-semibold text-rose-500 hover:text-rose-600 transition-colors ml-2 cursor-pointer"
+                                >
+                                  Cancel Order
+                                </button>
+                              )}
                           </div>
                         </div>
                       </div>

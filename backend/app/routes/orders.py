@@ -11,7 +11,7 @@ from app.dependencies import get_tenant_context, get_rls_db_session, get_current
 from app.models.tenant import Tenant
 from app.models.order import Order, OrderStatus
 from app.models.user import User
-from app.schemas.order import OrderCreate, OrderResponse
+from app.schemas.order import OrderCreate, OrderResponse, OrderStatusUpdate
 from app.schemas.response import success_response, PaginationMeta, ApiResponse, PaginatedData, ErrorResponse
 
 router = APIRouter(
@@ -211,12 +211,17 @@ async def get_order(
     order_identifier: str,
     db: AsyncSession = Depends(get_rls_db_session),
 ) -> Dict[str, Any]:
+    clean_ident = order_identifier.strip().lstrip("#")
     try:
-        order_uuid = uuid.UUID(order_identifier)
+        order_uuid = uuid.UUID(clean_ident)
         query = select(Order).where(Order.id == order_uuid, Order.is_deleted == False)
     except ValueError:
         query = select(Order).where(
-            Order.gateway_reference == order_identifier, Order.is_deleted == False
+            or_(
+                func.lower(Order.gateway_reference) == clean_ident.lower(),
+                Order.gateway_reference.ilike(f"%{clean_ident}%"),
+            ),
+            Order.is_deleted == False,
         )
 
     result = await db.execute(query.options(selectinload(Order.user)))
@@ -268,5 +273,48 @@ async def delete_order(
     return success_response(
         data={"id": str(order_id)},
         message="Order deleted successfully",
+    )
+
+
+@router.patch(
+    "/{order_id}/status",
+    response_model=ApiResponse[OrderResponse],
+    summary="Update order fulfillment/payment status (Tenant Admin)",
+)
+async def update_order_status(
+    order_id: uuid.UUID,
+    payload: OrderStatusUpdate,
+    db: AsyncSession = Depends(get_rls_db_session),
+    current_user: User = Depends(get_current_tenant_admin),
+) -> Dict[str, Any]:
+    result = await db.execute(
+        select(Order).where(Order.id == order_id, Order.is_deleted == False)
+    )
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Order not found in tenant store",
+        )
+
+    try:
+        new_status = OrderStatus(payload.status.lower())
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid status '{payload.status}'. Valid statuses: {[s.value for s in OrderStatus]}",
+        )
+
+    order.status = new_status
+    if payload.tracking_notes:
+        meta = dict(order.metadata_json or {})
+        meta["tracking_notes"] = payload.tracking_notes
+        order.metadata_json = meta
+
+    await db.commit()
+    await db.refresh(order)
+    return success_response(
+        data=OrderResponse.model_validate(order).model_dump(mode="json"),
+        message=f"Order status updated to {new_status.value}",
     )
 

@@ -63,33 +63,57 @@ export default function OrderConfirmationPage({
           setTenant(tenantRes.data);
         }
 
-        // 2. Verify transaction with payment provider via backend
-        const verifyQuery = sessionId
-          ? `?session_id=${encodeURIComponent(sessionId)}`
-          : "";
-        const verifyRes = await apiRequest<{
-          status: string;
-          order_id: string;
-          reference: string;
-        }>(`/payments/verify/${reference}${verifyQuery}`);
-
-        if (verifyRes.data) {
-          // Clear shopping cart on successful verified order
-          clearCart(tenantSlug, true);
+        // 2. Fetch order record by reference or ID first
+        let fetchedOrder: Order | null = null;
+        try {
+          const orderRes = await apiRequest<Order>(`/orders/${reference}`);
+          if (orderRes.data) {
+            fetchedOrder = orderRes.data;
+            if (isMounted) setOrder(fetchedOrder);
+          }
+        } catch {
+          // Fall through to verify if direct fetch failed
         }
 
-        // 3. Fetch full order record by reference
-        const orderRes = await apiRequest<Order>(`/orders/${reference}`);
-        if (orderRes.data && isMounted) {
-          setOrder(orderRes.data);
+        // 3. If sessionId provided or order still pending, verify with payment provider
+        if (sessionId || (!fetchedOrder && reference)) {
+          try {
+            const verifyQuery = sessionId
+              ? `?session_id=${encodeURIComponent(sessionId)}`
+              : "";
+            const verifyRes = await apiRequest<{
+              status: string;
+              order_id: string;
+              reference: string;
+            }>(`/payments/verify/${reference}${verifyQuery}`);
+
+            if (verifyRes.data) {
+              clearCart(tenantSlug, true);
+              const reloadedOrder = await apiRequest<Order>(
+                `/orders/${reference}`,
+              );
+              if (reloadedOrder.data && isMounted) {
+                setOrder(reloadedOrder.data);
+                fetchedOrder = reloadedOrder.data;
+              }
+            }
+          } catch (verifyErr) {
+            console.warn("Payment verification note:", verifyErr);
+          }
+        }
+
+        if (!fetchedOrder) {
+          throw new Error(
+            "Unable to retrieve order details for the requested reference.",
+          );
         }
       } catch (err: unknown) {
-        console.error("Order verification error:", err);
+        console.error("Order load error:", err);
         if (isMounted) {
           setError(
             err instanceof Error
               ? err.message
-              : "Unable to verify transaction. Please check your order history.",
+              : "Unable to load order. Please check your order history.",
           );
         }
       } finally {
@@ -104,6 +128,16 @@ export default function OrderConfirmationPage({
       isMounted = false;
     };
   }, [reference, sessionId, tenantSlug, clearCart]);
+
+  const shouldPrint = searchParams.get("print") === "true";
+  useEffect(() => {
+    if (shouldPrint && order && !isLoading) {
+      const timer = setTimeout(() => {
+        window.print();
+      }, 600);
+      return () => clearTimeout(timer);
+    }
+  }, [shouldPrint, order, isLoading]);
 
   const currency = order?.currency || tenant?.currency || "NGN";
 

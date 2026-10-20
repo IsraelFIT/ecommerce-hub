@@ -111,3 +111,8 @@ class OrderResponse(BaseModel):
     metadata_json: Dict[str, Any]
     created_at: datetime
     updated_at: datetime
+
+
+class OrderStatusUpdate(BaseModel):
+    status: str
+    tracking_notes: Optional[str] = None

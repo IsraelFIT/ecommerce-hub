@@ -4,10 +4,10 @@ from sqlalchemy import String, Boolean, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
-from app.models.base import UUIDPrimaryKeyMixin, TimestampMixin
+from app.models.base import UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin
 
 
-class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+class User(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "users"
 
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -15,6 +15,8 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     phone_number: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    avatar_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    gender: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     
     role: Mapped[str] = mapped_column(String(50), default="tenant_admin", nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
@@ -35,4 +37,6 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     reviews = relationship("Review", back_populates="user")
     likes = relationship("ProductLike", back_populates="user", cascade="all, delete-orphan")
     orders = relationship("Order", back_populates="user")
+    addresses = relationship("UserAddress", back_populates="user", cascade="all, delete-orphan")
+
 

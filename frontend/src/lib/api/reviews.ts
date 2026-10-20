@@ -12,6 +12,7 @@ export interface ReviewItem {
   comment: string;
   customer_name: string;
   customer_email?: string | null;
+  customer_avatar_url?: string | null;
   status: "approved" | "pending" | "rejected";
   created_at: string;
   updated_at: string;

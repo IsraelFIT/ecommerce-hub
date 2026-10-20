@@ -60,7 +60,7 @@ export default function CoreAdaptersPage() {
                   <h3 className="text-base font-bold font-secondary text-foreground">
                     Neon Serverless Postgres
                   </h3>
-                  <span className="text-[11px] text-muted-foreground font-mono">
+                  <span className="text-[11px] text-muted-foreground ">
                     Lakebase Architecture • asyncpg Pooler
                   </span>
                 </div>
@@ -79,19 +79,17 @@ export default function CoreAdaptersPage() {
                 <span className="text-muted-foreground">
                   Active Checkout Branch
                 </span>
-                <span className="font-mono font-bold text-primary">
-                  staging
-                </span>
+                <span className=" font-bold text-primary">staging</span>
               </div>
               <div className="flex items-center justify-between p-2.5 rounded-lg bg-card-gray/40 dark:bg-white/5 border border-border">
                 <span className="text-muted-foreground">Project ID</span>
-                <span className="font-mono text-foreground text-[11px]">
+                <span className=" text-foreground text-[11px]">
                   crimson-paper-76047648
                 </span>
               </div>
               <div className="flex items-center justify-between p-2.5 rounded-lg bg-card-gray/40 dark:bg-white/5 border border-border">
                 <span className="text-muted-foreground">Active Endpoint</span>
-                <span className="font-mono text-muted-foreground text-[11px] truncate max-w-50">
+                <span className=" text-muted-foreground text-[11px] truncate max-w-50">
                   ep-red-silence-b1x919l7
                 </span>
               </div>
@@ -129,7 +127,7 @@ export default function CoreAdaptersPage() {
                   <h3 className="text-base font-bold font-secondary text-foreground">
                     Sanity Headless CMS
                   </h3>
-                  <span className="text-[11px] text-muted-foreground font-mono">
+                  <span className="text-[11px] text-muted-foreground ">
                     Structured Content Data Layer
                   </span>
                 </div>
@@ -148,7 +146,7 @@ export default function CoreAdaptersPage() {
                 <span className="text-muted-foreground">
                   Active Dataset Target
                 </span>
-                <span className="font-mono font-bold text-primary text-xs">
+                <span className=" font-bold text-primary text-xs">
                   staging (Default)
                 </span>
               </div>
@@ -164,7 +162,7 @@ export default function CoreAdaptersPage() {
                 <span className="text-muted-foreground">
                   Content Versioning
                 </span>
-                <span className="font-mono text-muted-foreground">
+                <span className=" text-muted-foreground">
                   Drafts & Published
                 </span>
               </div>

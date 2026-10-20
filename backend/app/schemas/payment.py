@@ -60,4 +60,4 @@ class CheckoutSessionResponse(BaseModel):
     checkout_url: str
     reference: str
     gateway: str
-    split_details: SplitDetails
+    split_details: Optional[SplitDetails] = None

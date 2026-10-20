@@ -119,15 +119,32 @@ export async function proxy(request: NextRequest) {
     cleanUrl.searchParams.delete("refresh_token");
 
     const response = NextResponse.redirect(cleanUrl);
+    const hostname = request.nextUrl.hostname.toLowerCase();
+    const rootDomain = (
+      process.env.NEXT_PUBLIC_ROOT_DOMAIN || "ecommerce-hub.com"
+    ).toLowerCase();
+    const cookieDomain =
+      !hostname.endsWith("localhost") &&
+      hostname !== "127.0.0.1" &&
+      (hostname === rootDomain || hostname.endsWith(`.${rootDomain}`))
+        ? `.${rootDomain}`
+        : undefined;
+
+    const isSecure = request.nextUrl.protocol === "https:";
+
     const accessCookieOptions = {
       maxAge: 30 * 60, // 30 minutes
       path: "/",
       sameSite: "lax" as const,
+      secure: isSecure,
+      ...(cookieDomain ? { domain: cookieDomain } : {}),
     };
     const refreshCookieOptions = {
       maxAge: 12 * 60 * 60, // 12 hours
       path: "/",
       sameSite: "lax" as const,
+      secure: isSecure,
+      ...(cookieDomain ? { domain: cookieDomain } : {}),
     };
     response.cookies.set("auth_session", queryToken, accessCookieOptions);
     response.cookies.set("auth_token", queryToken, accessCookieOptions);
@@ -193,13 +210,15 @@ export async function proxy(request: NextRequest) {
   ];
 
   const isProtectedPath =
-    protectedRoutePrefixes.some(
+    normalizedPath !== "/orders/confirmation" &&
+    !normalizedPath.startsWith("/orders/confirmation/") &&
+    (protectedRoutePrefixes.some(
       (prefix) =>
         normalizedPath === prefix ||
         normalizedPath.startsWith(`${prefix}/`) ||
         pathname.includes(prefix),
     ) ||
-    (tenantSlug === "core" && normalizedPath !== "/login");
+      (tenantSlug === "core" && normalizedPath !== "/login"));
 
   const isAuthPath = authPaths.some(
     (path) => normalizedPath === path || normalizedPath.startsWith(`${path}/`),

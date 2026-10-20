@@ -76,6 +76,41 @@ async def get_tenant_by_slug(
     )
 
 
+@router.patch(
+    "/by-slug/{slug}",
+    response_model=ApiResponse[TenantResponse],
+    summary="Update tenant store settings by slug",
+)
+async def update_tenant_by_slug(
+    slug: str,
+    tenant_update: TenantUpdate,
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    result = await db.execute(
+        select(Tenant).where(Tenant.slug == slug.lower(), Tenant.is_deleted == False)
+    )
+    tenant = result.scalar_one_or_none()
+    if not tenant:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Tenant '{slug}' not found or does not exist",
+        )
+
+    update_dict = tenant_update.model_dump(exclude_unset=True)
+    if "branding_config" in update_dict and update_dict["branding_config"]:
+        update_dict["branding_config"] = tenant_update.branding_config.model_dump()
+
+    for key, value in update_dict.items():
+        setattr(tenant, key, value)
+
+    await db.commit()
+    await db.refresh(tenant)
+    return success_response(
+        data=TenantResponse.model_validate(tenant).model_dump(mode="json"),
+        message="Tenant settings updated successfully",
+    )
+
+
 @router.get(
     "/{tenant_id}",
     response_model=ApiResponse[TenantResponse],
@@ -85,7 +120,9 @@ async def get_tenant(
     tenant_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
-    result = await db.execute(select(Tenant).where(Tenant.id == tenant_id))
+    result = await db.execute(
+        select(Tenant).where(Tenant.id == tenant_id, Tenant.is_deleted == False)
+    )
     tenant = result.scalar_one_or_none()
     if not tenant:
         raise HTTPException(
@@ -108,7 +145,9 @@ async def update_tenant(
     tenant_update: TenantUpdate,
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
-    result = await db.execute(select(Tenant).where(Tenant.id == tenant_id))
+    result = await db.execute(
+        select(Tenant).where(Tenant.id == tenant_id, Tenant.is_deleted == False)
+    )
     tenant = result.scalar_one_or_none()
     if not tenant:
         raise HTTPException(
@@ -277,6 +316,16 @@ async def list_tenant_users(
     user_list = []
     seen_emails = set()
 
+    # Fetch registered users matching order customer emails to obtain avatars
+    customer_emails = [e for e in order_customer_stats.keys() if e not in seen_emails]
+    customer_user_map = {}
+    if customer_emails:
+        c_users_res = await db.execute(
+            select(User).where(func.lower(User.email).in_(customer_emails))
+        )
+        for cu in c_users_res.scalars().all():
+            customer_user_map[cu.email.lower()] = cu
+
     for u in tenant_users:
         seen_emails.add(u.email.lower())
         c_stats = order_customer_stats.get(u.email.lower(), {})
@@ -287,6 +336,8 @@ async def list_tenant_users(
             "full_name": f"{u.first_name} {u.last_name}".strip(),
             "email": u.email,
             "phone_number": u.phone_number,
+            "avatar_url": getattr(u, "avatar_url", None),
+            "gender": getattr(u, "gender", None),
             "role": u.role,
             "is_active": u.is_active,
             "is_verified": u.is_verified,
@@ -302,13 +353,16 @@ async def list_tenant_users(
             name_parts = stats["name"].split(" ", 1)
             first_name = name_parts[0] if name_parts else "Customer"
             last_name = name_parts[1] if len(name_parts) > 1 else ""
+            matching_cu = customer_user_map.get(email.lower())
             user_list.append({
-                "id": f"cust-{abs(hash(email)) % 10000000}",
+                "id": str(matching_cu.id) if matching_cu else f"cust-{abs(hash(email)) % 10000000}",
                 "first_name": first_name,
                 "last_name": last_name,
                 "full_name": stats["name"],
                 "email": email,
-                "phone_number": None,
+                "phone_number": getattr(matching_cu, "phone_number", None) if matching_cu else None,
+                "avatar_url": getattr(matching_cu, "avatar_url", None) if matching_cu else None,
+                "gender": getattr(matching_cu, "gender", None) if matching_cu else None,
                 "role": "customer",
                 "is_active": True,
                 "is_verified": True,

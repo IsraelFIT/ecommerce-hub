@@ -8,10 +8,21 @@ import { Trash2, Plus, Minus, CreditCard, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCartStore } from "@/store/cart";
 import { formatCurrency, getTenantRoute } from "@/utils/helper";
+import { useTenantTheme } from "@/components/providers/tenant-theme-provider";
+import { apiRequest } from "@/lib/api/client";
+import { Tenant } from "@/types/users";
 
 export function CartView() {
   const params = useParams();
-  const tenantSlug = (params?.tenant as string) || "store";
+  const { tenant: contextTenant } = useTenantTheme();
+  const paramTenant = params?.tenant as string | undefined;
+  const tenantSlug =
+    paramTenant &&
+    !["store", "cart", "general"].includes(paramTenant.toLowerCase())
+      ? paramTenant
+      : contextTenant?.slug || "general";
+  const [tenantData, setTenantData] = useState<Tenant | null>(null);
+
   const { items, updateQuantity, removeFromCart, getCartTotal } =
     useCartStore();
   const [shippingMethod, setShippingMethod] = useState<"pickup" | "delivery">(
@@ -24,10 +35,46 @@ export function CartView() {
     setMounted(true);
   }, []);
 
+  useEffect(() => {
+    let isMounted = true;
+    async function loadTenant() {
+      try {
+        const res = await apiRequest<Tenant>(`/tenants/by-slug/${tenantSlug}`);
+        if (res.data && isMounted) {
+          setTenantData(res.data);
+        }
+      } catch {
+        // Fallback to theme context tenant
+      }
+    }
+    loadTenant();
+    return () => {
+      isMounted = false;
+    };
+  }, [tenantSlug]);
+
+  const activeTenant = tenantData || contextTenant;
+  const currency = activeTenant?.currency || "NGN";
+  const configuredDeliveryFee = Number(
+    activeTenant?.delivery_fee ??
+      activeTenant?.branding_config?.deliveryFee ??
+      45,
+  );
+
   const subtotal = getCartTotal();
-  const deliveryFee = shippingMethod === "delivery" ? 45 : 0; // White-Glove cake delivery is premium!
-  const estTax = subtotal * 0.0825; // 8.25% NY tax
+  const deliveryFee = shippingMethod === "delivery" ? configuredDeliveryFee : 0;
+  const estTax = subtotal * 0.0825; // 8.25% tax
   const total = subtotal + deliveryFee + estTax;
+
+  const pickupInstruction =
+    activeTenant?.pickup_instruction ||
+    activeTenant?.branding_config?.pickupInstruction ||
+    "Pickup available Tuesday–Saturday at our studio. Select your time slot on the checkout page.";
+
+  const deliveryInstruction =
+    activeTenant?.delivery_instruction ||
+    activeTenant?.branding_config?.deliveryInstruction ||
+    "White-Glove climate-controlled delivery is locked for the Tri-State area. Assembly included.";
 
   if (!mounted) {
     return (
@@ -120,21 +167,29 @@ export function CartView() {
                       <span className="font-bold text-foreground">
                         {formatCurrency(
                           (item.price * item.quantity).toFixed(2),
+                          currency,
                         )}
                       </span>
                     </div>
 
                     <div className="flex flex-col gap-1 mb-4 text-sm text-stone-500">
-                      {item.size && (
-                        <div>
-                          <span className="font-semibold text-foreground">
-                            Size:
-                          </span>{" "}
-                          {item.size}
+                      {item.options && Object.keys(item.options).length > 0 ? (
+                        <div className="text-xs text-muted-foreground font-medium">
+                          {Object.entries(item.options)
+                            .map(
+                              ([k, v]) =>
+                                `${k.charAt(0).toUpperCase() + k.slice(1)}: ${v}`,
+                            )
+                            .join(" • ")}
                         </div>
-                      )}
+                      ) : item.description ? (
+                        <div className="text-xs text-muted-foreground line-clamp-1 font-medium">
+                          {item.description}
+                        </div>
+                      ) : null}
                       <div className="text-muted-foreground text-xs font-bold mt-1">
-                        Unit Price: {formatCurrency(item.price.toFixed(2))}
+                        Unit Price:{" "}
+                        {formatCurrency(item.price.toFixed(2), currency)}
                       </div>
                     </div>
 
@@ -147,8 +202,9 @@ export function CartView() {
                             updateQuantity(
                               item.id,
                               item.quantity - 1,
-                              item.size,
-                              item.flavor,
+                              item.options,
+                              undefined,
+                              tenantSlug,
                             )
                           }
                           className="text-stone-500 hover:text-stone-900 hover:bg-secondary rounded-md transition-colors p-2 cursor-pointer"
@@ -164,8 +220,9 @@ export function CartView() {
                             updateQuantity(
                               item.id,
                               item.quantity + 1,
-                              item.size,
-                              item.flavor,
+                              item.options,
+                              undefined,
+                              tenantSlug,
                             )
                           }
                           className="text-stone-500 hover:text-stone-900 hover:bg-secondary rounded-md transition-colors p-2 cursor-pointer"
@@ -178,7 +235,12 @@ export function CartView() {
                       {/* Remove Button */}
                       <button
                         onClick={() =>
-                          removeFromCart(item.id, item.size, item.flavor)
+                          removeFromCart(
+                            item.id,
+                            item.options,
+                            undefined,
+                            tenantSlug,
+                          )
                         }
                         className="text-stone-400 hover:text-rose-600 transition-colors flex items-center gap-1 text-xs cursor-pointer"
                       >
@@ -246,7 +308,7 @@ export function CartView() {
               <div className="flex justify-between text-xs text-stone-500 font-medium">
                 <span>Items Subtotal</span>
                 <span className="font-semibold text-sm text-foreground">
-                  {formatCurrency(subtotal.toFixed(2))}
+                  {formatCurrency(subtotal.toFixed(2), currency)}
                 </span>
               </div>
 
@@ -258,7 +320,12 @@ export function CartView() {
                   </span>
                 ) : (
                   <span className="font-semibold text-sm text-foreground">
-                    $45.00
+                    {configuredDeliveryFee > 0
+                      ? formatCurrency(
+                          configuredDeliveryFee.toFixed(2),
+                          currency,
+                        )
+                      : "Free Delivery"}
                   </span>
                 )}
               </div>
@@ -266,7 +333,7 @@ export function CartView() {
               <div className="flex justify-between text-xs text-stone-500 font-medium">
                 <span>Estimated Sales Tax</span>
                 <span className="font-semibold text-sm text-foreground">
-                  {formatCurrency(estTax.toFixed(2))}
+                  {formatCurrency(estTax.toFixed(2), currency)}
                 </span>
               </div>
 
@@ -277,7 +344,7 @@ export function CartView() {
                   Grand Total
                 </span>
                 <span className="text-2xl font-bold text-foreground">
-                  {formatCurrency(total.toFixed(2))}
+                  {formatCurrency(total.toFixed(2), currency)}
                 </span>
               </div>
             </div>
@@ -296,8 +363,8 @@ export function CartView() {
             {/* Pickup/delivery instructions */}
             <p className="text-[10px] text-stone-400 mt-4 leading-relaxed text-center">
               {shippingMethod === "pickup"
-                ? "Pickup available Tuesday–Saturday at our studio. Select your time slot on the checkout page."
-                : "White-Glove climate-controlled delivery is locked for the Tri-State area. Assembly included."}
+                ? pickupInstruction
+                : deliveryInstruction}
             </p>
           </div>
         </div>

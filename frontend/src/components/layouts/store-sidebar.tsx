@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -369,8 +370,18 @@ export function StoreSidebar() {
                   className="size-8.5 mx-auto flex items-center justify-center p-0.5 rounded-sm hover:bg-muted/80 transition-all cursor-pointer group"
                   title={`${displayName} (Store Admin)`}
                 >
-                  <div className="size-7 rounded-full bg-primary/20 border border-primary/40 text-primary font-bold text-xs flex items-center justify-center shrink-0">
-                    {displayInitials}
+                  <div className="size-7 rounded-full bg-primary/20 border border-primary/40 text-primary font-bold text-xs flex items-center justify-center shrink-0 overflow-hidden">
+                    {user?.avatar_url || user?.avatarUrl ? (
+                      <Image
+                        src={user.avatar_url || user.avatarUrl || ""}
+                        alt={displayName}
+                        width={28}
+                        height={28}
+                        className="size-full object-cover"
+                      />
+                    ) : (
+                      displayInitials
+                    )}
                   </div>
                 </button>
               </PopoverTrigger>
@@ -382,8 +393,18 @@ export function StoreSidebar() {
               >
                 <div className="flex flex-col gap-3">
                   <div className="flex items-center gap-2.5 pb-2.5 border-b border-border">
-                    <div className="size-9 rounded-full bg-primary/20 border border-primary/40 text-primary font-bold text-sm flex items-center justify-center shrink-0">
-                      {displayInitials}
+                    <div className="size-9 rounded-full bg-primary/20 border border-primary/40 text-primary font-bold text-sm flex items-center justify-center shrink-0 overflow-hidden">
+                      {user?.avatar_url || user?.avatarUrl ? (
+                        <Image
+                          src={user.avatar_url || user.avatarUrl || ""}
+                          alt={displayName}
+                          width={36}
+                          height={36}
+                          className="size-full object-cover"
+                        />
+                      ) : (
+                        displayInitials
+                      )}
                     </div>
                     <div className="flex flex-col min-w-0">
                       <span className="text-xs font-semibold text-foreground truncate">
@@ -436,8 +457,18 @@ export function StoreSidebar() {
                 className="relative rounded-sm flex items-center hover:bg-muted/80 transition-all duration-300 ease-in-out overflow-hidden px-2 py-1.5 flex-1 min-w-0"
                 title={`${displayName} (Store Admin)`}
               >
-                <div className="size-7 rounded-full bg-primary/20 border border-primary/40 text-primary font-bold text-xs flex items-center justify-center shrink-0">
-                  {displayInitials}
+                <div className="size-7 rounded-full bg-primary/20 border border-primary/40 text-primary font-bold text-xs flex items-center justify-center shrink-0 overflow-hidden">
+                  {user?.avatar_url || user?.avatarUrl ? (
+                    <Image
+                      src={user.avatar_url || user.avatarUrl || ""}
+                      alt={displayName}
+                      width={28}
+                      height={28}
+                      className="size-full object-cover"
+                    />
+                  ) : (
+                    displayInitials
+                  )}
                 </div>
                 <div className="flex flex-col min-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out max-w-32.5 opacity-100 translate-x-0 ml-2.5">
                   <span className="text-xs font-semibold text-foreground truncate">

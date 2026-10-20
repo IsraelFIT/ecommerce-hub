@@ -58,7 +58,7 @@ export default function CoreDevelopersPage() {
                 Super Admin Master API Key
               </h3>
             </div>
-            <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded font-semibold">
+            <span className="text-[10px]  text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded font-semibold">
               Live Key
             </span>
           </div>
@@ -69,7 +69,7 @@ export default function CoreDevelopersPage() {
           </p>
 
           <div className="flex items-center gap-2 mt-3 p-2.5 rounded-lg bg-card-gray/80 dark:bg-white/5 border border-border">
-            <code className="font-mono text-xs text-foreground flex-1 truncate">
+            <code className=" text-xs text-foreground flex-1 truncate">
               {masterApiKey}
             </code>
             <button
@@ -96,7 +96,7 @@ export default function CoreDevelopersPage() {
                 Neon Staging Database URI
               </h3>
             </div>
-            <span className="text-[10px] font-mono text-purple-600 dark:text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded font-semibold">
+            <span className="text-[10px]  text-purple-600 dark:text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded font-semibold">
               Staging Pooler
             </span>
           </div>
@@ -107,7 +107,7 @@ export default function CoreDevelopersPage() {
           </p>
 
           <div className="flex items-center gap-2 mt-3 p-2.5 rounded-lg bg-card-gray/80 dark:bg-white/5 border border-border">
-            <code className="font-mono text-[11px] text-foreground flex-1 truncate">
+            <code className=" text-[11px] text-foreground flex-1 truncate">
               {neonConnString}
             </code>
             <button
@@ -135,12 +135,12 @@ export default function CoreDevelopersPage() {
               API Quickstart (cURL Example)
             </h3>
           </div>
-          <span className="text-[10px] font-mono text-muted-foreground">
+          <span className="text-[10px]  text-muted-foreground">
             FastAPI Auth & Tenant Routing
           </span>
         </div>
 
-        <div className="mt-3 p-3 rounded-lg bg-black/80 dark:bg-black text-white font-mono text-xs overflow-x-auto">
+        <div className="mt-3 p-3 rounded-lg bg-black/80 dark:bg-black text-white  text-xs overflow-x-auto">
           <pre className="text-emerald-400"># Authenticate as Super Admin</pre>
           <pre className="text-zinc-300">
             {`curl -X POST "http://localhost:8000/auth/login" \\

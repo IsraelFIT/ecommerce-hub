@@ -232,7 +232,7 @@ export default function CoreRevenuePage() {
 
         <Badge
           variant="outline"
-          className="bg-primary/10 text-primary border-primary/30 font-mono text-xs shrink-0"
+          className="bg-primary/10 text-primary border-primary/30  text-xs shrink-0"
         >
           SPLIT_CONFIG_ACTIVE
         </Badge>
@@ -244,7 +244,7 @@ export default function CoreRevenuePage() {
           <h4 className="text-xs font-bold font-secondary text-foreground">
             Escrow Split Audit Log
           </h4>
-          <span className="text-[11px] text-muted-foreground font-mono">
+          <span className="text-[11px] text-muted-foreground ">
             Showing latest settlement records
           </span>
         </div>
@@ -269,7 +269,7 @@ export default function CoreRevenuePage() {
             <tbody className="divide-y divide-border">
               {splitTransactions.map((tx) => (
                 <tr key={tx.id} className="hover:bg-muted/40 transition-colors">
-                  <td className="p-3.5 font-mono">
+                  <td className="p-3.5 ">
                     <div className="font-bold text-foreground">{tx.id}</div>
                     <div className="text-[10px] text-muted-foreground">
                       {tx.date}
@@ -283,16 +283,16 @@ export default function CoreRevenuePage() {
                       {tx.customer}
                     </div>
                   </td>
-                  <td className="p-3.5 font-bold font-mono text-foreground">
+                  <td className="p-3.5 font-bold  text-foreground">
                     {formatCurrency(tx.gross)}
                   </td>
-                  <td className="p-3.5 font-bold font-mono text-primary">
+                  <td className="p-3.5 font-bold  text-primary">
                     +{formatCurrency(tx.platformFee)}
                   </td>
-                  <td className="p-3.5 font-bold font-mono text-emerald-600 dark:text-emerald-400">
+                  <td className="p-3.5 font-bold  text-emerald-600 dark:text-emerald-400">
                     {formatCurrency(tx.tenantPayout)}
                   </td>
-                  <td className="p-3.5 font-mono text-[10px] text-muted-foreground max-w-55 truncate">
+                  <td className="p-3.5  text-[10px] text-muted-foreground max-w-55 truncate">
                     {tx.gateway}
                   </td>
                   <td className="p-3.5 text-right">

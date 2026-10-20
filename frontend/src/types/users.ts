@@ -17,12 +17,25 @@ export interface BrandingConfig {
   secondaryColor?: string;
   accentColor?: string;
   landingPageType?: "default" | "custom" | string;
-  customLandingPageStatus?: "none" | "pending" | "in_review" | "in_progress" | "completed" | "rejected" | string;
+  customLandingPageStatus?:
+    | "none"
+    | "pending"
+    | "in_review"
+    | "in_progress"
+    | "completed"
+    | "rejected"
+    | string;
   logoUrl?: string | null;
   tagline?: string | null;
   storeHeadline?: string | null;
   announcementText?: string | null;
   bannerUrl?: string | null;
+  pickupLocationName?: string | null;
+  pickupAddress?: string | null;
+  pickupHours?: string | null;
+  deliveryFee?: number | null;
+  deliveryInstruction?: string | null;
+  pickupInstruction?: string | null;
 }
 
 export interface CustomizationRequest {
@@ -32,7 +45,13 @@ export interface CustomizationRequest {
   tenant_slug: string;
   requested_by_email?: string | null;
   request_type: string;
-  status: "pending" | "in_review" | "in_progress" | "completed" | "rejected" | string;
+  status:
+    | "pending"
+    | "in_review"
+    | "in_progress"
+    | "completed"
+    | "rejected"
+    | string;
   title: string;
   details?: string | null;
   primary_color?: string | null;
@@ -78,7 +97,37 @@ export interface Tenant {
   stripe_account_id?: string | null;
   sanity_dataset?: string | null;
   sanity_project_id?: string | null;
+  store_address?: string | null;
+  store_phone?: string | null;
+  store_email?: string | null;
+  pickup_location_name?: string | null;
+  pickup_address?: string | null;
+  pickup_hours?: string | null;
+  delivery_fee?: number | null;
+  delivery_instruction?: string | null;
+  pickup_instruction?: string | null;
   is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface UserAddress {
+  id: string;
+  user_id?: string;
+  first_name: string;
+  last_name: string;
+  firstName?: string;
+  lastName?: string;
+  company?: string | null;
+  country: string;
+  street: string;
+  city: string;
+  state: string;
+  zip_code: string;
+  zipCode?: string;
+  phone?: string | null;
+  email?: string | null;
+  is_default?: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -91,6 +140,9 @@ export interface User {
   last_name?: string;
   full_name?: string;
   role: UserRole;
+  phone_number?: string | null;
+  gender?: string | null;
+  avatar_url?: string | null;
   tenant_slug?: string | null;
   tenant_name?: string | null;
   tenant_currency?: string | null;

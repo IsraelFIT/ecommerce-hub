@@ -233,7 +233,7 @@ export default function CoreTenantsPage() {
                     <div className="font-bold text-foreground text-[13px] flex items-center gap-1.5">
                       <span>{t.name}</span>
                     </div>
-                    <div className="text-[11px] font-mono text-muted-foreground mt-0.5 flex items-center gap-1">
+                    <div className="text-[11px]  text-muted-foreground mt-0.5 flex items-center gap-1">
                       <span>{t.slug}.ecommerce-hub.com</span>
                     </div>
                   </td>
@@ -255,7 +255,7 @@ export default function CoreTenantsPage() {
                       </span>
                     )}
                   </td>
-                  <td className="p-3.5 font-mono text-[11px]">
+                  <td className="p-3.5  text-[11px]">
                     <div className="font-semibold text-foreground">
                       {t.gateway.toUpperCase()}
                     </div>
@@ -271,7 +271,7 @@ export default function CoreTenantsPage() {
                       {t.ordersCount} orders
                     </div>
                   </td>
-                  <td className="p-3.5 font-bold font-mono text-foreground text-[13px]">
+                  <td className="p-3.5 font-bold  text-foreground text-[13px]">
                     {t.totalVolume}
                   </td>
                   <td className="p-3.5">
@@ -367,7 +367,7 @@ export default function CoreTenantsPage() {
                     onChange={(e) => setNewStoreSlug(e.target.value)}
                     className="flex-1 px-3 py-2 bg-transparent text-foreground focus:outline-none"
                   />
-                  <span className="px-2.5 py-2 bg-muted/50 text-muted-foreground font-mono text-[11px] border-l border-border">
+                  <span className="px-2.5 py-2 bg-muted/50 text-muted-foreground  text-[11px] border-l border-border">
                     .ecommerce-hub.com
                   </span>
                 </div>

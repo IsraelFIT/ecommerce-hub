@@ -334,16 +334,36 @@ export function ItemDetailsClient({
   const router = useRouter();
   const addToCart = useCartStore((state) => state.addToCart);
 
-  // Gallery state
-  const rawImages =
-    item.images && item.images.length > 0 ? item.images : [item.image];
-  // Ensure we have multiple thumbnail items for the gallery view
-  const images =
-    rawImages.length >= 2
-      ? rawImages
-      : [rawImages[0], rawImages[0], rawImages[0], rawImages[0], rawImages[0]];
+  // Gallery state: extract all unique, non-empty image URLs
+  const images = useMemo(() => {
+    const list: string[] = [];
+    if (Array.isArray(item.images) && item.images.length > 0) {
+      item.images.forEach((img) => {
+        if (img && typeof img === "string" && img.trim().length > 0) {
+          const trimmed = img.trim();
+          if (!list.includes(trimmed)) {
+            list.push(trimmed);
+          }
+        }
+      });
+    }
+    if (
+      item.image &&
+      typeof item.image === "string" &&
+      item.image.trim().length > 0
+    ) {
+      const trimmed = item.image.trim();
+      if (!list.includes(trimmed)) {
+        list.push(trimmed);
+      }
+    }
+    return list.length > 0 ? list : ["/images/placeholder.jpg"];
+  }, [item.images, item.image]);
 
   const [selectedImageIdx, setSelectedImageIdx] = useState(0);
+  // Derive safe index without needing an effect or causing cascading renders
+  const activeImageIdx =
+    selectedImageIdx < images.length ? selectedImageIdx : 0;
 
   // Variant / Option states
   const variants =
@@ -471,16 +491,25 @@ export function ItemDetailsClient({
       ...otherFilterDescriptions,
     ].filter(Boolean);
 
+    const selectedOptions: Record<string, string> = {};
+    if (selectedSizeLabel) selectedOptions.size = selectedSizeLabel;
+    if (selectedColorLabel) selectedOptions.color = selectedColorLabel;
+    otherFilterEntries.forEach(([k]) => {
+      const val = selectedFilters[k];
+      if (val) selectedOptions[k] = val;
+    });
+
     addToCart(
       {
         id: currentVariant ? currentVariant.id : item.id,
         name: item.name,
         price: currentPrice,
-        image: images[selectedImageIdx] || item.image,
+        image: images[activeImageIdx] || item.image,
         description:
           descParts.length > 0 ? descParts.join(" • ") : item.description,
-        size: selectedSizeLabel || undefined,
-        flavor: selectedColorLabel || selectedFilters["dietary"] || undefined,
+        ...(Object.keys(selectedOptions).length > 0
+          ? { options: selectedOptions }
+          : {}),
       },
       quantity,
     );
@@ -569,16 +598,15 @@ export function ItemDetailsClient({
             <div className="relative w-fit max-w-full rounded-lg bg-card border border-border overflow-hidden">
               <Image
                 src={
-                  images[selectedImageIdx] ||
+                  images[activeImageIdx] ||
                   images[0] ||
                   "/images/placeholder.jpg"
                 }
                 alt={item.name}
-                width={800}
+                width={1200}
                 height={800}
                 priority
-                style={{ width: "auto", height: "auto" }}
-                className="w-auto h-auto max-w-full max-h-150 object-contain block transition-all duration-300"
+                className="object-contain block transition-all duration-300"
                 sizes="(max-width: 1024px) 100vw, 50vw"
               />
             </div>
@@ -592,20 +620,18 @@ export function ItemDetailsClient({
                     type="button"
                     onClick={() => setSelectedImageIdx(idx)}
                     className={cn(
-                      "relative w-fit max-w-20 max-h-20 rounded-lg overflow-hidden bg-card border-2 transition-all cursor-pointer shrink-0",
-                      selectedImageIdx === idx
-                        ? "border-primary"
-                        : "border-transparent",
+                      "relative w-20 h-20 rounded-xl overflow-hidden bg-card border-2 transition-all cursor-pointer shrink-0",
+                      activeImageIdx === idx
+                        ? "border-primary ring-2 ring-primary/20"
+                        : "border-stone-200/90 hover:border-stone-300",
                     )}
                   >
                     <Image
                       src={img}
                       alt={`Thumbnail ${idx + 1}`}
-                      width={80}
-                      height={80}
+                      fill
                       sizes="80px"
-                      style={{ width: "auto", height: "auto" }}
-                      className="w-auto h-auto max-w-20 max-h-20 object-contain block transition-all"
+                      className="object-cover transition-all"
                     />
                   </button>
                 ))}

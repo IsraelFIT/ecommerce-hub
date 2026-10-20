@@ -525,7 +525,7 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
                     />
                     Primary Brand Color
                   </Label>
-                  <span className="text-[10px] font-mono text-muted-foreground">
+                  <span className="text-[10px]  text-muted-foreground">
                     Core Accent
                   </span>
                 </div>
@@ -540,7 +540,7 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
                   <Input
                     value={brandColor}
                     onChange={(e) => handleColorChange(e.target.value)}
-                    className="h-9 text-xs uppercase font-mono"
+                    className="h-9 text-xs uppercase "
                     placeholder="#059669"
                   />
                 </div>
@@ -560,7 +560,7 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
                     />
                     Secondary / Accent Color
                   </Label>
-                  <span className="text-[10px] font-mono text-muted-foreground">
+                  <span className="text-[10px]  text-muted-foreground">
                     Highlight
                   </span>
                 </div>
@@ -579,7 +579,7 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
                     onChange={(e) =>
                       handleColorChange(brandColor, e.target.value)
                     }
-                    className="h-9 text-xs uppercase font-mono"
+                    className="h-9 text-xs uppercase "
                     placeholder="#EC4899"
                   />
                 </div>
@@ -925,7 +925,7 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
                   <Input
                     value={subdomainUrl}
                     readOnly
-                    className="bg-muted/40 font-mono text-xs h-9"
+                    className="bg-muted/40  text-xs h-9"
                   />
                   <Button
                     onClick={handleCopySubdomain}
@@ -947,7 +947,7 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
                     value={customDomain}
                     onChange={(e) => setCustomDomain(e.target.value)}
                     placeholder="shop.yourstore.com"
-                    className="text-xs h-9 bg-background font-mono"
+                    className="text-xs h-9 bg-background "
                   />
                   <Button
                     size="md"
@@ -961,7 +961,7 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
                 </div>
                 <p className="text-[11px] text-muted-foreground">
                   Point your DNS CNAME record to{" "}
-                  <code className="bg-muted px-1.5 py-0.5 rounded text-foreground font-mono text-[10px]">
+                  <code className="bg-muted px-1.5 py-0.5 rounded text-foreground  text-[10px]">
                     cname.ecommerce-hub.com
                   </code>
                 </p>
@@ -1032,7 +1032,7 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
                     className="size-2 rounded-full"
                     style={{ backgroundColor: accentColor }}
                   />
-                  <span className="text-[10px] text-muted-foreground font-mono truncate max-w-28">
+                  <span className="text-[10px] text-muted-foreground  truncate max-w-28">
                     {landingPageType === "custom" ? "Bespoke" : "Standard"}
                   </span>
                 </div>
@@ -1088,7 +1088,7 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
             <div className="p-3.5 rounded-xl bg-muted/40 border border-border text-xs space-y-2">
               <div className="flex items-center justify-between text-[11px]">
                 <span className="text-muted-foreground">Primary Color:</span>
-                <span className="font-mono font-bold flex items-center gap-1.5 text-foreground">
+                <span className=" font-bold flex items-center gap-1.5 text-foreground">
                   <span
                     className="size-3 rounded-full"
                     style={{ backgroundColor: brandColor }}
@@ -1098,7 +1098,7 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
               </div>
               <div className="flex items-center justify-between text-[11px]">
                 <span className="text-muted-foreground">Secondary Accent:</span>
-                <span className="font-mono font-bold flex items-center gap-1.5 text-foreground">
+                <span className=" font-bold flex items-center gap-1.5 text-foreground">
                   <span
                     className="size-3 rounded-full"
                     style={{ backgroundColor: accentColor }}

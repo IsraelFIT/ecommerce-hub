@@ -226,7 +226,7 @@ export default function TenantAdaptersPage({ params }: AdaptersPageProps) {
                 <span className="text-muted-foreground">
                   Multi-Tenancy Policy
                 </span>
-                <span className="font-mono font-semibold text-foreground">
+                <span className=" font-semibold text-foreground">
                   PostgreSQL RLS (tenant_id)
                 </span>
               </div>
@@ -399,7 +399,7 @@ export default function TenantAdaptersPage({ params }: AdaptersPageProps) {
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1">
-                      <span className="font-bold text-xs text-foreground font-mono">
+                      <span className="font-bold text-xs text-foreground ">
                         staging
                       </span>
                       {sanityDataset === "staging" && (
@@ -423,7 +423,7 @@ export default function TenantAdaptersPage({ params }: AdaptersPageProps) {
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1">
-                      <span className="font-bold text-xs text-foreground font-mono">
+                      <span className="font-bold text-xs text-foreground ">
                         production
                       </span>
                       {sanityDataset === "production" && (
@@ -514,7 +514,7 @@ export default function TenantAdaptersPage({ params }: AdaptersPageProps) {
             <Input
               value={`pk_live_${tenantSlug}_998240f91a0c4e`}
               readOnly
-              className="bg-muted text-xs font-mono border-border text-foreground"
+              className="bg-muted text-xs  border-border text-foreground"
             />
             <Button
               onClick={handleCopyApiKey}

@@ -5,19 +5,31 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useParams } from "next/navigation";
 import {
-  CheckCircle,
   CreditCard,
-  Calendar,
+  Calendar as CalendarIcon,
   Clock,
   MapPin,
   Truck,
   ChevronRight,
   ShoppingBag,
+  Plus,
+  ShieldCheck,
+  Loader2,
+  ExternalLink,
+  Check,
+  Lock,
 } from "lucide-react";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -26,26 +38,60 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCartStore } from "@/store/cart";
+import { useUserStore } from "@/store/user";
 import { formatCurrency, getTenantRoute } from "@/utils/helper";
+import { apiRequest } from "@/lib/api/client";
+import { getUserAddresses, addUserAddress } from "@/lib/api/auth";
+import { Tenant, UserAddress } from "@/types/users";
+import { Order, CheckoutSessionResponse } from "@/types";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 export default function CheckoutPage() {
   const router = useRouter();
   const params = useParams();
   const tenantSlug = (params?.tenant as string) || "store";
+  const { user } = useUserStore();
   const { items, getCartTotal, clearCart } = useCartStore();
   const [mounted, setMounted] = useState(false);
+  const [tenantData, setTenantData] = useState<Tenant | null>(null);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 
+  useEffect(() => {
+    let isMounted = true;
+    apiRequest<Tenant>(`/tenants/by-slug/${tenantSlug}`)
+      .then((res) => {
+        if (isMounted && res.data) {
+          setTenantData(res.data);
+        }
+      })
+      .catch(() => null);
+    return () => {
+      isMounted = false;
+    };
+  }, [tenantSlug]);
+
   // Form States
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+
+  useEffect(() => {
+    if (user) {
+      if (user.first_name)
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setFirstName((prev) => prev || user.first_name || "");
+      if (user.last_name) setLastName((prev) => prev || user.last_name || "");
+      if (user.email) setEmail((prev) => prev || user.email || "");
+      if (user.phone_number)
+        setPhone((prev) => prev || user.phone_number || "");
+    }
+  }, [user]);
 
   const [fulfillmentType, setFulfillmentType] = useState<"pickup" | "delivery">(
     "pickup",
@@ -55,25 +101,129 @@ export default function CheckoutPage() {
 
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
+  const [state, setState] = useState("");
   const [zip, setZip] = useState("");
+  const [country, setCountry] = useState("");
 
-  const [cardName, setCardName] = useState("");
-  const [cardNumber, setCardNumber] = useState("");
-  const [cardExpiry, setCardExpiry] = useState("");
-  const [cardCvv, setCardCvv] = useState("");
+  // Customer Profile Saved Addresses State
+  const [savedAddresses, setSavedAddresses] = useState<UserAddress[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | "new">(
+    "",
+  );
+  const [, setIsLoadingAddresses] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadAddresses() {
+      if (!user?.id) return;
+      try {
+        setIsLoadingAddresses(true);
+        const addrs = await getUserAddresses();
+        if (addrs && Array.isArray(addrs) && isMounted) {
+          setSavedAddresses(addrs);
+          if (addrs.length > 0) {
+            // Pick default address or first saved address
+            const defaultAddr = addrs.find((a) => a.is_default) || addrs[0];
+            setSelectedAddressId(defaultAddr.id);
+            setAddress(defaultAddr.street || "");
+            setCity(defaultAddr.city || "");
+            setState(defaultAddr.state || "");
+            setZip(defaultAddr.zip_code || defaultAddr.zipCode || "");
+            setCountry(defaultAddr.country || "");
+            if (defaultAddr.first_name || defaultAddr.firstName) {
+              setFirstName(
+                (prev) =>
+                  prev || defaultAddr.first_name || defaultAddr.firstName || "",
+              );
+            }
+            if (defaultAddr.last_name || defaultAddr.lastName) {
+              setLastName(
+                (prev) =>
+                  prev || defaultAddr.last_name || defaultAddr.lastName || "",
+              );
+            }
+            if (defaultAddr.phone) {
+              setPhone((prev) => prev || defaultAddr.phone || "");
+            }
+          }
+        }
+      } catch (err) {
+        console.error(
+          "Failed to load customer profile addresses in checkout:",
+          err,
+        );
+      } finally {
+        if (isMounted) setIsLoadingAddresses(false);
+      }
+    }
+    loadAddresses();
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id]);
+
+  const handleSelectSavedAddress = (addr: UserAddress) => {
+    setSelectedAddressId(addr.id);
+    setAddress(addr.street || "");
+    setCity(addr.city || "");
+    setState(addr.state || "");
+    setZip(addr.zip_code || addr.zipCode || "");
+    setCountry(addr.country || "");
+  };
+
+  const handleSelectNewAddress = () => {
+    setSelectedAddressId("new");
+    setAddress("");
+    setCity("");
+    setState("");
+    setZip("");
+  };
 
   const [giftMessage, setGiftMessage] = useState("");
 
-  // Checkout Success Modal State
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [orderNumber, setOrderNumber] = useState("");
+  // Payment Gateway & Checkout States
+  const [paymentGateway, setPaymentGateway] = useState<"paystack" | "stripe">(
+    "paystack",
+  );
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
+  const [isMockModalOpen, setIsMockModalOpen] = useState(false);
+  const [activeOrder, setActiveOrder] = useState<Order | null>(null);
+  const [checkoutSession, setCheckoutSession] =
+    useState<CheckoutSessionResponse | null>(null);
 
+  // Initialize payment gateway choice from tenant's default or currency
+  useEffect(() => {
+    if (tenantData) {
+      if (
+        tenantData.default_gateway === "stripe" ||
+        tenantData.default_gateway === "paystack"
+      ) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setPaymentGateway(tenantData.default_gateway as "paystack" | "stripe");
+      } else if (
+        tenantData.currency === "USD" ||
+        tenantData.currency === "EUR" ||
+        tenantData.currency === "GBP"
+      ) {
+        setPaymentGateway("stripe");
+      } else {
+        setPaymentGateway("paystack");
+      }
+    }
+  }, [tenantData]);
+
+  const storeCurrency = tenantData?.currency || "NGN";
   const subtotal = getCartTotal();
-  const deliveryFee = fulfillmentType === "delivery" ? 45 : 0;
+  const configuredDeliveryFee = Number(
+    tenantData?.delivery_fee ?? tenantData?.branding_config?.deliveryFee ?? 45,
+  );
+  const deliveryFee =
+    fulfillmentType === "delivery" ? configuredDeliveryFee : 0;
   const estTax = subtotal * 0.0825;
   const total = subtotal + deliveryFee + estTax;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (items.length === 0) {
@@ -91,22 +241,176 @@ export default function CheckoutPage() {
       return;
     }
 
-    if (!cardName || !cardNumber || !cardExpiry || !cardCvv) {
-      toast.error("Please complete the payment details.");
-      return;
+    // If customer selected delivery and is logged in, save address to profile if they don't have one or if it's a new address
+    if (fulfillmentType === "delivery" && user?.id && address.trim()) {
+      const isAlreadySaved = savedAddresses.some(
+        (a) =>
+          a.street?.trim().toLowerCase() === address.trim().toLowerCase() &&
+          a.city?.trim().toLowerCase() === city.trim().toLowerCase() &&
+          (a.zip_code || a.zipCode)?.trim() === zip.trim(),
+      );
+
+      if (!isAlreadySaved || savedAddresses.length === 0) {
+        try {
+          const newAddr = await addUserAddress({
+            first_name: firstName.trim() || user.first_name || "Valued",
+            last_name: lastName.trim() || user.last_name || "Customer",
+            street: address.trim(),
+            city: city.trim(),
+            state: state.trim() || city.trim(),
+            zip_code: zip.trim(),
+            country: country.trim() || tenantData?.country || "United States",
+            phone: phone.trim() || user.phone_number || undefined,
+            email: email.trim() || user.email || undefined,
+            is_default: savedAddresses.length === 0,
+          });
+          setSavedAddresses((prev) => [newAddr, ...prev]);
+        } catch (err) {
+          console.error("Could not save address to customer profile:", err);
+        }
+      }
     }
 
-    // Success simulation
-    const generatedOrderNum = `CB-${Math.floor(100000 + Math.random() * 900000)}`;
-    setOrderNumber(generatedOrderNum);
-    setIsSuccess(true);
-    toast.success("Order placed successfully!");
+    try {
+      setIsProcessingPayment(true);
+
+      // 1. Create order in PostgreSQL database with 2.5% platform split & subaccount allocation
+      const orderPayload = {
+        customer_email: email.trim().toLowerCase(),
+        customer_name: `${firstName} ${lastName}`.trim(),
+        payment_gateway: paymentGateway,
+        currency: storeCurrency,
+        delivery_fee: deliveryFee,
+        fulfillment_type: fulfillmentType,
+        delivery_address:
+          fulfillmentType === "delivery"
+            ? {
+                address: address.trim(),
+                city: city.trim(),
+                state: state.trim(),
+                zip: zip.trim(),
+                country:
+                  country.trim() || tenantData?.country || "United States",
+              }
+            : null,
+        fulfillment_date: date,
+        fulfillment_time: timeSlot,
+        gift_message: giftMessage.trim() || null,
+        items: items.map((item) => ({
+          product_id: item.id,
+          title: item.name,
+          quantity: item.quantity,
+          unit_price: Number(item.price),
+          image: item.image || null,
+          ...(item.options && Object.keys(item.options).length > 0
+            ? { options: item.options }
+            : {}),
+        })),
+      };
+
+      const orderRes = await apiRequest<Order>("/orders", {
+        method: "POST",
+        body: JSON.stringify(orderPayload),
+      });
+
+      if (!orderRes.data) {
+        throw new Error(orderRes.message || "Failed to create order");
+      }
+
+      const createdOrder = orderRes.data;
+      setActiveOrder(createdOrder);
+
+      // 2. Initialize checkout session via chosen provider (Paystack or Stripe)
+      const callbackUrl = `${window.location.origin}/${tenantSlug}/orders/confirmation?reference=${createdOrder.gateway_reference}`;
+      const sessionRes = await apiRequest<CheckoutSessionResponse>(
+        "/payments/checkout-session",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            order_id: createdOrder.id,
+            gateway: paymentGateway,
+            callback_url: callbackUrl,
+          }),
+        },
+      );
+
+      if (!sessionRes.data) {
+        throw new Error(
+          sessionRes.message || "Failed to initialize payment session",
+        );
+      }
+
+      const session = sessionRes.data;
+      setCheckoutSession(session);
+
+      // 3. Determine if live hosted redirect or sandbox modal
+      const isLiveRedirect =
+        session.checkout_url &&
+        !session.checkout_url.includes(createdOrder.gateway_reference) &&
+        (session.checkout_url.startsWith(
+          "https://checkout.stripe.com/c/pay/cs_",
+        ) ||
+          (session.checkout_url.startsWith("https://checkout.paystack.com/") &&
+            !session.checkout_url.includes("ECH-")));
+
+      if (isLiveRedirect) {
+        toast.info(
+          `Redirecting to secure ${
+            paymentGateway === "stripe" ? "Stripe" : "Paystack"
+          } checkout...`,
+        );
+        window.location.href = session.checkout_url;
+      } else {
+        // Open Interactive Payment Gateway Sandbox modal for local test / simulation
+        setIsMockModalOpen(true);
+      }
+    } catch (err: unknown) {
+      console.error("Checkout submission failed:", err);
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Checkout error occurred. Please try again.",
+      );
+    } finally {
+      setIsProcessingPayment(false);
+    }
   };
 
-  const handleCloseSuccess = () => {
-    clearCart();
-    setIsSuccess(false);
-    router.push(getTenantRoute(tenantSlug, "/"));
+  const handleAuthorizeMockPayment = async () => {
+    if (!activeOrder && !checkoutSession) return;
+    const reference =
+      checkoutSession?.reference || activeOrder?.gateway_reference;
+    if (!reference) return;
+
+    try {
+      setIsVerifyingPayment(true);
+      const verifyRes = await apiRequest<{
+        status: string;
+        order_id: string;
+        reference: string;
+      }>(`/payments/verify/${reference}`);
+
+      if (verifyRes.data && verifyRes.data.status === "paid") {
+        toast.success("Payment authorized successfully!");
+        clearCart(tenantSlug, true);
+        setIsMockModalOpen(false);
+        router.push(
+          getTenantRoute(
+            tenantSlug,
+            `/orders/confirmation?reference=${reference}`,
+          ),
+        );
+      } else {
+        toast.error("Payment authorization could not be verified.");
+      }
+    } catch (err: unknown) {
+      console.error("Verification failed:", err);
+      toast.error(
+        err instanceof Error ? err.message : "Payment verification failed",
+      );
+    } finally {
+      setIsVerifyingPayment(false);
+    }
   };
 
   if (!mounted) {
@@ -120,8 +424,8 @@ export default function CheckoutPage() {
     );
   }
 
-  // If cart is empty and not checked out, show redirect button
-  if (items.length === 0 && !isSuccess) {
+  // If cart is empty and no modal open, show redirect button
+  if (items.length === 0 && !isMockModalOpen) {
     return (
       <div className="py-32 bg-stone-50 text-center flex flex-col items-center justify-center">
         <div className="w-16 h-16 bg-stone-100 rounded-full flex items-center justify-center text-stone-400 mb-6">
@@ -146,14 +450,14 @@ export default function CheckoutPage() {
         <nav className="w-full flex items-center gap-2 text-sm text-foreground font-medium mb-8">
           <Link
             href={getTenantRoute(tenantSlug, "/")}
-            className="hover:text-stone-900 transition-colors text-stone-500"
+            className="hover:text-stone-900 transition-colors text-foreground"
           >
             Home
           </Link>
           <ChevronRight className="h-3.5 w-3.5 text-stone-400" />
           <Link
             href={getTenantRoute(tenantSlug, "/cart")}
-            className="hover:text-stone-900 transition-colors text-stone-500"
+            className="hover:text-stone-900 transition-colors text-foreground"
           >
             Cart
           </Link>
@@ -167,68 +471,149 @@ export default function CheckoutPage() {
         <div className="w-full mb-8">
           <h3 className="font-bold text-foreground">Secure Checkout</h3>
           <p className="text-muted-foreground mt-2 font-light">
-            Enter your fulfillment timeline, billing coordinates, and gift
-            options below.
+            Enter your fulfillment timeline, billing coordinates, and select
+            your preferred payment gateway.
           </p>
         </div>
 
-        {/* Success Modal Overlay */}
-        {isSuccess && (
+        {/* Interactive Payment Gateway Sandbox Modal */}
+        {isMockModalOpen && activeOrder && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white max-w-lg w-full p-8 md:p-12 text-center rounded-lg shadow-2xl flex flex-col items-center animate-in fade-in zoom-in-95 duration-200">
-              <CheckCircle className="h-16 w-16 text-emerald-600 mb-6" />
+            <div className="bg-white max-w-lg w-full p-6 md:p-8 rounded-2xl shadow-2xl flex flex-col items-center animate-in fade-in zoom-in-95 duration-200 border border-stone-200">
+              <div
+                className={cn(
+                  "w-14 h-14 rounded-2xl flex items-center justify-center mb-4 shadow-sm",
+                  paymentGateway === "stripe"
+                    ? "bg-indigo-600 text-white"
+                    : "bg-emerald-600 text-white",
+                )}
+              >
+                <CreditCard className="h-7 w-7" />
+              </div>
 
-              <h2 className="text-2xl font-bold text-stone-950 mb-2">
-                Order Confirmed!
-              </h2>
-              <p className="text-xs text-primary font-bold tracking-wider uppercase mb-6">
-                Order Number: {orderNumber}
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider mb-2 bg-stone-100 text-stone-700">
+                <span>{paymentGateway} Payment Sandbox</span>
+              </div>
+
+              <h3 className="text-xl font-bold text-foreground text-center mb-1">
+                Authorize Checkout Payment
+              </h3>
+              <p className="text-xs text-muted-foreground text-center mb-5 max-w-xs">
+                Simulate a live customer authorization to verify split payout
+                settlement and mark the order as paid.
               </p>
 
-              <div className="w-full bg-stone-100 rounded-md p-6 mb-8 text-left text-xs font-light text-stone-600 flex flex-col gap-2">
-                <p>
-                  <span className="font-semibold text-stone-900">Client:</span>{" "}
-                  {firstName} {lastName}
-                </p>
-                <p>
-                  <span className="font-semibold text-stone-900">Email:</span>{" "}
-                  {email}
-                </p>
-                <p>
-                  <span className="font-semibold text-stone-900">Method:</span>{" "}
-                  {fulfillmentType === "pickup" ? "Pickup" : "Delivery"}
-                </p>
-                <p>
-                  <span className="font-semibold text-stone-900">
-                    Schedule:
-                  </span>{" "}
-                  {date} at {timeSlot}
-                </p>
-                {fulfillmentType === "delivery" && (
-                  <p>
-                    <span className="font-semibold text-stone-900">
-                      Address:
-                    </span>{" "}
-                    {address}, {city}, {zip}
-                  </p>
-                )}
-                <div className="border-t border-stone-200 mt-3 pt-3 flex justify-between text-sm font-bold text-stone-950">
-                  <span>Amount Charged</span>
-                  <span>{formatCurrency(total.toFixed(2))}</span>
+              {/* Order Breakdown Card */}
+              <div className="w-full bg-stone-50 border border-stone-200 rounded-xl p-4 mb-6 space-y-2.5 text-xs text-stone-700">
+                <div className="flex justify-between items-center pb-2 border-b border-stone-200/70">
+                  <span className="text-muted-foreground">
+                    Order Reference:
+                  </span>
+                  <span className="font-mono font-bold text-stone-900 select-all">
+                    {checkoutSession?.reference ||
+                      activeOrder.gateway_reference}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Customer:</span>
+                  <span className="font-medium text-stone-900">
+                    {activeOrder.customer_name}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Email:</span>
+                  <span className="font-medium text-stone-900">
+                    {activeOrder.customer_email}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">
+                    Gateway Selected:
+                  </span>
+                  <span className="font-semibold text-stone-900 uppercase">
+                    {paymentGateway}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">
+                    Platform Fee (2.5%):
+                  </span>
+                  <span className="font-medium text-amber-700">
+                    {formatCurrency(activeOrder.platform_fee, storeCurrency)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">
+                    Tenant Subaccount Payout:
+                  </span>
+                  <span className="font-medium text-emerald-700">
+                    {formatCurrency(
+                      activeOrder.tenant_payout_amount,
+                      storeCurrency,
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center pt-2 border-t border-stone-200/70 text-sm font-bold text-stone-950">
+                  <span>Grand Total:</span>
+                  <span className="text-base text-stone-900">
+                    {formatCurrency(activeOrder.total_amount, storeCurrency)}
+                  </span>
                 </div>
               </div>
 
-              <p className="text-xs text-stone-500 mb-8 leading-relaxed">
-                Thank you for choosing Cakes by Bode. We have sent a receipt
-                with design details and schedule slots to your email address.
-              </p>
+              {/* Actions */}
+              <div className="w-full flex flex-col gap-2.5">
+                <Button
+                  onClick={handleAuthorizeMockPayment}
+                  disabled={isVerifyingPayment}
+                  className={cn(
+                    "w-full h-11 text-white font-semibold cursor-pointer shadow-sm transition-all",
+                    paymentGateway === "stripe"
+                      ? "bg-indigo-600 hover:bg-indigo-700"
+                      : "bg-emerald-600 hover:bg-emerald-700",
+                  )}
+                >
+                  {isVerifyingPayment ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Verifying Transaction with Provider...
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="h-4 w-4 mr-2" />
+                      Simulate Successful Payment & Confirm Order
+                    </>
+                  )}
+                </Button>
 
-              <Button
-                onClick={handleCloseSuccess}
-                className="w-full cursor-pointer"
-              >
-                Return to Studio Home
-              </Button>
+                {checkoutSession?.checkout_url && (
+                  <a
+                    href={checkoutSession.checkout_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full"
+                  >
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full h-10 text-xs border-stone-200 hover:bg-stone-50 text-stone-700 cursor-pointer"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                      Open Provider Hosted Page
+                    </Button>
+                  </a>
+                )}
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setIsMockModalOpen(false)}
+                  disabled={isVerifyingPayment}
+                  className="w-full h-9 text-xs text-stone-500 hover:text-stone-800 cursor-pointer"
+                >
+                  Cancel / Return to Checkout
+                </Button>
+              </div>
             </div>
           </div>
         )}
@@ -253,7 +638,7 @@ export default function CheckoutPage() {
                 <div className="flex flex-col gap-2">
                   <Label
                     htmlFor="firstName"
-                    className="text-xs font-bold uppercase tracking-wider text-stone-500"
+                    className="text-xs font-bold text-foreground"
                   >
                     First Name
                   </Label>
@@ -269,7 +654,7 @@ export default function CheckoutPage() {
                 <div className="flex flex-col gap-2">
                   <Label
                     htmlFor="lastName"
-                    className="text-xs font-bold uppercase tracking-wider text-stone-500"
+                    className="text-xs font-bold text-foreground"
                   >
                     Last Name
                   </Label>
@@ -285,7 +670,7 @@ export default function CheckoutPage() {
                 <div className="flex flex-col gap-2">
                   <Label
                     htmlFor="email"
-                    className="text-xs font-bold uppercase tracking-wider text-stone-500"
+                    className="text-xs font-bold text-foreground"
                   >
                     Email Address
                   </Label>
@@ -301,7 +686,7 @@ export default function CheckoutPage() {
                 <div className="flex flex-col gap-2">
                   <Label
                     htmlFor="phone"
-                    className="text-xs font-bold uppercase tracking-wider text-stone-500"
+                    className="text-xs font-bold text-foreground"
                   >
                     Phone Number
                   </Label>
@@ -356,91 +741,229 @@ export default function CheckoutPage() {
 
               {/* Delivery Address fields */}
               {fulfillmentType === "delivery" ? (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                  <div className="flex flex-col gap-2 md:col-span-3">
-                    <Label
-                      htmlFor="address"
-                      className="text-xs font-bold uppercase tracking-wider text-stone-500"
-                    >
-                      Street Address
-                    </Label>
-                    <Input
-                      type="text"
-                      id="address"
-                      required={fulfillmentType === "delivery"}
-                      value={address}
-                      onChange={(e) => setAddress(e.target.value)}
-                      className="h-10"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2 md:col-span-2">
-                    <Label
-                      htmlFor="city"
-                      className="text-xs font-bold uppercase tracking-wider text-stone-500"
-                    >
-                      City
-                    </Label>
-                    <Input
-                      type="text"
-                      id="city"
-                      required={fulfillmentType === "delivery"}
-                      value={city}
-                      onChange={(e) => setCity(e.target.value)}
-                      className="h-10"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Label
-                      htmlFor="zip"
-                      className="text-xs font-bold uppercase tracking-wider text-stone-500"
-                    >
-                      Zip Code
-                    </Label>
-                    <Input
-                      type="text"
-                      id="zip"
-                      required={fulfillmentType === "delivery"}
-                      value={zip}
-                      onChange={(e) => setZip(e.target.value)}
-                      className="h-10"
-                    />
+                <div className="space-y-4 mb-6">
+                  {/* Saved Addresses quick-selector if user has saved addresses */}
+                  {savedAddresses.length > 0 && (
+                    <div className="space-y-2 pb-1">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs font-bold text-foreground">
+                          Delivery Address
+                        </Label>
+                        <span className="text-[11px] text-muted-foreground">
+                          Loaded from your profile
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        {savedAddresses.map((addr) => {
+                          const isSelected = selectedAddressId === addr.id;
+                          return (
+                            <button
+                              key={addr.id}
+                              type="button"
+                              onClick={() => handleSelectSavedAddress(addr)}
+                              className={cn(
+                                "p-3 rounded-lg border text-left transition-all cursor-pointer flex flex-col justify-between text-xs",
+                                isSelected
+                                  ? "border-primary bg-primary/5 text-foreground ring-1 ring-primary shadow-xs"
+                                  : "border-stone-200 hover:border-stone-300 bg-stone-50/50 text-muted-foreground",
+                              )}
+                            >
+                              <div className="font-semibold text-foreground flex items-center justify-between gap-1">
+                                <span className="truncate">{addr.street}</span>
+                                {addr.is_default && (
+                                  <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.2 rounded font-medium shrink-0">
+                                    Default
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-stone-500 mt-1">
+                                {addr.city}, {addr.state}{" "}
+                                {addr.zip_code || addr.zipCode}
+                              </div>
+                            </button>
+                          );
+                        })}
+
+                        {/* Add new address option button */}
+                        <button
+                          type="button"
+                          onClick={handleSelectNewAddress}
+                          className={cn(
+                            "p-3 rounded-lg border text-left transition-all cursor-pointer flex items-center justify-center gap-2 text-xs font-medium border-dashed",
+                            selectedAddressId === "new"
+                              ? "border-primary bg-primary/5 text-primary ring-1 ring-primary"
+                              : "border-stone-300 hover:border-stone-400 bg-transparent text-stone-600",
+                          )}
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          <span>Use a different address</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-2 md:col-span-2">
+                      <Label
+                        htmlFor="address"
+                        className="text-xs font-bold text-foreground"
+                      >
+                        Street Address *
+                      </Label>
+                      <Input
+                        type="text"
+                        id="address"
+                        required={fulfillmentType === "delivery"}
+                        value={address}
+                        onChange={(e) => {
+                          setAddress(e.target.value);
+                          if (selectedAddressId !== "new")
+                            setSelectedAddressId("new");
+                        }}
+                        placeholder="e.g. 123 Broadway, Apt 4B"
+                        className="h-10"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2 md:col-span-1">
+                      <Label
+                        htmlFor="city"
+                        className="text-xs font-bold text-foreground"
+                      >
+                        City *
+                      </Label>
+                      <Input
+                        type="text"
+                        id="city"
+                        required={fulfillmentType === "delivery"}
+                        value={city}
+                        onChange={(e) => {
+                          setCity(e.target.value);
+                          if (selectedAddressId !== "new")
+                            setSelectedAddressId("new");
+                        }}
+                        placeholder="e.g. New York"
+                        className="h-10"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2 md:col-span-1">
+                      <Label
+                        htmlFor="state"
+                        className="text-xs font-bold text-foreground"
+                      >
+                        State / Region *
+                      </Label>
+                      <Input
+                        type="text"
+                        id="state"
+                        required={fulfillmentType === "delivery"}
+                        value={state}
+                        onChange={(e) => {
+                          setState(e.target.value);
+                          if (selectedAddressId !== "new")
+                            setSelectedAddressId("new");
+                        }}
+                        placeholder="e.g. NY"
+                        className="h-10"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2 md:col-span-1">
+                      <Label
+                        htmlFor="zip"
+                        className="text-xs font-bold text-foreground"
+                      >
+                        Zip Code *
+                      </Label>
+                      <Input
+                        type="text"
+                        id="zip"
+                        required={fulfillmentType === "delivery"}
+                        value={zip}
+                        onChange={(e) => {
+                          setZip(e.target.value);
+                          if (selectedAddressId !== "new")
+                            setSelectedAddressId("new");
+                        }}
+                        placeholder="e.g. 10001"
+                        className="h-10"
+                      />
+                    </div>
                   </div>
                 </div>
               ) : (
-                <div className="bg-stone-50 p-4 border border-stone-200 rounded-md mb-6 text-stone-600 text-xs leading-relaxed font-light">
-                  <p className="font-semibold text-stone-950 mb-1">
-                    Pickup Location:
+                <div className="bg-stone-50 p-4 border border-stone-200 rounded-md mb-6 text-foreground font-light">
+                  <p className="font-semibold mb-1">Pickup Location:</p>
+                  <p className="font-medium text-stone-900">
+                    {tenantData?.pickup_location_name ||
+                      tenantData?.branding_config?.pickupLocationName ||
+                      `${tenantData?.name || "Store"} Studio`}
                   </p>
-                  <p>Cakes by Bode Studio</p>
-                  <p>742 Designer Row, New York, NY 10011</p>
-                  <p className="mt-2 text-[10px] text-stone-400">
-                    Available: Tuesday–Saturday, 10:00 – 18:00
+                  <p>
+                    {tenantData?.pickup_address ||
+                      tenantData?.branding_config?.pickupAddress ||
+                      "Address"}
+                  </p>
+                  <p className="mt-2 text-xs text-stone-400">
+                    {tenantData?.pickup_hours ||
+                      tenantData?.branding_config?.pickupHours ||
+                      "Available: Tuesday–Saturday, 10:00 – 18:00"}
                   </p>
                 </div>
               )}
 
-              {/* Date & Time slots (Very crucial for cakes!) */}
+              {/* Date & Time slots */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="flex flex-col gap-2">
                   <Label
                     htmlFor="date"
-                    className="text-xs font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1"
+                    className="text-xs font-bold text-foreground flex items-center gap-1"
                   >
-                    <Calendar className="h-3.5 w-3.5" /> Date Needed
+                    <CalendarIcon className="h-3.5 w-3.5" /> Date Needed
                   </Label>
-                  <Input
-                    type="date"
-                    id="date"
-                    required
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="h-10"
-                  />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        id="date"
+                        type="button"
+                        variant="outline"
+                        className={cn(
+                          "h-10 w-full justify-start text-left font-normal border-stone-200 bg-background text-foreground shadow-2xs hover:bg-stone-50 transition-colors",
+                          !date && "text-muted-foreground",
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {date ? (
+                          format(new Date(`${date}T00:00:00`), "PPP")
+                        ) : (
+                          <span>Pick a date</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="w-auto p-0 bg-popover"
+                      align="start"
+                    >
+                      <Calendar
+                        mode="single"
+                        selected={
+                          date ? new Date(`${date}T00:00:00`) : undefined
+                        }
+                        onSelect={(selectedDate) => {
+                          if (selectedDate) {
+                            setDate(format(selectedDate, "yyyy-MM-dd"));
+                          }
+                        }}
+                        disabled={(d) =>
+                          d < new Date(new Date().setHours(0, 0, 0, 0))
+                        }
+                        autoFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className="flex flex-col gap-2">
                   <Label
                     htmlFor="timeSlot"
-                    className="text-xs font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1"
+                    className="text-xs font-bold text-foreground flex items-center gap-1"
                   >
                     <Clock className="h-3.5 w-3.5" /> Delivery / Collection Time
                   </Label>
@@ -467,99 +990,160 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            {/* 3. Payment Details */}
+            {/* 3. Payment Gateway Selection */}
             <div className="bg-white border border-stone-200 rounded-lg p-6 shadow-xs">
-              <h4 className="font-bold font-secondary text-foreground mb-4 pb-2 border-b border-stone-100 flex items-center gap-2">
-                <span className="inline-flex w-6 h-6 rounded-full bg-stone-100 text-foreground items-center justify-center text-xs font-bold">
-                  3
-                </span>
-                Secure Payment Details
-              </h4>
+              <div className="flex items-center justify-between mb-4 pb-2 border-b border-stone-100">
+                <h4 className="font-bold font-secondary text-foreground flex items-center gap-2">
+                  <span className="inline-flex w-6 h-6 rounded-full bg-stone-100 text-foreground items-center justify-center text-xs font-bold">
+                    3
+                  </span>
+                  Payment Gateway
+                </h4>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
+                  <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                  <span>Split Payouts Protected</span>
+                </div>
+              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div className="flex flex-col gap-2 md:col-span-4">
-                  <Label
-                    htmlFor="cardName"
-                    className="text-xs font-bold uppercase tracking-wider text-stone-500"
-                  >
-                    Name on Card
-                  </Label>
-                  <Input
-                    type="text"
-                    id="cardName"
-                    required
-                    value={cardName}
-                    onChange={(e) => setCardName(e.target.value)}
-                    placeholder="John Doe"
-                    className="h-10"
-                  />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Paystack Option */}
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setPaymentGateway("paystack")}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      setPaymentGateway("paystack");
+                    }
+                  }}
+                  className={cn(
+                    "relative p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between gap-3 text-left outline-none",
+                    paymentGateway === "paystack"
+                      ? "border-emerald-600 bg-emerald-50/20 ring-1 ring-emerald-600/30 shadow-xs"
+                      : "border-stone-200 hover:border-stone-300 bg-card text-foreground",
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                        P
+                      </div>
+                      <div>
+                        <div className="font-bold text-sm text-foreground flex items-center gap-1.5">
+                          Paystack
+                          <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full font-semibold">
+                            Direct / Subaccount
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          Cards, Bank Transfer, Apple Pay, USSD
+                        </p>
+                      </div>
+                    </div>
+                    <div
+                      className={cn(
+                        "w-5 h-5 rounded-full border flex items-center justify-center transition-colors shrink-0 mt-0.5",
+                        paymentGateway === "paystack"
+                          ? "border-emerald-600 bg-emerald-600 text-white"
+                          : "border-stone-300 bg-white",
+                      )}
+                    >
+                      {paymentGateway === "paystack" && (
+                        <Check className="h-3 w-3 stroke-3" />
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-stone-100 flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span>Currency: NGN, GHS, ZAR, USD</span>
+                    <span className="font-semibold text-emerald-700">
+                      97.5% merchant payout
+                    </span>
+                  </div>
                 </div>
-                <div className="flex flex-col gap-2 md:col-span-2">
-                  <Label
-                    htmlFor="cardNumber"
-                    className="text-xs font-bold uppercase tracking-wider text-stone-500"
-                  >
-                    Card Number
-                  </Label>
-                  <Input
-                    type="text"
-                    id="cardNumber"
-                    required
-                    value={cardNumber}
-                    onChange={(e) => setCardNumber(e.target.value)}
-                    placeholder="•••• •••• •••• ••••"
-                    maxLength={16}
-                    className="h-10"
-                  />
+
+                {/* Stripe Option */}
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setPaymentGateway("stripe")}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      setPaymentGateway("stripe");
+                    }
+                  }}
+                  className={cn(
+                    "relative p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between gap-3 text-left outline-none",
+                    paymentGateway === "stripe"
+                      ? "border-indigo-600 bg-indigo-50/20 ring-1 ring-indigo-600/30 shadow-xs"
+                      : "border-stone-200 hover:border-stone-300 bg-card text-foreground",
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                        S
+                      </div>
+                      <div>
+                        <div className="font-bold text-sm text-foreground flex items-center gap-1.5">
+                          Stripe
+                          <span className="text-[10px] bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded-full font-semibold">
+                            Connect / Split
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          Visa, Mastercard, Amex, Apple/Google Pay
+                        </p>
+                      </div>
+                    </div>
+                    <div
+                      className={cn(
+                        "w-5 h-5 rounded-full border flex items-center justify-center transition-colors shrink-0 mt-0.5",
+                        paymentGateway === "stripe"
+                          ? "border-indigo-600 bg-indigo-600 text-white"
+                          : "border-stone-300 bg-white",
+                      )}
+                    >
+                      {paymentGateway === "stripe" && (
+                        <Check className="h-3 w-3 stroke-3" />
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-stone-100 flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span>Global: 135+ Currencies</span>
+                    <span className="font-semibold text-indigo-700">
+                      Automated Connect payout
+                    </span>
+                  </div>
                 </div>
-                <div className="flex flex-col gap-2">
-                  <Label
-                    htmlFor="cardExpiry"
-                    className="text-xs font-bold uppercase tracking-wider text-stone-500"
-                  >
-                    Expiration
-                  </Label>
-                  <Input
-                    type="text"
-                    id="cardExpiry"
-                    required
-                    value={cardExpiry}
-                    onChange={(e) => setCardExpiry(e.target.value)}
-                    placeholder="MM/YY"
-                    maxLength={5}
-                    className="h-10"
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label
-                    htmlFor="cardCvv"
-                    className="text-xs font-bold uppercase tracking-wider text-stone-500"
-                  >
-                    CVV
-                  </Label>
-                  <Input
-                    type="text"
-                    id="cardCvv"
-                    required
-                    value={cardCvv}
-                    onChange={(e) => setCardCvv(e.target.value)}
-                    placeholder="•••"
-                    maxLength={3}
-                    className="h-10"
-                  />
-                </div>
+              </div>
+
+              <div className="mt-4 p-3 bg-stone-50 border border-stone-200/80 rounded-md text-xs text-muted-foreground flex items-center gap-2">
+                <Lock className="h-3.5 w-3.5 text-stone-500 shrink-0" />
+                <span>
+                  Payments are processed securely via{" "}
+                  <strong className="text-stone-800 capitalize font-medium">
+                    {paymentGateway}
+                  </strong>
+                  . Platform fees (2.5%) are retained and net proceeds route
+                  straight to the merchant.
+                </span>
               </div>
             </div>
 
-            {/* Gift Options */}
+            {/* 4. Gift Options */}
             <div className="bg-white border border-stone-200 rounded-lg p-6 shadow-xs">
-              <h4 className="font-bold font-secondary text-foreground mb-4 pb-2 border-b border-stone-100">
+              <h4 className="font-bold font-secondary text-foreground mb-4 pb-2 border-b border-stone-100 flex items-center gap-2">
+                <span className="inline-flex w-6 h-6 rounded-full bg-stone-100 text-foreground items-center justify-center text-xs font-bold">
+                  4
+                </span>
                 Gift Message & Custom Requests (Optional)
               </h4>
               <div className="flex flex-col gap-2">
                 <Label
                   htmlFor="giftMessage"
-                  className="text-xs  font-bold uppercase tracking-wider text-stone-500"
+                  className="text-xs font-bold text-foreground"
                 >
                   Message for Complimentary Card
                 </Label>
@@ -583,7 +1167,7 @@ export default function CheckoutPage() {
             {/* Items Summary list */}
             <div className="flex flex-col gap-4 mb-6 max-h-60 overflow-y-auto no-scrollbar">
               {items.map((item, idx) => (
-                <div key={idx} className="flex gap-4 items-center">
+                <div key={idx} className="flex gap-4 items-start">
                   <div className="relative aspect-square w-12 h-12 bg-stone-100 rounded-md shrink-0 overflow-hidden">
                     <Image
                       src={item.image}
@@ -593,17 +1177,21 @@ export default function CheckoutPage() {
                       sizes="48px"
                     />
                   </div>
-                  <div className="min-w-0 grow text-xs">
-                    <h5 className="font-bold text-foreground truncate">
+                  <div className="min-w-0 grow">
+                    <h6 className="font-bold text-foreground truncate">
                       {item.name}
-                    </h5>
-                    <p className="text-muted-foreground font-medium">
-                      Qty: {item.quantity} {item.size ? `• ${item.size}` : ""}
+                    </h6>
+                    <p className="text-xs text-muted-foreground font-medium">
+                      Qty: {item.quantity}
+                      {item.options?.size ? ` • ${item.options.size}` : ""}
                     </p>
                   </div>
-                  <span className="font-bold text-xs text-foreground shrink-0">
-                    {formatCurrency((item.price * item.quantity).toFixed(2))}
-                  </span>
+                  <h6 className="font-bold text-foreground shrink-0">
+                    {formatCurrency(
+                      (item.price * item.quantity).toFixed(2),
+                      storeCurrency,
+                    )}
+                  </h6>
                 </div>
               ))}
             </div>
@@ -612,14 +1200,14 @@ export default function CheckoutPage() {
 
             {/* Summary figures */}
             <div className="flex flex-col gap-4 mb-8">
-              <div className="flex justify-between text-xs text-stone-500 font-medium">
+              <div className="flex justify-between text-xs text-foreground font-medium">
                 <span>Items Subtotal</span>
                 <span className="font-semibold text-sm text-foreground">
-                  {formatCurrency(subtotal.toFixed(2))}
+                  {formatCurrency(subtotal.toFixed(2), storeCurrency)}
                 </span>
               </div>
 
-              <div className="flex justify-between text-xs text-stone-500 font-medium">
+              <div className="flex justify-between text-xs text-foreground font-medium">
                 <span>Fulfillment Fee</span>
                 {fulfillmentType === "pickup" ? (
                   <span className="text-emerald-600 font-semibold uppercase text-xs tracking-wider">
@@ -627,15 +1215,15 @@ export default function CheckoutPage() {
                   </span>
                 ) : (
                   <span className="font-semibold text-sm text-foreground">
-                    {formatCurrency(deliveryFee.toFixed(2))}
+                    {formatCurrency(deliveryFee.toFixed(2), storeCurrency)}
                   </span>
                 )}
               </div>
 
-              <div className="flex justify-between text-xs text-stone-500 font-medium">
+              <div className="flex justify-between text-xs text-foreground font-medium">
                 <span>Sales Tax (8.25%)</span>
                 <span className="font-semibold text-sm text-foreground">
-                  {formatCurrency(estTax.toFixed(2))}
+                  {formatCurrency(estTax.toFixed(2), storeCurrency)}
                 </span>
               </div>
 
@@ -646,7 +1234,7 @@ export default function CheckoutPage() {
                   Grand Total
                 </span>
                 <span className="text-2xl font-bold text-foreground">
-                  {formatCurrency(total.toFixed(2))}
+                  {formatCurrency(total.toFixed(2), storeCurrency)}
                 </span>
               </div>
             </div>
@@ -654,11 +1242,38 @@ export default function CheckoutPage() {
             {/* Place Order CTA button */}
             <Button
               type="submit"
-              className="w-full gap-2 flex items-center justify-center cursor-pointer"
+              disabled={isProcessingPayment}
+              className={cn(
+                "w-full h-12 gap-2 flex items-center justify-center font-bold text-sm cursor-pointer shadow-md transition-all",
+                paymentGateway === "stripe"
+                  ? "bg-indigo-600 hover:bg-indigo-700 text-white"
+                  : "bg-emerald-600 hover:bg-emerald-700 text-white",
+              )}
             >
-              <CreditCard className="h-5 w-5" />
-              Place Order & Book Date
+              {isProcessingPayment ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Securing Order & Initializing Payment...
+                </>
+              ) : (
+                <>
+                  <CreditCard className="h-5 w-5" />
+                  Pay {formatCurrency(
+                    total.toFixed(2),
+                    storeCurrency,
+                  )} with {paymentGateway === "stripe" ? "Stripe" : "Paystack"}
+                </>
+              )}
             </Button>
+            <div className="flex items-center justify-center gap-1.5 mt-3 text-[11px] text-muted-foreground font-medium">
+              <Lock className="h-3 w-3 text-stone-400" />
+              <span>
+                Encrypted via{" "}
+                {paymentGateway === "stripe"
+                  ? "Stripe Connect"
+                  : "Paystack Split"}
+              </span>
+            </div>
           </div>
         </form>
       </div>

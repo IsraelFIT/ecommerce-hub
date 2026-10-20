@@ -11,6 +11,7 @@ from app.routes.uploads import router as uploads_router
 from app.routes.customizations import router as customizations_router
 from app.routes.reviews import router as reviews_router
 from app.routes.likes import router as likes_router
+from app.routes.cart import router as cart_router
 
 __all__ = [
     "health_router",
@@ -26,4 +27,5 @@ __all__ = [
     "customizations_router",
     "reviews_router",
     "likes_router",
+    "cart_router",
 ]

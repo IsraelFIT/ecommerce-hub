@@ -1,5 +1,5 @@
 import uuid
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from app.models.order import OrderStatus
@@ -17,10 +17,12 @@ class OrderItem(BaseModel):
         }
     )
 
-    product_id: uuid.UUID
+    product_id: Union[uuid.UUID, str]
     title: str
     quantity: int = Field(..., gt=0)
     unit_price: float = Field(..., gt=0)
+    image: Optional[str] = None
+    options: Optional[Dict[str, Any]] = None
 
 
 class OrderCreate(BaseModel):
@@ -48,6 +50,13 @@ class OrderCreate(BaseModel):
     customer_name: str = Field(..., min_length=2)
     items: List[OrderItem] = Field(..., min_length=1)
     payment_gateway: str = Field(default="paystack")
+    currency: Optional[str] = None
+    delivery_fee: Optional[float] = 0.0
+    fulfillment_type: Optional[str] = "pickup"
+    delivery_address: Optional[Dict[str, Any]] = None
+    fulfillment_date: Optional[str] = None
+    fulfillment_time: Optional[str] = None
+    gift_message: Optional[str] = None
 
 
 class OrderResponse(BaseModel):
@@ -90,6 +99,7 @@ class OrderResponse(BaseModel):
     user_id: Optional[uuid.UUID] = None
     customer_email: str
     customer_name: str
+    customer_avatar_url: Optional[str] = None
     total_amount: float
     platform_fee: float
     tenant_payout_amount: float

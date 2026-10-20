@@ -31,6 +31,7 @@ import { deleteAuthCookies } from "@/lib/session";
 import { clearAuthSession } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { UserAvatar } from "@/components/shared/user-avatar";
 
 export function StoreHeader() {
   const isInvalid = useStoreInvalidPaths();
@@ -94,24 +95,18 @@ export function StoreHeader() {
       deleteAuthCookies();
       clearAuthSession();
       clearUser();
+      useCartStore.getState().clearCart(tenant, false);
       setIsAccountOpen(false);
       toast.success("Logged out successfully");
       router.push(`/${tenant}`);
       router.refresh();
     } catch {
       clearUser();
+      useCartStore.getState().clearCart(tenant, false);
       setIsAccountOpen(false);
       router.push(`/${tenant}`);
     }
   };
-
-  const userInitial = user?.first_name?.[0]
-    ? user.first_name[0].toUpperCase()
-    : user?.name?.[0]
-      ? user.name[0].toUpperCase()
-      : user?.email?.[0]
-        ? user.email[0].toUpperCase()
-        : null;
 
   const displayName = user
     ? user.full_name ||
@@ -127,7 +122,8 @@ export function StoreHeader() {
       {/* Dynamic Announcement Banner */}
       {branding.announcementText && (
         <div
-          className="w-full text-center py-1.5 px-4 text-[11px] md:text-xs font-semibold text-white transition-colors tracking-wide select-none shadow-xs"
+          data-announcement-bar="true"
+          className="w-full text-center py-1.5 px-4 text-[11px] md:text-xs font-semibold text-white transition-colors tracking-wide select-none shadow-xs no-print"
           style={{ backgroundColor: branding.primaryColor || "var(--primary)" }}
         >
           {branding.announcementText}
@@ -223,16 +219,15 @@ export function StoreHeader() {
                   size="md"
                   className="h-9 px-2.5 sm:px-3 gap-1.5 sm:gap-2 cursor-pointer font-semibold text-xs border-border bg-card hover:bg-muted/50 transition-colors"
                 >
-                  {userInitial ? (
-                    <div
-                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-white text-[10px] font-bold"
-                      style={{
-                        backgroundColor:
-                          branding.primaryColor || "var(--primary)",
-                      }}
-                    >
-                      {userInitial}
-                    </div>
+                  {user ? (
+                    <UserAvatar
+                      src={user.avatar_url || user.avatarUrl}
+                      name={displayName}
+                      email={user.email}
+                      size="xs"
+                      shape="circle"
+                      className="h-5 w-5 border-none"
+                    />
                   ) : (
                     <User className="h-4 w-4 text-muted-foreground" />
                   )}
@@ -246,18 +241,27 @@ export function StoreHeader() {
                 className="w-64 p-2 shadow-lg border border-border bg-popover rounded-xl"
               >
                 {/* User Header */}
-                <div className="px-3 py-2.5 border-b border-border/60 mb-1">
-                  <p className="text-xs font-bold text-foreground truncate">
-                    {displayName}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground truncate">
-                    {user?.email || "Not signed in"}
-                  </p>
-                  {user?.role && (
-                    <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground uppercase tracking-wider">
-                      {user.role.replace("_", " ")}
-                    </span>
-                  )}
+                <div className="px-3 py-2.5 border-b border-border/60 mb-1 flex items-center gap-2.5">
+                  <UserAvatar
+                    src={user?.avatar_url || user?.avatarUrl}
+                    name={displayName}
+                    email={user?.email}
+                    size="sm"
+                    shape="circle"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold text-foreground truncate">
+                      {displayName}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground truncate">
+                      {user?.email || "Not signed in"}
+                    </p>
+                    {user?.role && (
+                      <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground uppercase tracking-wider">
+                        {user.role.replace("_", " ")}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Account Navigation Links */}

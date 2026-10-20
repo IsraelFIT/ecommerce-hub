@@ -92,7 +92,7 @@ export default function ForgotPasswordPage() {
                     <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
                     <span>Dev OTP Code:</span>
                   </div>
-                  <strong className="font-mono text-sm tracking-wider px-2 py-0.5 bg-amber-500/20 rounded">
+                  <strong className=" text-sm tracking-wider px-2 py-0.5 bg-amber-500/20 rounded">
                     {devOtp}
                   </strong>
                 </div>

@@ -34,6 +34,12 @@ class BrandingConfig(BaseModel):
     storeHeadline: Optional[str] = Field(default=None, description="Store headline on live site")
     announcementText: Optional[str] = Field(default=None, description="Announcement banner text")
     bannerUrl: Optional[str] = Field(default=None, description="Banner image URL")
+    pickupLocationName: Optional[str] = Field(default=None, description="Pickup location title")
+    pickupAddress: Optional[str] = Field(default=None, description="Pickup location street address")
+    pickupHours: Optional[str] = Field(default=None, description="Pickup operating hours")
+    deliveryFee: Optional[float] = Field(default=45.0, description="Standard delivery fee amount")
+    deliveryInstruction: Optional[str] = Field(default=None, description="Custom delivery instructions/terms")
+    pickupInstruction: Optional[str] = Field(default=None, description="Custom pickup instructions/terms")
 
 
 class TenantBase(BaseModel):
@@ -47,6 +53,20 @@ class TenantBase(BaseModel):
     sanity_dataset: Optional[str] = Field(default=None, max_length=100)
     sanity_project_id: Optional[str] = Field(default=None, max_length=100)
     default_gateway: str = Field(default="paystack")
+    
+    # Physical and pickup address fields
+    store_address: Optional[str] = Field(default=None, max_length=500, description="Store physical street address")
+    store_phone: Optional[str] = Field(default=None, max_length=50, description="Store contact phone")
+    store_email: Optional[str] = Field(default=None, max_length=255, description="Store contact email")
+    pickup_location_name: Optional[str] = Field(default=None, max_length=255, description="Name/title of store pickup venue")
+    pickup_address: Optional[str] = Field(default=None, max_length=500, description="Full street address for order collection")
+    pickup_hours: Optional[str] = Field(default=None, max_length=255, description="Weekly hours available for order collection")
+
+    # Fulfillment & Delivery Rules
+    delivery_fee: Optional[float] = Field(default=45.0, description="Standard delivery fee amount")
+    delivery_instruction: Optional[str] = Field(default=None, description="Custom delivery terms/instructions")
+    pickup_instruction: Optional[str] = Field(default=None, description="Custom pickup terms/instructions")
+
     branding_config: BrandingConfig = Field(default_factory=BrandingConfig)
 
 
@@ -116,6 +136,15 @@ class TenantUpdate(BaseModel):
     branding_config: Optional[BrandingConfig] = None
     paystack_subaccount_code: Optional[str] = None
     stripe_account_id: Optional[str] = None
+    store_address: Optional[str] = None
+    store_phone: Optional[str] = None
+    store_email: Optional[str] = None
+    pickup_location_name: Optional[str] = None
+    pickup_address: Optional[str] = None
+    pickup_hours: Optional[str] = None
+    delivery_fee: Optional[float] = None
+    delivery_instruction: Optional[str] = None
+    pickup_instruction: Optional[str] = None
 
 
 class TenantResponse(TenantBase):

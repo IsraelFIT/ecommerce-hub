@@ -459,7 +459,7 @@ export default function CoreCustomizationsPage() {
                             <div className="font-bold text-xs text-foreground truncate">
                               {tenant.name}
                             </div>
-                            <div className="text-[11px] font-mono text-muted-foreground truncate">
+                            <div className="text-[11px]  text-muted-foreground truncate">
                               {tenant.slug}.localhost:3000
                             </div>
                           </div>
@@ -475,7 +475,7 @@ export default function CoreCustomizationsPage() {
                               style={{ backgroundColor: tenant.primary_color }}
                               title={`Primary: ${tenant.primary_color}`}
                             />
-                            <span className="font-mono text-xs font-semibold text-foreground">
+                            <span className=" text-xs font-semibold text-foreground">
                               {tenant.primary_color}
                             </span>
                           </div>
@@ -488,7 +488,7 @@ export default function CoreCustomizationsPage() {
                               }}
                               title={`Secondary: ${tenant.secondary_color}`}
                             />
-                            <span className="font-mono text-xs font-semibold text-foreground">
+                            <span className=" text-xs font-semibold text-foreground">
                               {tenant.secondary_color}
                             </span>
                           </div>
@@ -532,7 +532,7 @@ export default function CoreCustomizationsPage() {
                                 unoptimized
                               />
                             </div>
-                            <span className="text-[11px] text-muted-foreground font-mono truncate max-w-24">
+                            <span className="text-[11px] text-muted-foreground  truncate max-w-24">
                               Neon Storage
                             </span>
                           </div>
@@ -655,7 +655,7 @@ export default function CoreCustomizationsPage() {
                             <div className="font-bold text-xs text-foreground">
                               {req.tenant_name}
                             </div>
-                            <div className="text-[11px] font-mono text-muted-foreground">
+                            <div className="text-[11px]  text-muted-foreground">
                               /{req.tenant_slug}
                             </div>
                           </div>
@@ -715,7 +715,7 @@ export default function CoreCustomizationsPage() {
                               }}
                               title="Secondary Color"
                             />
-                            <span className="font-mono text-[10px] text-muted-foreground">
+                            <span className=" text-[10px] text-muted-foreground">
                               {req.primary_color}
                             </span>
                           </div>

@@ -145,7 +145,7 @@ function ResetPasswordForm() {
               type="text"
               placeholder="e.g. 492817"
               maxLength={10}
-              className="pl-9 h-10 font-mono tracking-widest text-sm bg-background border-input"
+              className="pl-9 h-10  tracking-widest text-sm bg-background border-input"
               value={otp}
               onChange={(e) => setOtp(e.target.value)}
               required

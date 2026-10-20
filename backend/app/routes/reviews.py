@@ -10,6 +10,7 @@ from app.dependencies import get_tenant_context
 from app.models.tenant import Tenant
 from app.models.product import Product
 from app.models.review import Review
+from app.models.user import User
 from app.schemas.review import (
     ReviewCreate,
     ReviewUpdateStatus,
@@ -86,7 +87,11 @@ async def list_reviews(
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     offset = (page - 1) * per_page
-    query = select(Review).where(Review.tenant_id == tenant.id).options(selectinload(Review.product))
+    query = (
+        select(Review)
+        .where(Review.tenant_id == tenant.id, Review.is_deleted == False)
+        .options(selectinload(Review.product), selectinload(Review.user))
+    )
 
     if product_id:
         query = query.where(Review.product_id == product_id)
@@ -108,11 +113,32 @@ async def list_reviews(
     result = await db.execute(query)
     reviews = result.scalars().all()
 
+    # Fallback user lookup by customer_email for reviews without direct user_id
+    emails_to_lookup = [
+        r.customer_email.strip().lower()
+        for r in reviews
+        if not r.user and r.customer_email
+    ]
+    email_user_map = {}
+    if emails_to_lookup:
+        eu_res = await db.execute(
+            select(User).where(func.lower(User.email).in_(emails_to_lookup))
+        )
+        for eu in eu_res.scalars().all():
+            email_user_map[eu.email.lower()] = eu
+
     items = []
     for r in reviews:
         resp = ReviewResponse.model_validate(r)
         if r.product:
             resp.product_name = r.product.name or r.product.title
+        
+        # Populate avatar
+        if r.user and getattr(r.user, "avatar_url", None):
+            resp.customer_avatar_url = r.user.avatar_url
+        elif r.customer_email and r.customer_email.strip().lower() in email_user_map:
+            resp.customer_avatar_url = getattr(email_user_map[r.customer_email.strip().lower()], "avatar_url", None)
+
         items.append(resp.model_dump(mode="json"))
 
     last_page = max(1, (total + per_page - 1) // per_page)
@@ -273,7 +299,11 @@ async def delete_review(
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     result = await db.execute(
-        select(Review).where(Review.id == review_id, Review.tenant_id == tenant.id)
+        select(Review).where(
+            Review.id == review_id,
+            Review.tenant_id == tenant.id,
+            Review.is_deleted == False,
+        )
     )
     review = result.scalar_one_or_none()
     if not review:
@@ -282,7 +312,8 @@ async def delete_review(
             detail="Review not found",
         )
 
-    await db.delete(review)
+    review.is_deleted = True
+    review.deleted_at = func.now()
     await db.commit()
 
     return success_response(

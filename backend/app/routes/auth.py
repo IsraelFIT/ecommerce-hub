@@ -1,12 +1,13 @@
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.user import User
+from app.models.user_address import UserAddress
 from app.models.tenant import Tenant
 from app.models.otp import PasswordResetOTP
 from app.core.security import (
@@ -28,6 +29,9 @@ from app.schemas.auth import (
     AuthResponse,
     UpdateProfileRequest,
     ChangePasswordRequest,
+    AddressCreate,
+    AddressUpdate,
+    AddressResponse,
 )
 from app.schemas.response import success_response, ApiResponse, ErrorResponse
 from app.dependencies import get_current_user
@@ -525,6 +529,10 @@ async def update_me(
         current_user.last_name = payload.last_name.strip()
     if payload.phone_number is not None:
         current_user.phone_number = payload.phone_number.strip() or None
+    if payload.avatar_url is not None:
+        current_user.avatar_url = payload.avatar_url.strip() or None
+    if payload.gender is not None:
+        current_user.gender = payload.gender.strip() or None
 
     await db.commit()
     await db.refresh(current_user)
@@ -559,4 +567,146 @@ async def change_password(
         data={},
         message="Password changed successfully",
     )
+
+
+@router.get(
+    "/addresses",
+    response_model=ApiResponse[List[AddressResponse]],
+    summary="List saved addresses for authenticated user",
+)
+async def get_user_addresses(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    query = (
+        select(UserAddress)
+        .where(
+            UserAddress.user_id == current_user.id,
+            UserAddress.is_deleted == False,
+        )
+        .order_by(UserAddress.is_default.desc(), UserAddress.created_at.desc())
+    )
+    result = await db.execute(query)
+    addresses = result.scalars().all()
+    return success_response(
+        data=[AddressResponse.model_validate(a).model_dump(mode="json") for a in addresses],
+        message="User addresses retrieved successfully",
+    )
+
+
+@router.post(
+    "/addresses",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ApiResponse[AddressResponse],
+    summary="Create a new address for authenticated user",
+)
+async def create_user_address(
+    payload: AddressCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    if payload.is_default:
+        await db.execute(
+            update(UserAddress)
+            .where(UserAddress.user_id == current_user.id)
+            .values(is_default=False)
+        )
+
+    new_address = UserAddress(
+        user_id=current_user.id,
+        first_name=payload.first_name,
+        last_name=payload.last_name,
+        company=payload.company,
+        country=payload.country,
+        street=payload.street,
+        city=payload.city,
+        state=payload.state,
+        zip_code=payload.zip_code,
+        phone=payload.phone,
+        email=payload.email,
+        is_default=payload.is_default,
+    )
+    db.add(new_address)
+    await db.commit()
+    await db.refresh(new_address)
+    return success_response(
+        data=AddressResponse.model_validate(new_address).model_dump(mode="json"),
+        message="Address created successfully",
+    )
+
+
+@router.patch(
+    "/addresses/{address_id}",
+    response_model=ApiResponse[AddressResponse],
+    summary="Update a saved address for authenticated user",
+)
+async def update_user_address(
+    address_id: uuid.UUID,
+    payload: AddressUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    query = select(UserAddress).where(
+        UserAddress.id == address_id,
+        UserAddress.user_id == current_user.id,
+        UserAddress.is_deleted == False,
+    )
+    result = await db.execute(query)
+    address = result.scalar_one_or_none()
+    if not address:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Address not found",
+        )
+
+    update_dict = payload.model_dump(exclude_unset=True)
+    if update_dict.get("is_default"):
+        await db.execute(
+            update(UserAddress)
+            .where(UserAddress.user_id == current_user.id, UserAddress.id != address_id)
+            .values(is_default=False)
+        )
+
+    for k, v in update_dict.items():
+        setattr(address, k, v)
+
+    await db.commit()
+    await db.refresh(address)
+    return success_response(
+        data=AddressResponse.model_validate(address).model_dump(mode="json"),
+        message="Address updated successfully",
+    )
+
+
+@router.delete(
+    "/addresses/{address_id}",
+    response_model=ApiResponse[Dict[str, Any]],
+    summary="Soft-delete a saved address for authenticated user",
+)
+async def delete_user_address(
+    address_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    query = select(UserAddress).where(
+        UserAddress.id == address_id,
+        UserAddress.user_id == current_user.id,
+        UserAddress.is_deleted == False,
+    )
+    result = await db.execute(query)
+    address = result.scalar_one_or_none()
+    if not address:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Address not found",
+        )
+
+    address.is_deleted = True
+    address.deleted_at = func.now()
+    await db.commit()
+    return success_response(
+        data={"id": str(address_id)},
+        message="Address deleted successfully",
+    )
+
 

@@ -4,9 +4,10 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useParams } from "next/navigation";
-import { Grid, List, Loader2, Star, ChevronRight } from "lucide-react";
+import { Grid, List, Loader2, ChevronRight } from "lucide-react";
 import { Product, ProductCategory, ProductFilter } from "@/types/products";
 import { MenuCard, CardProduct } from "@/components/pages/menu/menu-card";
+import { MenuSidebar } from "@/components/pages/menu/menu-sidebar";
 import { useTenantTheme } from "@/components/providers/tenant-theme-provider";
 import { useUserStore } from "@/store/user";
 import { formatCurrency, getTenantRoute } from "@/utils/helper";
@@ -37,12 +38,15 @@ export function MenuList() {
 
   // Filters State
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
+  const [selectedClass, setSelectedClass] = useState<string>("all");
   const [catalogBounds, setCatalogBounds] = useState<{
     minPrice: number;
     maxCatalogPrice: number;
   }>({ minPrice: 0, maxCatalogPrice: 100 });
-  const [priceRange, setPriceRange] = useState<number>(100);
-  const [debouncedPriceRange, setDebouncedPriceRange] = useState<number>(100);
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 100]);
+  const [debouncedPriceRange, setDebouncedPriceRange] = useState<
+    [number, number]
+  >([0, 100]);
   const [selectedCustomFilters, setSelectedCustomFilters] = useState<
     Record<string, string[]>
   >({});
@@ -92,8 +96,8 @@ export function MenuList() {
                 minPrice: foundMin,
                 maxCatalogPrice: foundMax,
               });
-              setPriceRange(foundMax);
-              setDebouncedPriceRange(foundMax);
+              setPriceRange([foundMin, foundMax]);
+              setDebouncedPriceRange([foundMin, foundMax]);
             }
           }
           if (catRes.status === "success" && catRes.data) {
@@ -127,9 +131,14 @@ export function MenuList() {
         published_only: true,
         per_page: 50,
         category: selectedCategory !== "ALL" ? selectedCategory : undefined,
+        product_class: selectedClass !== "all" ? selectedClass : undefined,
+        min_price:
+          debouncedPriceRange[0] > catalogBounds.minPrice
+            ? debouncedPriceRange[0]
+            : undefined,
         max_price:
-          debouncedPriceRange < catalogBounds.maxCatalogPrice
-            ? debouncedPriceRange
+          debouncedPriceRange[1] < catalogBounds.maxCatalogPrice
+            ? debouncedPriceRange[1]
             : undefined,
         rating: selectedRating > 0 ? selectedRating : undefined,
         availability: availability !== "all" ? availability : undefined,
@@ -150,7 +159,9 @@ export function MenuList() {
   }, [
     tenantSlug,
     selectedCategory,
+    selectedClass,
     debouncedPriceRange,
+    catalogBounds.minPrice,
     catalogBounds.maxCatalogPrice,
     selectedRating,
     availability,
@@ -171,18 +182,48 @@ export function MenuList() {
       map.set(cat, (map.get(cat) || 0) + 1);
     });
 
-    if (tenantCategories.length > 0) {
-      return tenantCategories.map((tc) => ({
+    const seen = new Set<string>();
+    const list: { name: string; count: number }[] = [];
+
+    // First add defined tenant categories
+    tenantCategories.forEach((tc) => {
+      seen.add(tc.name.toLowerCase());
+      list.push({
         name: tc.name,
         count: map.get(tc.name) || 0,
-      }));
-    }
+      });
+    });
 
-    return Array.from(map.entries()).map(([name, count]) => ({
-      name,
-      count,
-    }));
+    // Then add any product categories that weren't in tenantCategories (e.g. Services, Digital, etc.)
+    map.forEach((count, catName) => {
+      if (!seen.has(catName.toLowerCase())) {
+        seen.add(catName.toLowerCase());
+        list.push({
+          name: catName,
+          count,
+        });
+      }
+    });
+
+    return list;
   }, [products, tenantCategories]);
+
+  // Counts for each product class
+  const classCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      all: products.length,
+      physical: 0,
+      digital: 0,
+      service: 0,
+    };
+    products.forEach((p) => {
+      const pClass = (p.product_class || "physical").toLowerCase();
+      if (counts[pClass] !== undefined) {
+        counts[pClass]++;
+      }
+    });
+    return counts;
+  }, [products]);
 
   const { minPrice, maxCatalogPrice } = catalogBounds;
 
@@ -205,22 +246,34 @@ export function MenuList() {
 
   const handleClearAll = () => {
     setSelectedCategory("ALL");
-    setPriceRange(catalogBounds.maxCatalogPrice);
-    setDebouncedPriceRange(catalogBounds.maxCatalogPrice);
+    setSelectedClass("all");
+    setPriceRange([catalogBounds.minPrice, catalogBounds.maxCatalogPrice]);
+    setDebouncedPriceRange([
+      catalogBounds.minPrice,
+      catalogBounds.maxCatalogPrice,
+    ]);
     setSelectedCustomFilters({});
     setSelectedRating(0);
     setAvailability("all");
     setCurrentPage(1);
   };
 
-  // Products are already filtered by the backend
+  // Filter products by selected class and sort by recency
   const filteredProducts = useMemo(() => {
-    return [...products].sort((a, b) => {
-      return (b.created_at || "").localeCompare(a.created_at || "");
-    });
-  }, [products]);
+    return products
+      .filter((p) => {
+        if (selectedClass !== "all") {
+          const pClass = (p.product_class || "physical").toLowerCase();
+          if (pClass !== selectedClass.toLowerCase()) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        return (b.created_at || "").localeCompare(a.created_at || "");
+      });
+  }, [products, selectedClass]);
 
-  // Dynamic categories to render
+  // Dynamic categories to render: ensure ALL items in filteredProducts are represented
   const categoriesToRender = useMemo(() => {
     if (selectedCategory !== "ALL") {
       const match = availableCategories.find(
@@ -237,6 +290,16 @@ export function MenuList() {
         ),
       );
 
+    // Include any categories present on filteredProducts that were not in availableCategories
+    filteredProducts.forEach((p) => {
+      const catName = (p.category || "General").trim();
+      if (
+        !catsWithItems.some((c) => c.toLowerCase() === catName.toLowerCase())
+      ) {
+        catsWithItems.push(catName);
+      }
+    });
+
     if (catsWithItems.length === 0 && filteredProducts.length > 0) {
       return ["General"];
     }
@@ -250,10 +313,10 @@ export function MenuList() {
   }, [products]);
 
   return (
-    <div className="bg-stone-100/60 min-h-screen py-8 md:py-12">
+    <div className="min-h-screen py-8">
       <div className="container flex-col">
         {/* Breadcrumb Navigation */}
-        <nav className="flex items-center gap-2 text-sm text-foreground font-medium mb-6">
+        <nav className="w-full flex items-center gap-2 text-sm text-foreground font-medium mb-6">
           <Link
             href={getTenantRoute(tenantSlug, "/")}
             className="hover:text-stone-900 transition-colors text-stone-500"
@@ -285,274 +348,35 @@ export function MenuList() {
         </nav>
 
         <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          <aside className="lg:col-span-3 bg-white rounded-2xl border border-stone-200/90 p-5 space-y-6 sticky top-24">
-            {/* Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
-              <h5 className="font-bold text-stone-900">Filters</h5>
-              <button
-                onClick={handleClearAll}
-                className="text-xs text-stone-500 hover:text-stone-900 font-medium transition-colors cursor-pointer"
-              >
-                Clear all
-              </button>
-            </div>
-
-            {/* 1. Category Checkboxes */}
-            <div className="space-y-3">
-              <h6 className="font-bold text-stone-900">Category</h6>
-              <div className="space-y-2">
-                {isLoading && availableCategories.length === 0 ? (
-                  <div className="space-y-2.5">
-                    {Array.from({ length: 4 }).map((_, i) => (
-                      <div key={i} className="flex items-center gap-2.5">
-                        <Skeleton className="w-4 h-4 rounded" />
-                        <Skeleton className="h-3.5 w-24 rounded" />
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <>
-                    <label className="flex items-center gap-2.5 text-xs text-foreground hover:text-stone-950 cursor-pointer select-none">
-                      <input
-                        type="radio"
-                        name="category"
-                        checked={selectedCategory === "ALL"}
-                        onChange={() => {
-                          setSelectedCategory("ALL");
-                          setCurrentPage(1);
-                        }}
-                        className="w-4 h-4 text-primary focus:ring-primary border-stone-300 accent-primary cursor-pointer"
-                      />
-                      <span
-                        className={cn(
-                          selectedCategory === "ALL" &&
-                            "font-bold text-stone-950",
-                        )}
-                      >
-                        All
-                      </span>
-                    </label>
-                    {availableCategories.map((cat) => {
-                      const isChecked =
-                        selectedCategory.toLowerCase() ===
-                        cat.name.toLowerCase();
-                      return (
-                        <label
-                          key={cat.name}
-                          className="flex items-center gap-2.5 text-xs text-foreground hover:text-stone-950 cursor-pointer select-none"
-                        >
-                          <input
-                            type="radio"
-                            name="category"
-                            checked={isChecked}
-                            onChange={() => {
-                              setSelectedCategory(cat.name);
-                              setCurrentPage(1);
-                            }}
-                            className="w-4 h-4 text-primary focus:ring-primary border-stone-300 accent-primary cursor-pointer"
-                          />
-                          <span
-                            className={cn(
-                              isChecked && "font-bold text-stone-950",
-                            )}
-                          >
-                            {cat.name}
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </>
-                )}
-              </div>
-            </div>
-
-            <div className="h-px bg-stone-100" />
-
-            {/* 2. Price Range Slider (With Tenant Currency) */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h6 className="font-bold text-stone-900">Price Range</h6>
-                <span className="text-xs font-bold text-primary">
-                  {formatCurrency(priceRange, tenantCurrency)}
-                </span>
-              </div>
-
-              <input
-                type="range"
-                min={minPrice}
-                max={maxCatalogPrice}
-                step={1}
-                value={priceRange}
-                onChange={(e) => setPriceRange(Number(e.target.value))}
-                className="w-full h-1.5 bg-stone-200 rounded-lg appearance-none cursor-pointer accent-primary"
-              />
-
-              <div className="flex items-center justify-between text-[11px] text-stone-500 font-medium">
-                <span>{formatCurrency(minPrice, tenantCurrency)}</span>
-                <span>{formatCurrency(maxCatalogPrice, tenantCurrency)}</span>
-              </div>
-            </div>
-
-            <div className="h-px bg-stone-100" />
-
-            {/* 4. Dynamic Filters configured by tenant admin */}
-            {isLoading && tenantFilters.length === 0 ? (
-              <div className="space-y-3">
-                <Skeleton className="h-3.5 w-24 rounded" />
-                <div className="space-y-2">
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <div key={i} className="flex items-center gap-2.5">
-                      <Skeleton className="w-4 h-4 rounded" />
-                      <Skeleton className="h-3.5 w-20 rounded" />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              tenantFilters.length > 0 &&
-              tenantFilters.map((filter) => (
-                <div key={filter.id} className="space-y-3">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-stone-900">
-                    {filter.name}
-                  </h4>
-                  <div className="space-y-2">
-                    {filter.options.map((opt) => {
-                      const isChecked =
-                        selectedCustomFilters[filter.slug]?.includes(opt) ||
-                        false;
-                      return (
-                        <label
-                          key={opt}
-                          className="flex items-center gap-2.5 text-xs text-foreground hover:text-stone-950 cursor-pointer select-none"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() =>
-                              toggleCustomFilter(filter.slug, opt)
-                            }
-                            className="w-4 h-4 rounded text-primary focus:ring-primary border-stone-300 accent-primary cursor-pointer"
-                          />
-                          <span
-                            className={cn(
-                              isChecked && "font-bold text-stone-950",
-                            )}
-                          >
-                            {opt}
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                  <div className="h-px bg-stone-100" />
-                </div>
-              ))
-            )}
-
-            {/* 6. Rating */}
-            <div className="space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-stone-900">
-                Rating
-              </h4>
-              <div className="space-y-2">
-                {[5, 4, 3, 2, 1].map((stars) => (
-                  <label
-                    key={stars}
-                    className="flex items-center gap-2.5 text-xs text-foreground hover:text-stone-950 cursor-pointer select-none"
-                  >
-                    <input
-                      type="radio"
-                      name="rating"
-                      checked={selectedRating === stars}
-                      onChange={() => setSelectedRating(stars)}
-                      className="w-4 h-4 rounded text-primary focus:ring-primary border-stone-300 accent-primary cursor-pointer"
-                    />
-                    <div className="flex items-center gap-1 text-primary">
-                      {[...Array(stars)].map((_, i) => (
-                        <Star
-                          key={i}
-                          className="h-3.5 w-3.5 fill-primary text-primary"
-                        />
-                      ))}
-                      <span className="text-stone-500 text-xs ml-1 font-medium">
-                        & up
-                      </span>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="h-px bg-stone-100" />
-
-            {/* 7. Availability */}
-            <div className="space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-stone-900">
-                Availability
-              </h4>
-              <div className="space-y-2">
-                <label className="flex items-center gap-2.5 text-xs text-foreground hover:text-stone-950 cursor-pointer select-none">
-                  <input
-                    type="radio"
-                    name="avail"
-                    checked={availability === "all"}
-                    onChange={() => {
-                      setAvailability("all");
-                      setCurrentPage(1);
-                    }}
-                    className="w-4 h-4 text-primary focus:ring-primary border-stone-300 accent-primary cursor-pointer"
-                  />
-                  <span>All Items</span>
-                </label>
-                <label className="flex items-center gap-2.5 text-xs text-foreground hover:text-stone-950 cursor-pointer select-none">
-                  <input
-                    type="radio"
-                    name="avail"
-                    checked={availability === "available"}
-                    onChange={() => {
-                      setAvailability("available");
-                      setCurrentPage(1);
-                    }}
-                    className="w-4 h-4 text-primary focus:ring-primary border-stone-300 accent-primary cursor-pointer"
-                  />
-                  <span>Available Now</span>
-                </label>
-                <label className="flex items-center gap-2.5 text-xs text-foreground hover:text-stone-950 cursor-pointer select-none">
-                  <input
-                    type="radio"
-                    name="avail"
-                    checked={availability === "schedule"}
-                    onChange={() => {
-                      setAvailability("schedule");
-                      setCurrentPage(1);
-                    }}
-                    className="w-4 h-4 text-primary focus:ring-primary border-stone-300 accent-primary cursor-pointer"
-                  />
-                  <span>Preorder</span>
-                </label>
-              </div>
-            </div>
-
-            {/* Apply Filters Button */}
-            <Button
-              size="default"
-              onClick={() => {
-                setCurrentPage(1);
-                fetchFilteredProducts();
-              }}
-              disabled={isFiltering}
-              className="w-full"
-            >
-              {isFiltering ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
-                  Applying...
-                </>
-              ) : (
-                "Apply Filters"
-              )}
-            </Button>
-          </aside>
+          {/* Menu Sidebar */}
+          <MenuSidebar
+            isLoading={isLoading}
+            isFiltering={isFiltering}
+            availableCategories={availableCategories}
+            selectedCategory={selectedCategory}
+            setSelectedCategory={setSelectedCategory}
+            selectedClass={selectedClass}
+            setSelectedClass={setSelectedClass}
+            classCounts={classCounts}
+            setCurrentPage={setCurrentPage}
+            priceRange={priceRange}
+            setPriceRange={setPriceRange}
+            minPrice={minPrice}
+            maxCatalogPrice={maxCatalogPrice}
+            tenantCurrency={tenantCurrency}
+            tenantFilters={tenantFilters}
+            selectedCustomFilters={selectedCustomFilters}
+            toggleCustomFilter={toggleCustomFilter}
+            selectedRating={selectedRating}
+            setSelectedRating={setSelectedRating}
+            availability={availability}
+            setAvailability={setAvailability}
+            handleClearAll={handleClearAll}
+            onApplyFilters={() => {
+              setCurrentPage(1);
+              fetchFilteredProducts();
+            }}
+          />
 
           <main className="lg:col-span-9 space-y-6">
             {/* Top Bar: Count & View Switcher */}
@@ -797,11 +621,8 @@ export function MenuList() {
           </main>
         </div>
 
-        {/* ========================================= */}
-        {/* BOTTOM SECTION: RECENTLY VIEWED           */}
-        {/* ========================================= */}
         {recentlyViewed.length > 0 && (
-          <section className="pt-10 border-t border-stone-200/80 space-y-6">
+          <section className="pt-10 mt-10 border-t border-stone-200/80 space-y-6">
             <h3 className="text-xl md:text-2xl font-bold  text-stone-900 tracking-tight">
               Recently Viewed
             </h3>

@@ -28,6 +28,7 @@ class ReviewResponse(BaseModel):
     comment: str
     customer_name: str
     customer_email: Optional[str] = None
+    customer_avatar_url: Optional[str] = None
     status: str
     created_at: datetime
     updated_at: datetime

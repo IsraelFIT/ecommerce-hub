@@ -15,6 +15,8 @@ export interface TenantUserItem {
   full_name: string;
   email: string;
   phone_number?: string | null;
+  avatar_url?: string | null;
+  gender?: string | null;
   role: string;
   is_active: boolean;
   is_verified: boolean;

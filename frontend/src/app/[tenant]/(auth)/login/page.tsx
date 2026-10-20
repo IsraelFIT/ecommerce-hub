@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useUserStore } from "@/store/user";
+import { useCartStore } from "@/store/cart";
 import { setAuthSession } from "@/lib/auth";
 import { loginUser } from "@/lib/api/auth";
 import { getTenantSubdomainUrl } from "@/utils/helper";
@@ -76,6 +77,14 @@ function TenantLoginForm({ tenantSlug }: { tenantSlug: string }) {
       );
       setUser(user);
 
+      // Hydrate & merge saved database cart for the user
+      const targetSlug = authData.tenant_slug || tenantSlug;
+      try {
+        await useCartStore.getState().loadUserCart(targetSlug, true);
+      } catch {
+        // Fallback silently if network error
+      }
+
       toast.success(
         `Welcome back, ${authData.first_name || authData.full_name || "Shopper"}!`,
       );
@@ -95,7 +104,6 @@ function TenantLoginForm({ tenantSlug }: { tenantSlug: string }) {
       // Determine appropriate destination
       const isTenantAdmin =
         authData.role === "tenant_admin" || authData.role === "admin";
-      const targetSlug = authData.tenant_slug || tenantSlug;
 
       if (redirectPath) {
         // If user came with explicit redirect param

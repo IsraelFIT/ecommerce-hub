@@ -193,6 +193,8 @@ class UserResponse(BaseModel):
     last_name: str
     email: EmailStr
     phone_number: Optional[str] = None
+    avatar_url: Optional[str] = None
+    gender: Optional[str] = None
     role: str
     is_active: bool
     tenant_id: Optional[uuid.UUID] = None
@@ -254,6 +256,57 @@ class UpdateProfileRequest(BaseModel):
     first_name: Optional[str] = Field(None, min_length=1, max_length=100)
     last_name: Optional[str] = Field(None, min_length=1, max_length=100)
     phone_number: Optional[str] = Field(None, max_length=50)
+    avatar_url: Optional[str] = Field(None, max_length=500)
+    gender: Optional[str] = Field(None, max_length=20)
+
+
+class AddressCreate(BaseModel):
+    first_name: str = Field(..., min_length=1, max_length=100)
+    last_name: str = Field(..., min_length=1, max_length=100)
+    company: Optional[str] = Field(None, max_length=150)
+    country: str = Field(default="United States", max_length=100)
+    street: str = Field(..., min_length=1, max_length=255)
+    city: str = Field(..., min_length=1, max_length=100)
+    state: str = Field(..., min_length=1, max_length=100)
+    zip_code: str = Field(..., min_length=1, max_length=50)
+    phone: Optional[str] = Field(None, max_length=50)
+    email: Optional[EmailStr] = None
+    is_default: bool = Field(default=False)
+
+
+class AddressUpdate(BaseModel):
+    first_name: Optional[str] = Field(None, min_length=1, max_length=100)
+    last_name: Optional[str] = Field(None, min_length=1, max_length=100)
+    company: Optional[str] = Field(None, max_length=150)
+    country: Optional[str] = Field(None, max_length=100)
+    street: Optional[str] = Field(None, min_length=1, max_length=255)
+    city: Optional[str] = Field(None, min_length=1, max_length=100)
+    state: Optional[str] = Field(None, min_length=1, max_length=100)
+    zip_code: Optional[str] = Field(None, min_length=1, max_length=50)
+    phone: Optional[str] = Field(None, max_length=50)
+    email: Optional[EmailStr] = None
+    is_default: Optional[bool] = None
+
+
+class AddressResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    user_id: uuid.UUID
+    first_name: str
+    last_name: str
+    company: Optional[str] = None
+    country: str
+    street: str
+    city: str
+    state: str
+    zip_code: str
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    is_default: bool
+    created_at: datetime
+    updated_at: datetime
+
 
 
 class ChangePasswordRequest(BaseModel):

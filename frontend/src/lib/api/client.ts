@@ -5,6 +5,7 @@ import {
   createSession,
   ACCESS_TOKEN_MAX_AGE,
 } from "@/lib/session";
+import { getRefreshToken, clearAuthSession } from "@/lib/auth";
 import {
   recordUserActivity,
   isUserRecentlyActive,
@@ -56,6 +57,60 @@ function normalizeEndpoint(endpoint: string): string {
     return `/api${clean}`;
   }
   return clean;
+}
+
+let refreshPromise: Promise<string | null> | null = null;
+
+async function executeTokenRefresh(
+  refreshTokenValue: string,
+): Promise<string | null> {
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  refreshPromise = (async () => {
+    try {
+      console.log(
+        "⚠️ Access token expired, user is active: attempting automatic token refresh...",
+      );
+      // Dynamic import to avoid circular dependency
+      const { refreshToken: performRefresh } = await import("./auth");
+      const refreshResponse = await performRefresh({
+        refresh_token: refreshTokenValue,
+      });
+
+      if (refreshResponse.status === "success" && refreshResponse.data) {
+        const authData = refreshResponse.data;
+        const newAccessToken =
+          authData.auth?.access_token ||
+          (authData as unknown as { access_token?: string }).access_token;
+        const newRefreshToken =
+          authData.auth?.refresh_token ||
+          (authData as unknown as { refresh_token?: string }).refresh_token ||
+          refreshTokenValue;
+
+        if (newAccessToken) {
+          await createSession(
+            newAccessToken,
+            newRefreshToken,
+            authData.role,
+            ACCESS_TOKEN_MAX_AGE,
+          );
+
+          console.log("✅ Token refreshed successfully, retrying request...");
+          return newAccessToken;
+        }
+      }
+      return null;
+    } catch (refreshError) {
+      console.error("❌ Automatic token refresh failed:", refreshError);
+      return null;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
 }
 
 /**
@@ -166,79 +221,61 @@ export const apiRequest = async <T = unknown>(
     // Handle token expiration (401 errors)
     if (response.status === 401) {
       const isRefreshEndpoint = endpoint.includes("/refresh-token");
+      const refreshTokenValue = session?.refreshToken || getRefreshToken();
 
-      // Only attempt refresh if there was user activity in the last 30 minutes
-      const hasRecentActivity = isUserRecentlyActive(30 * 60 * 1000);
+      const hasRecentActivity = isUserRecentlyActive(12 * 60 * 60 * 1000);
 
-      if (!isRefreshEndpoint && session?.refreshToken && hasRecentActivity) {
-        console.log(
-          "⚠️ Access token expired, user is active: attempting automatic token refresh...",
-        );
-        try {
-          // Dynamic import to avoid circular dependency
-          const { refreshToken: performRefresh } = await import("./auth");
-          const refreshResponse = await performRefresh({
-            refresh_token: session.refreshToken,
+      if (!isRefreshEndpoint && refreshTokenValue && hasRecentActivity) {
+        const newAccessToken = await executeTokenRefresh(refreshTokenValue);
+
+        if (newAccessToken) {
+          // Retry original request with new Bearer token
+          const retryHeaders: HeadersInit = {
+            ...headers,
+            Authorization: `Bearer ${newAccessToken}`,
+          };
+
+          const retryResponse = await fetch(url, {
+            ...options,
+            headers: retryHeaders,
           });
 
-          if (refreshResponse.status === "success" && refreshResponse.data) {
-            const authData = refreshResponse.data;
-            const newAccessToken =
-              authData.auth?.access_token ||
-              (authData as unknown as { access_token?: string }).access_token;
-            const newRefreshToken =
-              authData.auth?.refresh_token ||
-              (authData as unknown as { refresh_token?: string })
-                .refresh_token ||
-              session.refreshToken;
-
-            if (newAccessToken) {
-              await createSession(
-                newAccessToken,
-                newRefreshToken,
-                authData.role,
-                ACCESS_TOKEN_MAX_AGE,
-              );
-
-              console.log(
-                "✅ Token refreshed successfully, retrying request...",
-              );
-
-              // Retry original request with new Bearer token
-              const retryHeaders: HeadersInit = {
-                ...headers,
-                Authorization: `Bearer ${newAccessToken}`,
-              };
-
-              const retryResponse = await fetch(url, {
-                ...options,
-                headers: retryHeaders,
-              });
-
-              const retryText = await retryResponse.text();
-              const retryData: ParsedData = retryText
-                ? JSON.parse(retryText)
-                : {};
-
-              return {
-                status: (retryData.status as "success" | "error") || "success",
-                message: retryData.message || "Request successful",
-                data: (retryData.data ?? retryData) as T,
-                pagination: retryData.pagination,
-                filters: retryData.filters,
-                errors: retryData.errors as
-                  | Record<string, string[] | string>
-                  | undefined,
-              };
-            }
+          if (retryResponse.status === 204) {
+            return {
+              status: "success",
+              message: "Operation completed successfully",
+              data: {} as T,
+            };
           }
-        } catch (refreshError) {
-          console.error("❌ Automatic token refresh failed:", refreshError);
+
+          const retryText = await retryResponse.text();
+          let retryData: ParsedData = {};
+          try {
+            retryData = retryText ? JSON.parse(retryText) : {};
+          } catch {
+            throw new Error(
+              `Invalid JSON response: ${retryText.substring(0, 100)}`,
+            );
+          }
+
+          if (retryResponse.ok) {
+            return {
+              status: (retryData.status as "success" | "error") || "success",
+              message: retryData.message || "Request successful",
+              data: (retryData.data ?? retryData) as T,
+              pagination: retryData.pagination,
+              filters: retryData.filters,
+              errors: retryData.errors as
+                | Record<string, string[] | string>
+                | undefined,
+            };
+          }
         }
       }
 
       console.log("⚠️ Session expired or invalid, clearing session...");
       await deleteSession();
+      clearAuthSession();
       throw new Error("Session expired. Please login again.");
     }
 
@@ -358,10 +395,52 @@ export const apiFormDataRequest = async <T = unknown>(
     }
 
     if (response.status === 401) {
+      const refreshTokenValue = session?.refreshToken || getRefreshToken();
+
+      const hasRecentActivity = isUserRecentlyActive(12 * 60 * 60 * 1000);
+
+      if (refreshTokenValue && hasRecentActivity) {
+        const newAccessToken = await executeTokenRefresh(refreshTokenValue);
+        if (newAccessToken) {
+          const retryHeaders: HeadersInit = {
+            ...headers,
+            Authorization: `Bearer ${newAccessToken}`,
+          };
+          const retryResponse = await fetch(url, {
+            ...options,
+            method: options.method || "POST",
+            headers: retryHeaders,
+            body: formData,
+          });
+          const retryText = await retryResponse.text();
+          let retryData: ParsedData = {};
+          try {
+            retryData = retryText ? JSON.parse(retryText) : {};
+          } catch {
+            throw new Error(
+              `Invalid JSON response: ${retryText.substring(0, 100)}`,
+            );
+          }
+          if (retryResponse.ok) {
+            return {
+              status: (retryData.status as "success" | "error") || "success",
+              message: retryData.message || "Request successful",
+              data: (retryData.data ?? retryData) as T,
+              pagination: retryData.pagination,
+              filters: retryData.filters,
+              errors: retryData.errors as
+                | Record<string, string[] | string>
+                | undefined,
+            };
+          }
+        }
+      }
+
       console.log(
         "⚠️ Session expired for FormData request, clearing session...",
       );
       await deleteSession();
+      clearAuthSession();
       throw new Error("Session expired. Please login again.");
     }
 

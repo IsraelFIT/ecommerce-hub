@@ -259,7 +259,7 @@ export default function CoreDashboardPage() {
                   <h4 className="text-sm font-bold font-secondary text-foreground">
                     Neon Postgres Infrastructure
                   </h4>
-                  <span className="text-[10px] text-muted-foreground font-mono">
+                  <span className="text-[10px] text-muted-foreground ">
                     eu-central-1 (Frankfurt)
                   </span>
                 </div>
@@ -276,19 +276,17 @@ export default function CoreDashboardPage() {
             <div className="flex flex-col gap-3 mt-3.5 text-xs">
               <div className="flex items-center justify-between p-2.5 rounded-lg bg-card-gray/50 dark:bg-white/5 border border-border">
                 <span className="text-muted-foreground">Active Branch</span>
-                <span className="font-mono font-semibold text-primary">
+                <span className=" font-semibold text-primary">
                   staging (checked out)
                 </span>
               </div>
               <div className="flex items-center justify-between p-2.5 rounded-lg bg-card-gray/50 dark:bg-white/5 border border-border">
                 <span className="text-muted-foreground">Production Branch</span>
-                <span className="font-mono text-foreground">
-                  production (protected)
-                </span>
+                <span className=" text-foreground">production (protected)</span>
               </div>
               <div className="flex items-center justify-between p-2.5 rounded-lg bg-card-gray/50 dark:bg-white/5 border border-border">
                 <span className="text-muted-foreground">Connection Pooler</span>
-                <span className="font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
+                <span className=" text-emerald-600 dark:text-emerald-400 font-semibold">
                   PgBouncer / asyncpg Active
                 </span>
               </div>
@@ -312,7 +310,7 @@ export default function CoreDashboardPage() {
               </Link>
               <Link
                 href="/developers"
-                className="text-xs text-muted-foreground hover:text-foreground font-mono"
+                className="text-xs text-muted-foreground hover:text-foreground "
               >
                 View Connection String →
               </Link>
@@ -408,7 +406,7 @@ export default function CoreDashboardPage() {
                       key={tx.id}
                       className="hover:bg-muted/40 transition-colors"
                     >
-                      <td className="py-2.5 font-mono">
+                      <td className="py-2.5 ">
                         <div className="font-semibold text-foreground">
                           {tx.id}
                         </div>
@@ -420,17 +418,17 @@ export default function CoreDashboardPage() {
                         <div className="font-medium text-foreground">
                           {tx.tenant}
                         </div>
-                        <div className="text-[10px] text-muted-foreground font-mono">
+                        <div className="text-[10px] text-muted-foreground ">
                           {tx.gateway}
                         </div>
                       </td>
-                      <td className="py-2.5 font-semibold text-foreground font-mono">
+                      <td className="py-2.5 font-semibold text-foreground ">
                         {formatCurrency(tx.gross)}
                       </td>
-                      <td className="py-2.5 font-semibold text-primary font-mono">
+                      <td className="py-2.5 font-semibold text-primary ">
                         +{formatCurrency(tx.fee)}
                       </td>
-                      <td className="py-2.5 font-semibold text-emerald-600 dark:text-emerald-400 font-mono">
+                      <td className="py-2.5 font-semibold text-emerald-600 dark:text-emerald-400 ">
                         {formatCurrency(tx.payout)}
                       </td>
                       <td className="py-2.5">
@@ -482,7 +480,7 @@ export default function CoreDashboardPage() {
                   >
                     {tenant.category}
                   </Badge>
-                  <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
+                  <span className="text-[10px]  text-emerald-600 dark:text-emerald-400 font-semibold">
                     {tenant.status}
                   </span>
                 </div>
@@ -490,7 +488,7 @@ export default function CoreDashboardPage() {
                 <h5 className="font-bold font-secondary text-sm text-foreground mt-2">
                   {tenant.name}
                 </h5>
-                <p className="text-[11px] font-mono text-muted-foreground mt-0.5 truncate">
+                <p className="text-[11px]  text-muted-foreground mt-0.5 truncate">
                   {tenant.slug}.ecommerce-hub.com
                 </p>
               </div>

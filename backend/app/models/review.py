@@ -4,10 +4,10 @@ from sqlalchemy import String, Text, Integer, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
-from app.models.base import UUIDPrimaryKeyMixin, TimestampMixin
+from app.models.base import UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin
 
 
-class Review(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+class Review(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "reviews"
 
     tenant_id: Mapped[uuid.UUID] = mapped_column(

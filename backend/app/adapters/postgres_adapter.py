@@ -105,7 +105,7 @@ class PostgresAdapter(ProductRepositoryAdapter):
     async def get_by_id(self, product_id: uuid.UUID) -> Optional[ProductResponse]:
         query = (
             select(Product)
-            .where(Product.id == product_id)
+            .where(Product.id == product_id, Product.is_deleted == False)
             .options(selectinload(Product.variants), selectinload(Product.category))
         )
         result = await self.session.execute(query)
@@ -117,7 +117,7 @@ class PostgresAdapter(ProductRepositoryAdapter):
     async def get_by_slug(self, slug: str) -> Optional[ProductResponse]:
         query = (
             select(Product)
-            .where(Product.slug == slug)
+            .where(Product.slug == slug, Product.is_deleted == False)
             .options(selectinload(Product.variants), selectinload(Product.category))
         )
         result = await self.session.execute(query)
@@ -137,6 +137,7 @@ class PostgresAdapter(ProductRepositoryAdapter):
         availability: Optional[str] = None,
         search: Optional[str] = None,
         filters: Optional[Dict[str, List[str]]] = None,
+        product_class: Optional[str] = None,
         **kwargs,
     ) -> List[ProductSummaryResponse]:
         query = (
@@ -147,6 +148,7 @@ class PostgresAdapter(ProductRepositoryAdapter):
                 selectinload(Product.category),
             )
         )
+        query = query.where(Product.is_deleted == False)
         if published_only:
             query = query.where(Product.is_published == True)
 
@@ -223,6 +225,16 @@ class PostgresAdapter(ProductRepositoryAdapter):
                         )
                 if option_conds:
                     query = query.where(or_(*option_conds))
+
+        # 6. Product Class Filter
+        if product_class and product_class.strip() and product_class.strip().lower() != "all":
+            from app.models.product import ProductClass
+            class_str = product_class.strip().lower()
+            try:
+                p_class = ProductClass(class_str)
+                query = query.where(Product.product_class == p_class)
+            except ValueError:
+                pass
 
         query = query.offset(skip).limit(limit)
 
@@ -396,12 +408,13 @@ class PostgresAdapter(ProductRepositoryAdapter):
         return await self.get_by_id(product.id)
 
     async def delete_product(self, product_id: uuid.UUID) -> bool:
-        query = select(Product).where(Product.id == product_id)
+        query = select(Product).where(Product.id == product_id, Product.is_deleted == False)
         result = await self.session.execute(query)
         product = result.scalar_one_or_none()
         if not product:
             return False
 
-        await self.session.delete(product)
+        product.is_deleted = True
+        product.deleted_at = func.now()
         await self.session.commit()
         return True

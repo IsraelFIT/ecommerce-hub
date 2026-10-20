@@ -1,5 +1,5 @@
 import { apiRequest } from "./client";
-import { User, UserRole, ApiResponse } from "@/types/users";
+import { User, UserRole, UserAddress, ApiResponse } from "@/types/users";
 
 export interface LoginPayload {
   email: string;
@@ -65,6 +65,9 @@ export interface UserProfileData {
   first_name: string;
   last_name: string;
   full_name?: string;
+  phone_number?: string | null;
+  avatar_url?: string | null;
+  gender?: string | null;
   role: UserRole;
   tenant_slug?: string | null;
   tenant_name?: string | null;
@@ -183,6 +186,10 @@ export async function getCurrentUserProfile(token?: string): Promise<User> {
     first_name: data.first_name,
     last_name: data.last_name,
     full_name: data.full_name,
+    phone_number: data.phone_number,
+    avatar_url: data.avatar_url,
+    avatarUrl: data.avatar_url || undefined,
+    gender: data.gender,
     role: data.role,
     tenant_slug: data.tenant_slug,
     tenant_name: data.tenant_name,
@@ -195,6 +202,8 @@ export interface UpdateUserProfilePayload {
   first_name?: string;
   last_name?: string;
   phone_number?: string;
+  avatar_url?: string;
+  gender?: string;
 }
 
 export interface ChangeUserPasswordPayload {
@@ -221,6 +230,10 @@ export async function updateUserProfile(
     first_name: data.first_name,
     last_name: data.last_name,
     full_name: data.full_name,
+    phone_number: data.phone_number,
+    avatar_url: data.avatar_url,
+    avatarUrl: data.avatar_url || undefined,
+    gender: data.gender,
     role: data.role,
     tenant_slug: data.tenant_slug,
     tenant_name: data.tenant_name,
@@ -240,3 +253,48 @@ export async function changeUserPassword(
     body: JSON.stringify(payload),
   });
 }
+
+/**
+ * Fetch saved addresses for current user.
+ */
+export async function getUserAddresses(): Promise<UserAddress[]> {
+  const response = await apiRequest<UserAddress[]>("/auth/addresses");
+  return response.data || [];
+}
+
+/**
+ * Add a new saved address.
+ */
+export async function addUserAddress(
+  payload: Omit<UserAddress, "id" | "user_id" | "created_at" | "updated_at">,
+): Promise<UserAddress> {
+  const response = await apiRequest<UserAddress>("/auth/addresses", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  return response.data;
+}
+
+/**
+ * Update a saved address.
+ */
+export async function updateUserAddress(
+  addressId: string,
+  payload: Partial<UserAddress>,
+): Promise<UserAddress> {
+  const response = await apiRequest<UserAddress>(`/auth/addresses/${addressId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+  return response.data;
+}
+
+/**
+ * Soft-delete a saved address.
+ */
+export async function deleteUserAddress(addressId: string): Promise<void> {
+  await apiRequest<void>(`/auth/addresses/${addressId}`, {
+    method: "DELETE",
+  });
+}
+

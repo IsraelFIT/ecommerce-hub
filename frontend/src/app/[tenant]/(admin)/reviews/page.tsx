@@ -39,6 +39,7 @@ import {
   type ReviewItem,
   type ReviewStats,
 } from "@/lib/api/reviews";
+import { UserAvatar } from "@/components/shared/user-avatar";
 
 export default function TenantReviewsAdminPage() {
   const params = useParams();
@@ -323,9 +324,13 @@ export default function TenantReviewsAdminPage() {
                   >
                     <TableCell className="py-3">
                       <div className="flex items-center gap-3">
-                        <div className="relative w-10 h-10 rounded-lg bg-muted overflow-hidden shrink-0 border border-border flex items-center justify-center font-bold text-xs text-primary">
-                          {r.customer_name?.charAt(0)?.toUpperCase() || "C"}
-                        </div>
+                        <UserAvatar
+                          src={r.customer_avatar_url}
+                          name={r.customer_name}
+                          email={r.customer_email}
+                          size="md"
+                          shape="rounded"
+                        />
                         <div className="min-w-0">
                           <span className="font-semibold text-xs text-foreground block truncate">
                             {r.customer_name}

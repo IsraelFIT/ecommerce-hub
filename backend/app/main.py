@@ -20,6 +20,7 @@ from app.routes import (
     customizations_router,
     reviews_router,
     likes_router,
+    cart_router,
 )
 
 
@@ -88,6 +89,7 @@ app.include_router(uploads_router, prefix="/api")
 app.include_router(customizations_router, prefix="/api")
 app.include_router(reviews_router, prefix="/api")
 app.include_router(likes_router, prefix="/api")
+app.include_router(cart_router, prefix="/api")
 
 
 from app.schemas.response import success_response, ApiResponse

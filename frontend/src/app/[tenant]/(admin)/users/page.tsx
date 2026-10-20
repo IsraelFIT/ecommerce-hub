@@ -35,6 +35,7 @@ import { getTenantUsers, type TenantUserItem } from "@/lib/api/tenants";
 import { useUserStore } from "@/store/user";
 import { useTenantTheme } from "@/components/providers/tenant-theme-provider";
 import { formatCurrency } from "@/utils/helper";
+import { UserAvatar } from "@/components/shared/user-avatar";
 
 export default function TenantUsersAdminPage() {
   const params = useParams();
@@ -325,9 +326,13 @@ export default function TenantUsersAdminPage() {
                   >
                     <TableCell className="py-3">
                       <div className="flex items-center gap-3">
-                        <div className="relative w-10 h-10 rounded-lg bg-muted overflow-hidden shrink-0 border border-border flex items-center justify-center font-bold text-xs text-primary">
-                          {initial}
-                        </div>
+                        <UserAvatar
+                          src={item.avatar_url}
+                          name={displayName}
+                          email={item.email}
+                          size="md"
+                          shape="rounded"
+                        />
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
                             <span className="font-semibold text-xs text-foreground block truncate">

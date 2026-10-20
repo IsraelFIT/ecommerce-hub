@@ -104,6 +104,14 @@ export function useStoreInvalidPaths(): boolean {
     normalizedPath = normalizedPath.slice(`/${tenant}`.length) || "/";
   }
 
+  // Customer storefront order confirmation page MUST always show StoreHeader and StoreFooter
+  if (
+    normalizedPath === "/orders/confirmation" ||
+    normalizedPath.startsWith("/orders/confirmation")
+  ) {
+    return false;
+  }
+
   const storeExcludedPaths = [
     "/admin",
     "/products",

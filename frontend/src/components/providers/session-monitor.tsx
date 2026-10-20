@@ -41,30 +41,72 @@ export function SessionMonitor() {
       if (isRefreshingRef.current || isLoggingOutRef.current) return;
 
       const token = getSessionTokenClient();
-      if (!token) return; // Unauthenticated guest
+      const refreshTokenValue = getRefreshToken();
+      if (!token && !refreshTokenValue) return; // Unauthenticated guest
 
       const expMs = getJwtExpirationMs(token);
-      if (!expMs) return; // Non-JWT or non-expiring token
-
       const now = Date.now();
-      const remainingMs = expMs - now;
+      const remainingMs = expMs ? expMs - now : 0;
 
-      // Case A: Access token has completely expired
-      if (remainingMs <= 0) {
+      // Case A: Access token has completely expired or is missing
+      if (remainingMs <= 0 || !token) {
+        if (refreshTokenValue && isUserRecentlyActive(12 * 60 * 60 * 1000)) {
+          console.log(
+            "🔄 Access token expired. Attempting automatic token refresh...",
+          );
+          isRefreshingRef.current = true;
+          try {
+            const res = await apiRefreshToken({
+              refresh_token: refreshTokenValue,
+            });
+
+            if (res.status === "success" && res.data) {
+              const authData = res.data;
+              const newAccessToken =
+                authData.auth?.access_token ||
+                (authData as unknown as { access_token?: string }).access_token;
+              const newRefreshToken =
+                authData.auth?.refresh_token ||
+                (authData as unknown as { refresh_token?: string })
+                  .refresh_token ||
+                refreshTokenValue;
+
+              if (newAccessToken) {
+                await createSession(
+                  newAccessToken,
+                  newRefreshToken,
+                  authData.role,
+                  ACCESS_TOKEN_MAX_AGE,
+                );
+
+                const newExpMs = getJwtExpirationMs(newAccessToken);
+                lastRefreshedExpRef.current = newExpMs;
+
+                console.log(
+                  "✅ Token refreshed successfully, session continued.",
+                );
+                return;
+              }
+            }
+          } catch (err) {
+            console.error("❌ SessionMonitor refresh failed:", err);
+          } finally {
+            isRefreshingRef.current = false;
+          }
+        }
+
+        // Only log out if refresh token is missing or refresh failed
         console.warn(
-          "🔒 Access token has expired. Logging out due to inactivity...",
+          "🔒 Session has expired. Logging out due to inactivity...",
         );
         isLoggingOutRef.current = true;
         try {
           await deleteSession();
           clearAuthSession();
           useUserStore.getState().clearUser();
-          toast.error(
-            "Your session has expired due to inactivity. Please log in again.",
-            {
-              id: "session-expired-inactivity",
-            },
-          );
+          toast.error("Your session has expired. Please log in again.", {
+            id: "session-expired-inactivity",
+          });
           // Redirect to login page if on protected/admin routes
           const pathname = currentPathname || window.location.pathname;
           if (
@@ -92,17 +134,9 @@ export function SessionMonitor() {
         if (lastRefreshedExpRef.current === expMs) return;
 
         // Check if user has demonstrated frontend activity
-        const userActive = isUserRecentlyActive();
+        const userActive = isUserRecentlyActive(30 * 60 * 1000);
 
-        if (userActive) {
-          const refreshTokenValue = getRefreshToken();
-          if (!refreshTokenValue) {
-            console.warn(
-              "Cannot proactively refresh: refresh_token cookie missing",
-            );
-            return;
-          }
-
+        if (userActive && refreshTokenValue) {
           console.log(
             `🔄 Proactively refreshing access token (${Math.round(remainingMs / 1000)}s remaining, user active)...`,
           );
@@ -145,10 +179,6 @@ export function SessionMonitor() {
           } finally {
             isRefreshingRef.current = false;
           }
-        } else {
-          console.log(
-            `⏸️ User inactive in the last 25 minutes. Skipping proactive refresh. Token will expire in ${Math.round(remainingMs / 1000)}s.`,
-          );
         }
       }
     };

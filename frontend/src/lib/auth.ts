@@ -100,7 +100,7 @@ export function clearAuthSession() {
       localStorage.removeItem("refresh_token");
       localStorage.removeItem("auth_session");
       localStorage.removeItem("userRole");
-      localStorage.clear();
+      localStorage.removeItem("cart-storage");
       sessionStorage.clear();
     } catch (e) {
       console.warn("Could not clear localStorage/sessionStorage:", e);
@@ -109,5 +109,9 @@ export function clearAuthSession() {
 }
 
 export function getRefreshToken(): string | undefined {
-  return getCookie("refresh_token") as string | undefined;
+  const cookieVal =
+    (getCookie("refresh_token") as string | undefined) ||
+    (getCookie("auth_refresh_token") as string | undefined);
+  if (cookieVal && cookieVal.trim().length > 0) return cookieVal;
+  return undefined;
 }

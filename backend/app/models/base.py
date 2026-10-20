@@ -1,6 +1,7 @@
 import uuid
+from typing import Optional
 from datetime import datetime
-from sqlalchemy import DateTime, func
+from sqlalchemy import DateTime, func, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
@@ -27,3 +28,16 @@ class UUIDPrimaryKeyMixin:
         default=uuid.uuid4,
         index=True,
     )
+
+
+class SoftDeleteMixin:
+    is_deleted: Mapped[bool] = mapped_column(
+        default=False,
+        nullable=False,
+        index=True,
+    )
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+

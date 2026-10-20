@@ -5,7 +5,7 @@ from sqlalchemy import String, Text, Numeric, Integer, ForeignKey, JSON, Boolean
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
-from app.models.base import UUIDPrimaryKeyMixin, TimestampMixin
+from app.models.base import UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin
 
 
 class ProductClass(str, enum.Enum):
@@ -14,7 +14,7 @@ class ProductClass(str, enum.Enum):
     SERVICE = "service"    # Requires scheduling
 
 
-class Category(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+class Category(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "categories"
 
     tenant_id: Mapped[uuid.UUID] = mapped_column(
@@ -37,7 +37,7 @@ class Category(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     products: Mapped[List["Product"]] = relationship("Product", back_populates="category")
 
 
-class ProductFilter(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+class ProductFilter(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "product_filters"
 
     tenant_id: Mapped[uuid.UUID] = mapped_column(
@@ -54,7 +54,7 @@ class ProductFilter(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     display_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
 
-class Product(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+class Product(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "products"
 
     tenant_id: Mapped[uuid.UUID] = mapped_column(

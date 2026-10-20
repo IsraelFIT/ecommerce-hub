@@ -189,7 +189,7 @@
   }
 
   li {
-    @apply list-none cursor-pointer relative font-primary;
+    @apply list-none relative font-primary;
   }
 
   [data-sonner-toast] {

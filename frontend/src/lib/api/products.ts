@@ -16,6 +16,7 @@ export interface GetProductsOptions {
   per_page?: number;
   published_only?: boolean;
   category?: string;
+  product_class?: string;
   min_price?: number;
   max_price?: number;
   rating?: number;
@@ -36,6 +37,7 @@ export async function getProducts(
     per_page = 50,
     published_only = false,
     category,
+    product_class,
     min_price,
     max_price,
     rating,
@@ -52,6 +54,13 @@ export async function getProducts(
 
   if (category && category.trim() && category.toUpperCase() !== "ALL") {
     queryParams.set("category", category.trim());
+  }
+  if (
+    product_class &&
+    product_class.trim() &&
+    product_class.toLowerCase() !== "all"
+  ) {
+    queryParams.set("product_class", product_class.trim().toLowerCase());
   }
   if (min_price !== undefined && min_price !== null) {
     queryParams.set("min_price", min_price.toString());
@@ -215,3 +224,5 @@ export async function uploadProductImage(
     body: formData,
   });
 }
+
+export const uploadImage = uploadProductImage;

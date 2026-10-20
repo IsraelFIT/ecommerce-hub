@@ -1,9 +1,9 @@
 import enum
 from typing import Optional, Dict, Any
-from sqlalchemy import String, Enum, JSON, Boolean
+from sqlalchemy import String, Enum, JSON, Boolean, Float, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
-from app.models.base import UUIDPrimaryKeyMixin, TimestampMixin
+from app.models.base import UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin
 
 
 class BackendType(str, enum.Enum):
@@ -11,7 +11,7 @@ class BackendType(str, enum.Enum):
     SANITY = "sanity"
 
 
-class Tenant(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+class Tenant(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "tenants"
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -37,6 +37,20 @@ class Tenant(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     category: Mapped[str] = mapped_column(String(100), default="General", nullable=False)
     country: Mapped[str] = mapped_column(String(100), default="Nigeria", nullable=False)
     currency: Mapped[str] = mapped_column(String(10), default="NGN", nullable=False)
+
+    # Store physical address & pickup location details
+    store_address: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    store_phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    store_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    pickup_location_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    pickup_address: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    pickup_hours: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Fulfillment & Delivery Rules
+    delivery_fee: Mapped[Optional[float]] = mapped_column(Float, default=45.0, nullable=True)
+    delivery_instruction: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    pickup_instruction: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
     branding_config: Mapped[Dict[str, Any]] = mapped_column(
         JSON,
         default=lambda: {

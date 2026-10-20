@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/pagination";
 import { formatCurrency } from "@/utils/helper";
 import { useUserStore } from "@/store/user";
+import { UserAvatar } from "@/components/shared/user-avatar";
 
 export default function DashboardPage() {
   const { user } = useUserStore();
@@ -63,6 +64,8 @@ export default function DashboardPage() {
     {
       id: "ORD-8492",
       client: "Amara & David",
+      avatar:
+        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80",
       event: "3-Tier Floral Wedding Cake",
       flavor: "Tahitian Vanilla & Raspberry Coulis",
       date: "Aug 29, 2026",
@@ -72,6 +75,8 @@ export default function DashboardPage() {
     {
       id: "ORD-8493",
       client: "Sophia Laurent",
+      avatar:
+        "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80",
       event: "Gold Foil 30th Birthday Cake",
       flavor: "Belgian Chocolate Hazelnut Crunch",
       date: "Aug 30, 2026",
@@ -81,6 +86,8 @@ export default function DashboardPage() {
     {
       id: "ORD-8494",
       client: "St. Jude Gala Committee",
+      avatar:
+        "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80",
       event: "120pc Macaron Tower & Petite Fours",
       flavor: "Pistachio, Passionfruit, Matcha",
       date: "Sep 02, 2026",
@@ -189,11 +196,21 @@ export default function DashboardPage() {
                 key={order.id}
                 className="hover:bg-muted/20 transition-colors"
               >
-                <TableCell className="p-4 font-mono font-semibold text-primary text-xs">
+                <TableCell className="p-4  font-semibold text-primary text-xs">
                   {order.id}
                 </TableCell>
-                <TableCell className="p-4 font-medium text-xs">
-                  {order.client}
+                <TableCell className="p-4">
+                  <div className="flex items-center gap-2.5">
+                    <UserAvatar
+                      src={order.avatar}
+                      name={order.client}
+                      size="sm"
+                      shape="rounded"
+                    />
+                    <span className="font-medium text-xs text-foreground">
+                      {order.client}
+                    </span>
+                  </div>
                 </TableCell>
                 <TableCell className="p-4">
                   <div className="font-medium text-foreground text-xs">

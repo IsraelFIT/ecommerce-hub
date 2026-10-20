@@ -46,7 +46,7 @@ export function HowItWorksSection() {
                 </span>
                 <div className="flex items-center gap-2">
                   <div className="h-4 w-4 rounded-full bg-primary/70" />
-                  <span className="text-xs font-bold text-foreground font-mono">
+                  <span className="text-xs font-bold text-foreground ">
                     your-store.ecommercehub.com
                   </span>
                 </div>

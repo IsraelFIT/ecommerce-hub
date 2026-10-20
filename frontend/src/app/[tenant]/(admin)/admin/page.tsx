@@ -36,6 +36,7 @@ import { useUserStore } from "@/store/user";
 import { useTenantTheme } from "@/components/providers/tenant-theme-provider";
 import { getTenantSubdomainUrl, getTenantRoute } from "@/utils/helper";
 import { Badge } from "@/components/ui/badge";
+import { UserAvatar } from "@/components/shared/user-avatar";
 
 interface AdminPageProps {
   params: Promise<{
@@ -58,6 +59,7 @@ interface OrderItem {
   id: string;
   customerName: string;
   customerEmail: string;
+  customerAvatar?: string;
   itemsCount: number;
   grossAmount: number;
   netPayout: number;
@@ -144,6 +146,8 @@ export default function TenantOverviewPage({ params }: AdminPageProps) {
       id: "ORD-9421",
       customerName: "Sarah Jenkins",
       customerEmail: "sarah.j@example.com",
+      customerAvatar:
+        "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80",
       itemsCount: 2,
       grossAmount: 448.0,
       netPayout: 436.8,
@@ -156,6 +160,8 @@ export default function TenantOverviewPage({ params }: AdminPageProps) {
       id: "ORD-9420",
       customerName: "Tunde Adeyemi",
       customerEmail: "tunde.a@example.com",
+      customerAvatar:
+        "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80",
       itemsCount: 1,
       grossAmount: 149.0,
       netPayout: 145.28,
@@ -168,6 +174,8 @@ export default function TenantOverviewPage({ params }: AdminPageProps) {
       id: "ORD-9419",
       customerName: "Marcus Vance",
       customerEmail: "marcus.v@example.com",
+      customerAvatar:
+        "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80",
       itemsCount: 3,
       grossAmount: 241.0,
       netPayout: 234.97,
@@ -180,6 +188,8 @@ export default function TenantOverviewPage({ params }: AdminPageProps) {
       id: "ORD-9418",
       customerName: "Elena Rostova",
       customerEmail: "elena.r@example.com",
+      customerAvatar:
+        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80",
       itemsCount: 1,
       grossAmount: 299.0,
       netPayout: 291.52,
@@ -408,11 +418,22 @@ export default function TenantOverviewPage({ params }: AdminPageProps) {
                     {ord.id}
                   </TableCell>
                   <TableCell className="p-3.5">
-                    <div className="font-medium text-foreground">
-                      {ord.customerName}
-                    </div>
-                    <div className="text-muted-foreground text-xs">
-                      {ord.customerEmail}
+                    <div className="flex items-center gap-3">
+                      <UserAvatar
+                        src={ord.customerAvatar}
+                        name={ord.customerName}
+                        email={ord.customerEmail}
+                        size="sm"
+                        shape="rounded"
+                      />
+                      <div className="min-w-0">
+                        <div className="font-medium text-foreground text-xs truncate">
+                          {ord.customerName}
+                        </div>
+                        <div className="text-muted-foreground text-[11px] truncate">
+                          {ord.customerEmail}
+                        </div>
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell className="p-3.5">
@@ -522,7 +543,7 @@ export default function TenantOverviewPage({ params }: AdminPageProps) {
               </div>
               <div className="flex items-center justify-between py-1.5 border-b border-border">
                 <span className="text-muted-foreground">Subdomain Route</span>
-                <span className="font-mono text-foreground">
+                <span className=" text-foreground">
                   {tenantSlug}.ecommerce-hub.com
                 </span>
               </div>

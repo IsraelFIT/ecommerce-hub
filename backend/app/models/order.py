@@ -5,7 +5,7 @@ from sqlalchemy import String, Numeric, Enum, ForeignKey, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
-from app.models.base import UUIDPrimaryKeyMixin, TimestampMixin
+from app.models.base import UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin
 
 
 class OrderStatus(str, enum.Enum):
@@ -16,7 +16,7 @@ class OrderStatus(str, enum.Enum):
     CANCELLED = "cancelled"
 
 
-class Order(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+class Order(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "orders"
 
     tenant_id: Mapped[uuid.UUID] = mapped_column(

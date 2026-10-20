@@ -1,7 +1,7 @@
 import uuid
 from typing import Dict, Any, List
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies import get_tenant_context, get_rls_db_session
 from app.models.tenant import Tenant
@@ -35,7 +35,10 @@ async def list_filters(
     tenant: Tenant = Depends(get_tenant_context),
     db: AsyncSession = Depends(get_rls_db_session),
 ) -> Dict[str, Any]:
-    query = select(ProductFilter).where(ProductFilter.tenant_id == tenant.id)
+    query = select(ProductFilter).where(
+        ProductFilter.tenant_id == tenant.id,
+        ProductFilter.is_deleted == False,
+    )
     if active_only:
         query = query.where(ProductFilter.is_active == True)
     query = query.order_by(ProductFilter.display_order.asc(), ProductFilter.name.asc())
@@ -230,7 +233,9 @@ async def delete_filter(
     db: AsyncSession = Depends(get_rls_db_session),
 ) -> Dict[str, Any]:
     query = select(ProductFilter).where(
-        ProductFilter.id == filter_id, ProductFilter.tenant_id == tenant.id
+        ProductFilter.id == filter_id,
+        ProductFilter.tenant_id == tenant.id,
+        ProductFilter.is_deleted == False,
     )
     result = await db.execute(query)
     product_filter = result.scalar_one_or_none()
@@ -240,7 +245,8 @@ async def delete_filter(
             detail="Filter not found",
         )
 
-    await db.delete(product_filter)
+    product_filter.is_deleted = True
+    product_filter.deleted_at = func.now()
     await db.commit()
 
     return success_response(

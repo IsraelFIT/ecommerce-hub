@@ -411,7 +411,7 @@ export function HeroSection() {
                 </TableHeader>
                 <TableBody className="divide-y divide-border text-foreground">
                   <TableRow className="hover:bg-card transition-colors">
-                    <TableCell className="py-2.5 pr-2 font-mono text-muted-foreground text-xs flex items-center gap-1">
+                    <TableCell className="py-2.5 pr-2  text-muted-foreground text-xs flex items-center gap-1">
                       <CheckSquare className="h-3 w-3 text-muted-foreground" />
                       #3656
                     </TableCell>
@@ -434,7 +434,7 @@ export function HeroSection() {
                     </TableCell>
                   </TableRow>
                   <TableRow className="hover:bg-card transition-colors">
-                    <TableCell className="py-2.5 pr-2 font-mono text-muted-foreground text-xs flex items-center gap-1">
+                    <TableCell className="py-2.5 pr-2  text-muted-foreground text-xs flex items-center gap-1">
                       <CheckSquare className="h-3 w-3 text-muted-foreground" />
                       #6524
                     </TableCell>

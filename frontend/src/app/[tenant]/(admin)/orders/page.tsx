@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { UserAvatar } from "@/components/shared/user-avatar";
 
 interface OrdersPageProps {
   params?: Promise<{
@@ -39,6 +40,7 @@ interface OrderItem {
   id: string;
   customerName: string;
   customerEmail: string;
+  customerAvatar?: string;
   itemsCount: number;
   grossAmount: number;
   netPayout: number;
@@ -54,6 +56,8 @@ export default function TenantOrdersPage({}: OrdersPageProps) {
       id: "ORD-9421",
       customerName: "Sarah Jenkins",
       customerEmail: "sarah.j@example.com",
+      customerAvatar:
+        "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80",
       itemsCount: 2,
       grossAmount: 448.0,
       netPayout: 436.8,
@@ -66,6 +70,8 @@ export default function TenantOrdersPage({}: OrdersPageProps) {
       id: "ORD-9420",
       customerName: "Tunde Adeyemi",
       customerEmail: "tunde.a@example.com",
+      customerAvatar:
+        "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80",
       itemsCount: 1,
       grossAmount: 149.0,
       netPayout: 145.28,
@@ -78,6 +84,8 @@ export default function TenantOrdersPage({}: OrdersPageProps) {
       id: "ORD-9419",
       customerName: "Marcus Vance",
       customerEmail: "marcus.v@example.com",
+      customerAvatar:
+        "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80",
       itemsCount: 3,
       grossAmount: 241.0,
       netPayout: 234.97,
@@ -90,6 +98,8 @@ export default function TenantOrdersPage({}: OrdersPageProps) {
       id: "ORD-9418",
       customerName: "Elena Rostova",
       customerEmail: "elena.r@example.com",
+      customerAvatar:
+        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80",
       itemsCount: 1,
       grossAmount: 299.0,
       netPayout: 291.52,
@@ -236,15 +246,26 @@ export default function TenantOrdersPage({}: OrdersPageProps) {
                     key={ord.id}
                     className="border-border hover:bg-muted/40 transition-colors"
                   >
-                    <TableCell className="p-4 font-mono font-bold text-foreground text-xs">
+                    <TableCell className="p-4  font-bold text-foreground text-xs">
                       {ord.id}
                     </TableCell>
                     <TableCell className="p-4">
-                      <div className="font-semibold text-foreground">
-                        {ord.customerName}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {ord.customerEmail}
+                      <div className="flex items-center gap-3">
+                        <UserAvatar
+                          src={ord.customerAvatar}
+                          name={ord.customerName}
+                          email={ord.customerEmail}
+                          size="sm"
+                          shape="rounded"
+                        />
+                        <div className="min-w-0">
+                          <div className="font-semibold text-foreground text-xs truncate">
+                            {ord.customerName}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground truncate">
+                            {ord.customerEmail}
+                          </div>
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell className="p-4">

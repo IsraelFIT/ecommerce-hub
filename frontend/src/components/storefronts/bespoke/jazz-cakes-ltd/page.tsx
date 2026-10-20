@@ -303,7 +303,7 @@ export function JazzCakesBespokeStorefront({
       >
         <div className="container max-w-6xl mx-auto">
           <div className="text-center max-w-2xl mx-auto mb-16">
-            <span className="text-xs uppercase tracking-widest text-amber-400 font-semibold font-mono">
+            <span className="text-xs uppercase tracking-widest text-amber-400 font-semibold ">
               Live Atelier Studio
             </span>
             <h2 className="text-3xl sm:text-4xl md:text-5xl  font-bold text-white mt-2">
@@ -346,7 +346,7 @@ export function JazzCakesBespokeStorefront({
                           <Cake
                             className={`size-4 ${isSelected ? "text-amber-400" : "text-stone-500"}`}
                           />
-                          <span className="text-xs font-bold text-amber-300 font-mono">
+                          <span className="text-xs font-bold text-amber-300 ">
                             ${tier.basePrice}
                           </span>
                         </div>
@@ -401,11 +401,11 @@ export function JazzCakesBespokeStorefront({
                         </div>
                         <div className="text-right shrink-0">
                           {flavor.extraPrice > 0 ? (
-                            <span className="text-xs font-mono text-amber-400">
+                            <span className="text-xs  text-amber-400">
                               +${flavor.extraPrice}
                             </span>
                           ) : (
-                            <span className="text-[11px] font-mono text-stone-500">
+                            <span className="text-[11px]  text-stone-500">
                               Included
                             </span>
                           )}
@@ -445,7 +445,7 @@ export function JazzCakesBespokeStorefront({
                         </p>
                       </div>
                     </div>
-                    <span className="text-xs font-mono text-amber-400 font-semibold">
+                    <span className="text-xs  text-amber-400 font-semibold">
                       +$35
                     </span>
                   </label>
@@ -473,7 +473,7 @@ export function JazzCakesBespokeStorefront({
                         </p>
                       </div>
                     </div>
-                    <span className="text-xs font-mono text-amber-400 font-semibold">
+                    <span className="text-xs  text-amber-400 font-semibold">
                       +$45
                     </span>
                   </label>
@@ -501,13 +501,13 @@ export function JazzCakesBespokeStorefront({
                 <div className="space-y-3 text-xs">
                   <div className="flex justify-between text-stone-300">
                     <span>Base Tier ({selectedTier.name}):</span>
-                    <span className="font-mono text-white font-medium">
+                    <span className=" text-white font-medium">
                       ${selectedTier.basePrice}
                     </span>
                   </div>
                   <div className="flex justify-between text-stone-300">
                     <span>Flavour Pairing ({selectedFlavor.name}):</span>
-                    <span className="font-mono text-white font-medium">
+                    <span className=" text-white font-medium">
                       {selectedFlavor.extraPrice > 0
                         ? `+$${selectedFlavor.extraPrice}`
                         : "$0"}
@@ -516,17 +516,13 @@ export function JazzCakesBespokeStorefront({
                   {addGoldLeaf && (
                     <div className="flex justify-between text-stone-300">
                       <span>24k Edible Gold Leaf:</span>
-                      <span className="font-mono text-white font-medium">
-                        +$35
-                      </span>
+                      <span className=" text-white font-medium">+$35</span>
                     </div>
                   )}
                   {addFlowers && (
                     <div className="flex justify-between text-stone-300">
                       <span>Organic Sugar Orchids:</span>
-                      <span className="font-mono text-white font-medium">
-                        +$45
-                      </span>
+                      <span className=" text-white font-medium">+$45</span>
                     </div>
                   )}
 
@@ -541,7 +537,7 @@ export function JazzCakesBespokeStorefront({
                       >
                         <Minus className="size-3" />
                       </Button>
-                      <span className="w-8 text-center font-mono font-bold text-white text-sm">
+                      <span className="w-8 text-center  font-bold text-white text-sm">
                         {quantity}
                       </span>
                       <Button
@@ -561,7 +557,7 @@ export function JazzCakesBespokeStorefront({
                     Total Price
                   </span>
                   <div className="text-right">
-                    <span className="text-3xl font-extrabold text-amber-400 font-mono">
+                    <span className="text-3xl font-extrabold text-amber-400 ">
                       ${totalPrice}
                     </span>
                     <p className="text-[10px] text-stone-400 mt-0.5">
@@ -603,7 +599,7 @@ export function JazzCakesBespokeStorefront({
         <div className="container max-w-6xl mx-auto">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-16">
             <div>
-              <span className="text-xs uppercase tracking-widest text-amber-400 font-semibold font-mono">
+              <span className="text-xs uppercase tracking-widest text-amber-400 font-semibold ">
                 The Heritage Vault
               </span>
               <h2 className="text-3xl sm:text-4xl md:text-5xl  font-bold text-white mt-2">
@@ -634,7 +630,7 @@ export function JazzCakesBespokeStorefront({
                   <span className="absolute top-3 left-3 px-3 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-stone-950/80 text-amber-300 border border-stone-800 backdrop-blur-md">
                     {item.category}
                   </span>
-                  <span className="absolute top-3 right-3 px-3 py-1 rounded-full text-[10px] font-mono font-bold bg-amber-500 text-stone-950">
+                  <span className="absolute top-3 right-3 px-3 py-1 rounded-full text-[10px]  font-bold bg-amber-500 text-stone-950">
                     ${item.price}
                   </span>
                 </div>
@@ -686,7 +682,7 @@ export function JazzCakesBespokeStorefront({
             <div className="absolute top-0 right-0 w-80 h-80 bg-amber-500/10 blur-[100px] pointer-events-none" />
 
             <div className="text-center max-w-xl mx-auto mb-10">
-              <span className="text-xs uppercase tracking-widest text-amber-400 font-semibold font-mono">
+              <span className="text-xs uppercase tracking-widest text-amber-400 font-semibold ">
                 Private Appointment
               </span>
               <h2 className="text-3xl sm:text-4xl  font-bold text-white mt-2">

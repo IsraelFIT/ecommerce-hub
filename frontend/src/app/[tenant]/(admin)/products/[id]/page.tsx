@@ -1259,7 +1259,7 @@ export default function TenantProductDetailPage({
               <Input
                 value={slug}
                 onChange={(e) => setSlug(e.target.value)}
-                className="h-9 text-xs font-mono bg-muted border-border text-foreground"
+                className="h-9 text-xs  bg-muted border-border text-foreground"
               />
             </div>
 

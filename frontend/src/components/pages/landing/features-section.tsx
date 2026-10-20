@@ -75,7 +75,7 @@ export function FeaturesSection() {
               </div>
               <div className="bg-card p-2 rounded-xl border border-border flex items-center gap-2 text-xs">
                 <span className="h-2 w-2 rounded-full bg-primary" />
-                <span className="font-mono text-foreground text-[11px]">
+                <span className=" text-foreground text-[11px]">
                   jazz-cakes.ecommercehub.com
                 </span>
               </div>

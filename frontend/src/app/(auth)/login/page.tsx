@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useUserStore } from "@/store/user";
+import { useCartStore } from "@/store/cart";
 import { setAuthSession } from "@/lib/auth";
 import { loginUser } from "@/lib/api/auth";
 import { getTenantSubdomainUrl } from "@/utils/helper";
@@ -82,6 +83,14 @@ function LoginForm() {
         authData.auth.refresh_token,
       );
       setUser(user);
+
+      // Hydrate & merge saved database cart for the user
+      const targetSlug = authData.tenant_slug || "general";
+      try {
+        await useCartStore.getState().loadUserCart(targetSlug, true);
+      } catch {
+        // Fallback silently if network error
+      }
 
       toast.success(
         `Welcome back, ${authData.first_name || authData.full_name || "Merchant"}!`,
@@ -182,7 +191,7 @@ function LoginForm() {
 
           <div className="flex items-center gap-2 bg-card border border-border rounded-xl p-2 shadow-2xs">
             <Globe className="h-4 w-4 text-primary ml-1 shrink-0" />
-            <span className="font-mono text-xs font-semibold text-foreground flex-1 truncate">
+            <span className=" text-xs font-semibold text-foreground flex-1 truncate">
               {liveSubdomainUrl}
             </span>
             <Button

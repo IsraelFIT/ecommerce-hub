@@ -23,7 +23,7 @@ export const BESPOKE_STOREFRONTS: Record<
       <div className="min-h-screen bg-stone-950 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="size-10 rounded-full border-2 border-amber-500 border-t-transparent animate-spin" />
-          <p className="text-xs uppercase tracking-widest text-stone-400 font-mono">
+          <p className="text-xs uppercase tracking-widest text-stone-400 ">
             Loading Bespoke Experience...
           </p>
         </div>

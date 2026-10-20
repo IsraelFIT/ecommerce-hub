@@ -26,7 +26,7 @@ export default async function TenantLayout({
       initialBranding={tenantData?.branding_config}
       initialTenant={tenantData}
     >
-      <SessionSyncWrapper>
+      <SessionSyncWrapper tenantSlug={tenant}>
         <div className="min-h-screen flex flex-col bg-background text-foreground antialiased">
           <StoreHeader />
           <div className="flex-1 flex flex-col">{children}</div>

@@ -315,7 +315,7 @@ export default function SignupPage() {
                 return (
                   <div className="flex items-center gap-2 bg-card border border-border rounded-xl p-2 shadow-2xs">
                     <Globe className="h-4 w-4 text-primary ml-1.5 shrink-0" />
-                    <span className="font-mono font-semibold text-foreground flex-1 truncate">
+                    <span className=" font-semibold text-foreground flex-1 truncate">
                       {liveUrl}
                     </span>
                     <Button
@@ -679,7 +679,7 @@ export default function SignupPage() {
                                 .replace(/[^a-z0-9-]/g, ""),
                             )
                           }
-                          className="h-10 font-mono bg-background border-input focus-visible:ring-primary"
+                          className="h-10  bg-background border-input focus-visible:ring-primary"
                           required
                         />
                       </div>
@@ -724,7 +724,7 @@ export default function SignupPage() {
                           Operating Currency & Gateway
                         </Label>
                         <div className="h-9 px-3 rounded-md border border-border bg-card-gray flex items-center justify-between text-xs">
-                          <span className="font-bold text-primary font-mono text-sm">
+                          <span className="font-bold text-primary  text-sm">
                             {selectedCountry.currency}
                           </span>
                           <span className="text-muted-foreground font-medium">
@@ -777,9 +777,7 @@ export default function SignupPage() {
                       <div className="flex rounded-md shadow-2xs border border-input overflow-hidden focus-within:ring focus-within:ring-primary focus-within:border-primary bg-background">
                         <div className="flex items-center gap-1.5 bg-card-gray px-3 border-r border-border font-medium text-foreground">
                           <span>{selectedCountry.flag}</span>
-                          <span className="font-mono">
-                            {selectedCountry.dial}
-                          </span>
+                          <span className="">{selectedCountry.dial}</span>
                         </div>
                         <Input
                           type="tel"

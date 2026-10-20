@@ -1,10 +1,16 @@
 "use client";
 
-import { useState, useEffect, useTransition, Suspense } from "react";
+import { useState, useEffect, useRef, useTransition, Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { Heart, Camera, ShoppingBag, ChevronRight } from "lucide-react";
+import {
+  Heart,
+  Camera,
+  ShoppingBag,
+  ChevronRight,
+  Loader2,
+} from "lucide-react";
 import { getTenantRoute } from "@/utils/helper";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,29 +27,22 @@ import { useUserStore } from "@/store/user";
 import { useTenantTheme } from "@/components/providers/tenant-theme-provider";
 import { MenuCard } from "@/components/pages/menu/menu-card";
 import type { Product } from "@/types/products";
+import { UserAddress } from "@/types/users";
 import { deleteAuthCookies } from "@/lib/session";
 import { clearAuthSession } from "@/lib/auth";
-import { updateUserProfile, changeUserPassword } from "@/lib/api/auth";
+import {
+  updateUserProfile,
+  changeUserPassword,
+  getUserAddresses,
+  addUserAddress,
+  deleteUserAddress,
+} from "@/lib/api/auth";
+import { uploadImage } from "@/lib/api/products";
 import { apiRequest } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 type TabType = "profile" | "orders" | "address" | "password" | "wishlist";
-
-interface SavedAddress {
-  id: string;
-  firstName: string;
-  lastName: string;
-  company?: string;
-  country: string;
-  street: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  phone: string;
-  email: string;
-  isDefault?: boolean;
-}
 
 interface OrderItemDisplay {
   id: string;
@@ -82,34 +81,6 @@ interface ApiOrder {
   status?: string;
   items?: ApiOrderItem[];
 }
-
-const DEFAULT_ADDRESSES: SavedAddress[] = [
-  {
-    id: "addr-1",
-    firstName: "Bessie",
-    lastName: "Cooper",
-    street: "2464 Royal Ln. Mesa",
-    city: "Mesa",
-    state: "New Jersey",
-    zipCode: "45463",
-    country: "United States",
-    phone: "+1 (555) 234-5678",
-    email: "bessie.cooper@example.com",
-    isDefault: true,
-  },
-  {
-    id: "addr-2",
-    firstName: "Bessie",
-    lastName: "Cooper",
-    street: "6391 Elgin St. Celina",
-    city: "Celina",
-    state: "Delaware",
-    zipCode: "10299",
-    country: "United States",
-    phone: "+1 (555) 345-6789",
-    email: "bessie.cooper@example.com",
-  },
-];
 
 const SAMPLE_ORDERS: OrderDisplay[] = [
   {
@@ -229,13 +200,37 @@ function ProfileContent() {
     });
   };
 
+  // Avatar upload
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setIsUploadingAvatar(true);
+      const res = await uploadImage(file, tenant);
+      if (res.data?.url) {
+        const updated = await updateUserProfile({
+          avatar_url: res.data.url,
+        });
+        updateUser(updated);
+        toast.success("Avatar image updated!");
+      }
+    } catch {
+      toast.error("Failed to upload avatar image");
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
   // Personal Information State
   const [profileForm, setProfileForm] = useState({
     firstName: user?.first_name || "",
     lastName: user?.last_name || "",
     email: user?.email || "",
-    phone: "",
-    gender: "Female",
+    phone: user?.phone_number || "",
+    gender: user?.gender || "Female",
   });
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
 
@@ -247,6 +242,8 @@ function ProfileContent() {
         firstName: user.first_name || prev.firstName,
         lastName: user.last_name || prev.lastName,
         email: user.email || prev.email,
+        phone: user.phone_number ?? prev.phone,
+        gender: user.gender ?? prev.gender,
       }));
     }
   }, [user]);
@@ -259,6 +256,7 @@ function ProfileContent() {
         first_name: profileForm.firstName,
         last_name: profileForm.lastName,
         phone_number: profileForm.phone,
+        gender: profileForm.gender,
       });
       updateUser(updated);
       toast.success("Profile updated successfully!");
@@ -268,6 +266,8 @@ function ProfileContent() {
         first_name: profileForm.firstName,
         last_name: profileForm.lastName,
         name: `${profileForm.firstName} ${profileForm.lastName}`,
+        phone_number: profileForm.phone,
+        gender: profileForm.gender,
       });
       toast.success("Profile changes saved locally");
     } finally {
@@ -355,23 +355,32 @@ function ProfileContent() {
   });
 
   // Manage Address State
-  const [addresses, setAddresses] = useState<SavedAddress[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(`user_addresses_${tenant}`);
-      if (saved) {
-        try {
-          return JSON.parse(saved) as SavedAddress[];
-        } catch {}
+  const [addresses, setAddresses] = useState<UserAddress[]>([]);
+  const [isLoadingAddresses, setIsLoadingAddresses] = useState(false);
+
+  useEffect(() => {
+    async function loadAddresses() {
+      if (!user?.id) return;
+      setIsLoadingAddresses(true);
+      try {
+        const res = await getUserAddresses();
+        if (res && Array.isArray(res)) {
+          setAddresses(res);
+        }
+      } catch (err) {
+        console.error("Failed to load addresses:", err);
+      } finally {
+        setIsLoadingAddresses(false);
       }
     }
-    return DEFAULT_ADDRESSES;
-  });
+    loadAddresses();
+  }, [user?.id]);
 
   const [addressForm, setAddressForm] = useState({
     firstName: "",
     lastName: "",
     company: "",
-    country: "United States",
+    country: "",
     street: "",
     city: "",
     state: "",
@@ -380,49 +389,52 @@ function ProfileContent() {
     email: "",
   });
 
-  const handleAddAddress = (e: React.FormEvent) => {
+  const handleAddAddress = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!addressForm.firstName || !addressForm.street) {
       toast.error("Please fill in the required address fields");
       return;
     }
-    const newAddress: SavedAddress = {
-      id: `addr-${Date.now()}`,
-      ...addressForm,
-    };
-    const nextList = [...addresses, newAddress];
-    setAddresses(nextList);
-    if (typeof window !== "undefined") {
-      localStorage.setItem(
-        `user_addresses_${tenant}`,
-        JSON.stringify(nextList),
-      );
+    try {
+      const added = await addUserAddress({
+        first_name: addressForm.firstName,
+        last_name: addressForm.lastName,
+        company: addressForm.company || undefined,
+        street: addressForm.street,
+        city: addressForm.city,
+        state: addressForm.state,
+        zip_code: addressForm.zipCode,
+        country: addressForm.country,
+        phone: addressForm.phone,
+        email: addressForm.email || undefined,
+      });
+      setAddresses((prev) => [added, ...prev]);
+      toast.success("Address added successfully!");
+      setAddressForm({
+        firstName: "",
+        lastName: "",
+        company: "",
+        country: "",
+        street: "",
+        city: "",
+        state: "",
+        zipCode: "",
+        phone: "",
+        email: "",
+      });
+    } catch {
+      toast.error("Failed to add address");
     }
-    toast.success("Address added successfully!");
-    setAddressForm({
-      firstName: "",
-      lastName: "",
-      company: "",
-      country: "United States",
-      street: "",
-      city: "",
-      state: "",
-      zipCode: "",
-      phone: "",
-      email: "",
-    });
   };
 
-  const handleDeleteAddress = (id: string) => {
-    const nextList = addresses.filter((a) => a.id !== id);
-    setAddresses(nextList);
-    if (typeof window !== "undefined") {
-      localStorage.setItem(
-        `user_addresses_${tenant}`,
-        JSON.stringify(nextList),
-      );
+  const handleDeleteAddress = async (id: string) => {
+    try {
+      await deleteUserAddress(id);
+      setAddresses((prev) => prev.filter((a) => a.id !== id));
+      toast.success("Address deleted");
+    } catch {
+      toast.error("Failed to delete address");
     }
-    toast.success("Address deleted");
   };
 
   // Password Manager State
@@ -527,10 +539,10 @@ function ProfileContent() {
   ];
 
   return (
-    <div className="w-full bg-background py-8 md:py-12">
-      <div className="container">
+    <div className="w-full bg-background py-8">
+      <div className="container flex-col">
         {/* Breadcrumb Navigation */}
-        <nav className="flex items-center gap-2 text-sm text-foreground font-medium mb-8">
+        <nav className="w-full flex items-center gap-2 text-sm text-foreground font-medium mb-8">
           <Link
             href={getTenantRoute(tenant, "/")}
             className="hover:text-stone-900 transition-colors text-stone-500"
@@ -546,7 +558,8 @@ function ProfileContent() {
           </Link>
           <ChevronRight className="h-3.5 w-3.5 text-stone-400" />
           <span className="text-stone-900 font-semibold truncate max-w-xs">
-            {tabsList.find((t) => t.id === activeTab)?.label || "Personal Information"}
+            {tabsList.find((t) => t.id === activeTab)?.label ||
+              "Personal Information"}
           </span>
         </nav>
 
@@ -602,19 +615,36 @@ function ProfileContent() {
                 <div className="flex justify-center md:justify-start mb-8">
                   <div className="relative inline-block">
                     <div className="h-28 w-28 rounded-full overflow-hidden border border-border shadow-sm bg-muted flex items-center justify-center">
-                      <Image
-                        src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&q=80"
-                        alt="Profile Avatar"
-                        width={112}
-                        height={112}
-                        priority
-                        className="h-full w-full object-cover"
-                      />
+                      {isUploadingAvatar ? (
+                        <Loader2 className="h-7 w-7 animate-spin text-primary" />
+                      ) : (
+                        <Image
+                          src={
+                            user?.avatar_url ||
+                            user?.avatarUrl ||
+                            "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&q=80"
+                          }
+                          alt="Profile Avatar"
+                          width={112}
+                          height={112}
+                          priority
+                          className="h-full w-full object-cover"
+                        />
+                      )}
                     </div>
+                    <input
+                      type="file"
+                      ref={avatarInputRef}
+                      onChange={handleAvatarChange}
+                      className="hidden"
+                      accept="image/*"
+                    />
                     <button
                       type="button"
                       aria-label="Upload photo"
-                      className="absolute bottom-1 right-1 h-8 w-8 rounded-full bg-primary text-white flex items-center justify-center shadow-md hover:bg-primary/90 transition-colors cursor-pointer"
+                      disabled={isUploadingAvatar}
+                      onClick={() => avatarInputRef.current?.click()}
+                      className="absolute bottom-1 right-1 h-8 w-8 rounded-full bg-primary text-white flex items-center justify-center shadow-md hover:bg-primary/90 transition-colors cursor-pointer disabled:opacity-50"
                     >
                       <Camera className="h-4 w-4" />
                     </button>
@@ -678,7 +708,7 @@ function ProfileContent() {
                       }
                       placeholder="example@gmail.com"
                       className="h-10"
-                      required
+                      readOnly
                     />
                   </div>
 
@@ -926,7 +956,12 @@ function ProfileContent() {
             {activeTab === "address" && (
               <div className="space-y-8">
                 {/* Saved Addresses Cards */}
-                {addresses.length > 0 && (
+                {isLoadingAddresses ? (
+                  <div className="flex items-center gap-2 text-muted-foreground py-4 text-sm">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    <span>Loading saved addresses...</span>
+                  </div>
+                ) : addresses.length > 0 ? (
                   <div className="space-y-3">
                     {addresses.map((addr) => (
                       <div
@@ -934,25 +969,27 @@ function ProfileContent() {
                         className="rounded-xl border border-border/80 p-4 bg-background flex items-start justify-between gap-4"
                       >
                         <div>
-                          <p className="text-sm font-bold text-foreground">
-                            {addr.firstName} {addr.lastName}
+                          <p className="text-sm font-bold text-foreground flex items-center gap-2">
+                            <span>
+                              {addr.first_name || addr.firstName}{" "}
+                              {addr.last_name || addr.lastName}
+                            </span>
+                            {addr.is_default && (
+                              <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-semibold">
+                                Default
+                              </span>
+                            )}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
                             {addr.street}, {addr.city}, {addr.state}{" "}
-                            {addr.zipCode}
+                            {addr.zip_code || addr.zipCode}
                           </p>
                           <p className="text-[11px] text-muted-foreground mt-0.5">
-                            {addr.country} • {addr.phone}
+                            {addr.country}
+                            {addr.phone ? ` • ${addr.phone}` : ""}
                           </p>
                         </div>
                         <div className="flex items-center gap-3 shrink-0 text-xs font-semibold">
-                          <button
-                            type="button"
-                            onClick={() => toast.info("Editing address inline")}
-                            className="text-foreground hover:underline cursor-pointer"
-                          >
-                            Edit
-                          </button>
                           <button
                             type="button"
                             onClick={() => handleDeleteAddress(addr.id)}
@@ -964,6 +1001,10 @@ function ProfileContent() {
                       </div>
                     ))}
                   </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground py-2">
+                    No addresses saved yet. Add your address below.
+                  </p>
                 )}
 
                 {/* Add New Address Form */}

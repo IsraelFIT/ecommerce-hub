@@ -45,7 +45,7 @@ async def list_categories(
     query = (
         select(Category, func.coalesce(subq.c.prod_count, 0).label("product_count"))
         .outerjoin(subq, Category.id == subq.c.category_id)
-        .where(Category.tenant_id == tenant.id)
+        .where(Category.tenant_id == tenant.id, Category.is_deleted == False)
         .order_by(Category.display_order.asc(), Category.name.asc())
     )
 
@@ -87,7 +87,9 @@ async def get_category(
     db: AsyncSession = Depends(get_rls_db_session),
 ) -> Dict[str, Any]:
     query = select(Category).where(
-        Category.id == category_id, Category.tenant_id == tenant.id
+        Category.id == category_id,
+        Category.tenant_id == tenant.id,
+        Category.is_deleted == False,
     )
     result = await db.execute(query)
     cat = result.scalar_one_or_none()
@@ -251,7 +253,9 @@ async def delete_category(
     db: AsyncSession = Depends(get_rls_db_session),
 ) -> Dict[str, Any]:
     query = select(Category).where(
-        Category.id == category_id, Category.tenant_id == tenant.id
+        Category.id == category_id,
+        Category.tenant_id == tenant.id,
+        Category.is_deleted == False,
     )
     result = await db.execute(query)
     category = result.scalar_one_or_none()
@@ -261,7 +265,8 @@ async def delete_category(
             detail="Category not found",
         )
 
-    await db.delete(category)
+    category.is_deleted = True
+    category.deleted_at = func.now()
     await db.commit()
 
     return success_response(

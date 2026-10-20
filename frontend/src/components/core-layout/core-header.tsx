@@ -48,7 +48,7 @@ export function CoreHeader() {
             <h4 className="font-secondary font-bold text-sm md:text-[15px] leading-tight text-foreground truncate transition-colors duration-200">
               {pageInfo.title}
             </h4>
-            <span className="hidden md:inline-flex items-center gap-1 text-[10px] font-semibold font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+            <span className="hidden md:inline-flex items-center gap-1 text-[10px] font-semibold  text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
               <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
               2.5% fee
             </span>
@@ -69,7 +69,7 @@ export function CoreHeader() {
             placeholder="Search stores, tenants, fees, logs..."
             className="bg-transparent border-none outline-none text-xs text-foreground placeholder:text-muted-foreground w-full font-primary"
           />
-          <kbd className="text-[10px] font-mono bg-background px-1.5 py-0.5 rounded text-foreground border border-border shadow-xs">
+          <kbd className="text-[10px]  bg-background px-1.5 py-0.5 rounded text-foreground border border-border shadow-xs">
             ⌘K
           </kbd>
         </div>
@@ -77,9 +77,7 @@ export function CoreHeader() {
         {/* Live Neon Branch indicator */}
         <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-card border border-border text-xs text-foreground">
           <Database className="size-3.5 text-primary" />
-          <span className="text-[11px] font-mono text-muted-foreground">
-            neon:
-          </span>
+          <span className="text-[11px]  text-muted-foreground">neon:</span>
           <span className="text-[11px] font-semibold text-primary">
             staging
           </span>

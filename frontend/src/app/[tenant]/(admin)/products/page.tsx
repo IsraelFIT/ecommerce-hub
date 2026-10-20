@@ -1817,7 +1817,7 @@ export default function TenantProductsPage({ params }: ProductsPageProps) {
                             {name}
                           </Link>
                           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                            <span className="text-[11px] text-muted-foreground font-mono">
+                            <span className="text-[11px] text-muted-foreground">
                               {p.slug}
                             </span>
                             {(p.reviews_count || 0) > 0 && (

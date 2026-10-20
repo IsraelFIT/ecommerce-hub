@@ -152,6 +152,7 @@ async def list_products(
     max_price: Optional[float] = Query(None, description="Maximum price filter"),
     rating: Optional[float] = Query(None, description="Minimum average rating filter"),
     availability: Optional[str] = Query(None, description="Availability filter ('available', 'preorder', 'schedule')"),
+    product_class: Optional[str] = Query(None, description="Product class filter ('physical', 'digital', 'service')"),
     search: Optional[str] = Query(None, description="Search keyword filter"),
     filters: Optional[str] = Query(None, description="JSON-encoded dynamic filters dictionary"),
     authorization: Optional[str] = Header(None, alias="Authorization"),
@@ -195,6 +196,7 @@ async def list_products(
         availability=availability,
         search=search,
         filters=parsed_filters or None,
+        product_class=product_class,
     )
     
     user_id = _extract_user_id(authorization, request)

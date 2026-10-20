@@ -9,8 +9,11 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useUserStore } from "@/store/user";
+import { UserAvatar } from "@/components/shared/user-avatar";
 
 export default function CoreSecurityPage() {
+  const { user } = useUserStore();
   const auditLogs = [
     {
       id: "LOG-3091",
@@ -99,7 +102,7 @@ export default function CoreSecurityPage() {
             <ShieldCheck className="size-4" />
             <span>Master Admin Identity</span>
           </div>
-          <p className="text-sm font-bold font-mono text-foreground mt-2 truncate">
+          <p className="text-sm font-bold  text-foreground mt-2 truncate">
             israelfolaranmi01@gmail.com
           </p>
           <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1 block">
@@ -127,7 +130,7 @@ export default function CoreSecurityPage() {
           <h4 className="text-xs font-bold font-secondary text-foreground">
             Platform Security Trail
           </h4>
-          <span className="text-[11px] text-muted-foreground font-mono">
+          <span className="text-[11px] text-muted-foreground ">
             Immutable system logs
           </span>
         </div>
@@ -151,21 +154,40 @@ export default function CoreSecurityPage() {
                   key={log.id}
                   className="hover:bg-muted/40 transition-colors"
                 >
-                  <td className="p-3.5 font-mono text-[11px] text-muted-foreground">
+                  <td className="p-3.5  text-[11px] text-muted-foreground">
                     {log.id}
                   </td>
                   <td className="p-3.5 font-semibold text-foreground">
                     {log.event}
                   </td>
-                  <td className="p-3.5 font-mono text-[11px] text-muted-foreground">
-                    {log.actor}
+                  <td className="p-3.5">
+                    <div className="flex items-center gap-2">
+                      <UserAvatar
+                        src={
+                          user?.email === log.actor
+                            ? user.avatar_url
+                            : undefined
+                        }
+                        email={log.actor}
+                        name={
+                          log.actor.includes("@")
+                            ? log.actor.split("@")[0]
+                            : log.actor
+                        }
+                        size="xs"
+                        shape="rounded"
+                      />
+                      <span className=" text-[11px] text-muted-foreground truncate">
+                        {log.actor}
+                      </span>
+                    </div>
                   </td>
                   <td className="p-3.5">
-                    <span className="px-2 py-0.5 rounded bg-primary/10 text-primary font-mono text-[10px] font-semibold">
+                    <span className="px-2 py-0.5 rounded bg-primary/10 text-primary  text-[10px] font-semibold">
                       {log.role}
                     </span>
                   </td>
-                  <td className="p-3.5 font-mono text-[11px] text-muted-foreground">
+                  <td className="p-3.5  text-[11px] text-muted-foreground">
                     {log.ip}
                   </td>
                   <td className="p-3.5 text-muted-foreground text-[11px]">

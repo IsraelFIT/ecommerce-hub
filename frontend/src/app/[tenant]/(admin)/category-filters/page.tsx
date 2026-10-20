@@ -502,7 +502,7 @@ export default function CategoryFiltersAdminPage() {
                       </TableCell>
 
                       <TableCell className="py-3">
-                        <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded border border-border text-foreground">
+                        <span className="text-xs  bg-muted px-2 py-0.5 rounded border border-border text-foreground">
                           {cat.slug}
                         </span>
                       </TableCell>
@@ -664,7 +664,7 @@ export default function CategoryFiltersAdminPage() {
                       </TableCell>
 
                       <TableCell className="py-3">
-                        <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded border border-border text-foreground">
+                        <span className="text-xs  bg-muted px-2 py-0.5 rounded border border-border text-foreground">
                           {filt.slug}
                         </span>
                       </TableCell>

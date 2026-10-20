@@ -51,6 +51,19 @@ export function isTokenExpired(token: string | undefined): boolean {
   return Date.now() >= expMs;
 }
 
+function getCookieDomain(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  const hostname = window.location.hostname;
+  if (hostname.endsWith("localhost") || hostname === "127.0.0.1") {
+    return undefined;
+  }
+  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || "ecommerce-hub.com";
+  if (hostname.endsWith(rootDomain)) {
+    return `.${rootDomain}`;
+  }
+  return undefined;
+}
+
 /**
  * Validates session presence and expiration from NextRequest inside Proxy (Middleware).
  */
@@ -60,12 +73,18 @@ export function validateSessionFromRequest(request: NextRequest): boolean {
     request.cookies.get("auth_session")?.value ||
     request.cookies.get("auth_token")?.value;
 
-  if (!token || token.trim().length === 0) {
+  const refreshToken = request.cookies.get(REFRESH_TOKEN_KEY)?.value;
+
+  if (!token && !refreshToken) {
     return false;
   }
 
-  // Reject expired access tokens
-  if (isTokenExpired(token)) {
+  // If access token is missing or expired, check if a valid unexpired refresh token exists.
+  // Allowing the request through lets client-side SessionMonitor or API client refresh the access token.
+  if (!token || isTokenExpired(token)) {
+    if (refreshToken && !isTokenExpired(refreshToken)) {
+      return true;
+    }
     return false;
   }
 
@@ -91,29 +110,36 @@ export async function getSession(): Promise<ClientSession | null> {
     (getCookie(AUTH_TOKEN_KEY) as string | undefined) ||
     (getCookie("auth_session") as string | undefined) ||
     (getCookie("auth_token") as string | undefined);
-  const refreshToken = getCookie(REFRESH_TOKEN_KEY) as string | undefined;
-  const role = getCookie(USER_ROLE_KEY) as string | undefined;
+  const refreshToken =
+    (getCookie(REFRESH_TOKEN_KEY) as string | undefined) ||
+    (getCookie("refresh_token") as string | undefined) ||
+    (getCookie("auth_refresh_token") as string | undefined);
+  const role =
+    (getCookie(USER_ROLE_KEY) as string | undefined) ||
+    (getCookie("userRole") as string | undefined);
 
-  if (!accessToken) {
+  if (!accessToken && !refreshToken) {
     return null;
   }
 
   let tenantSlug: string | undefined;
-  try {
-    const parts = accessToken.split(".");
-    if (parts.length >= 2) {
-      const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-      const jsonStr = decodeURIComponent(
-        atob(base64)
-          .split("")
-          .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-          .join(""),
-      );
-      const payload = JSON.parse(jsonStr);
-      tenantSlug = payload.tenant_slug || payload.tenantSlug;
+  if (accessToken) {
+    try {
+      const parts = accessToken.split(".");
+      if (parts.length >= 2) {
+        const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+        const jsonStr = decodeURIComponent(
+          atob(base64)
+            .split("")
+            .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+            .join(""),
+        );
+        const payload = JSON.parse(jsonStr);
+        tenantSlug = payload.tenant_slug || payload.tenantSlug;
+      }
+    } catch {
+      // Ignore malformed token decode
     }
-  } catch {
-    // Ignore malformed token decode
   }
 
   return {
@@ -136,16 +162,23 @@ export async function createSession(
   role?: string,
   expiresInSeconds: number = ACCESS_TOKEN_MAX_AGE,
 ): Promise<void> {
+  const domain = getCookieDomain();
+  const isHttps =
+    typeof window !== "undefined" && window.location.protocol === "https:";
   const accessCookieOptions = {
     maxAge: expiresInSeconds || ACCESS_TOKEN_MAX_AGE,
     path: "/",
     sameSite: "lax" as const,
+    secure: isHttps,
+    ...(domain ? { domain } : {}),
   };
 
   const refreshCookieOptions = {
     maxAge: REFRESH_TOKEN_MAX_AGE,
     path: "/",
     sameSite: "lax" as const,
+    secure: isHttps,
+    ...(domain ? { domain } : {}),
   };
 
   setCookie(AUTH_TOKEN_KEY, accessToken, accessCookieOptions);
@@ -154,9 +187,11 @@ export async function createSession(
 
   if (refreshToken) {
     setCookie(REFRESH_TOKEN_KEY, refreshToken, refreshCookieOptions);
+    setCookie("refresh_token", refreshToken, refreshCookieOptions);
   }
   if (role) {
     setCookie(USER_ROLE_KEY, role, refreshCookieOptions);
+    setCookie("userRole", role, refreshCookieOptions);
   }
 }
 

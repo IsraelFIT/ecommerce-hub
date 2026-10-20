@@ -174,14 +174,39 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  // Normalize path if the subdomain URL included the leading tenant slug
+  // Extract path-based tenant slug if not already on a subdomain
+  const pathSegments = pathname.split("/").filter(Boolean);
+  const reservedRootSlugs = [
+    "api",
+    "core",
+    "login",
+    "signup",
+    "register",
+    "forgot-password",
+    "reset-password",
+    "dashboard",
+    "_next",
+    "static",
+    "favicon.ico",
+  ];
+  let effectiveTenantSlug = tenantSlug;
+  if (
+    !effectiveTenantSlug &&
+    pathSegments.length > 0 &&
+    !reservedRootSlugs.includes(pathSegments[0])
+  ) {
+    effectiveTenantSlug = pathSegments[0];
+  }
+
+  // Normalize path if the subdomain URL OR path-based URL included the leading tenant slug
   let normalizedPath = pathname;
   if (
-    tenantSlug &&
-    (normalizedPath === `/${tenantSlug}` ||
-      normalizedPath.startsWith(`/${tenantSlug}/`))
+    effectiveTenantSlug &&
+    (normalizedPath === `/${effectiveTenantSlug}` ||
+      normalizedPath.startsWith(`/${effectiveTenantSlug}/`))
   ) {
-    normalizedPath = normalizedPath.slice(`/${tenantSlug}`.length) || "/";
+    normalizedPath =
+      normalizedPath.slice(`/${effectiveTenantSlug}`.length) || "/";
   }
 
   // 4. Auth and Protected Route checking
@@ -230,7 +255,7 @@ export async function proxy(request: NextRequest) {
     const redirectUrl = new URL("/login", request.url);
     redirectUrl.searchParams.set(
       "redirect",
-      normalizedPath +
+      pathname +
         (request.nextUrl.search && !request.nextUrl.search.includes("redirect")
           ? request.nextUrl.search
           : ""),
@@ -257,8 +282,8 @@ export async function proxy(request: NextRequest) {
           ? "/"
           : "/core"
         : primaryRole === "tenant_admin" || primaryRole === "admin"
-          ? tenantSlug
-            ? "/admin"
+          ? effectiveTenantSlug
+            ? `/${effectiveTenantSlug}/admin`
             : "/dashboard"
           : "/";
     return NextResponse.redirect(new URL(fallbackPath, request.url));
@@ -270,7 +295,11 @@ export async function proxy(request: NextRequest) {
     isProtectedPath &&
     !checkPathAllowed(normalizedPath, userRoles)
   ) {
-    const fallbackPath = tenantSlug ? "/" : "/dashboard";
+    const fallbackPath = effectiveTenantSlug
+      ? `/${effectiveTenantSlug}/admin`
+      : tenantSlug
+        ? "/"
+        : "/dashboard";
     return NextResponse.redirect(new URL(fallbackPath, request.url));
   }
 

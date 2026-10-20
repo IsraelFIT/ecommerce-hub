@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { Search, Loader2, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
@@ -56,7 +56,7 @@ interface ApiOrder {
   status: string;
   payment_gateway: string;
   gateway_reference: string;
-  items: any[];
+  items: unknown[];
   metadata_json?: Record<string, unknown>;
   created_at: string;
   updated_at: string;
@@ -79,33 +79,40 @@ export default function TenantOrdersPage({ params }: OrdersPageProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
-  const fetchOrders = async () => {
-    setIsLoading(true);
-    try {
-      const res = await apiRequest<{ items: ApiOrder[]; total?: number }>(
-        "/orders?per_page=100",
-        {
-          headers: {
-            "X-Tenant-Slug": tenantSlug,
-          },
-        },
-      );
-      if (res.data?.items) {
-        setOrders(res.data.items);
-      } else {
-        setOrders([]);
-      }
-    } catch (err: any) {
-      toast.error(err.message || "Failed to load orders");
-      setOrders([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchOrders();
+    let isMounted = true;
+
+    async function loadOrders() {
+      try {
+        const res = await apiRequest<{ items: ApiOrder[]; total?: number }>(
+          "/orders?per_page=100",
+          {
+            headers: {
+              "X-Tenant-Slug": tenantSlug,
+            },
+          },
+        );
+        if (isMounted) {
+          setOrders(res.data?.items || []);
+        }
+      } catch (err: unknown) {
+        if (isMounted) {
+          const msg =
+            err instanceof Error ? err.message : "Failed to load orders";
+          toast.error(msg);
+          setOrders([]);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadOrders();
+    return () => {
+      isMounted = false;
+    };
   }, [tenantSlug]);
 
   const handleSearchChange = (val: string) => {
@@ -142,8 +149,10 @@ export default function TenantOrdersPage({ params }: OrdersPageProps) {
         );
         toast.success(`Order status updated to ${nextStatus}`);
       }
-    } catch (err: any) {
-      toast.error(err.message || "Failed to update order status");
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : "Failed to update order status";
+      toast.error(msg);
     } finally {
       setUpdatingId(null);
     }

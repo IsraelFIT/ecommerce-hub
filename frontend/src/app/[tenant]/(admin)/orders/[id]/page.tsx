@@ -151,10 +151,13 @@ export default function TenantAdminOrderDetailPage({
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+
     async function fetchOrder() {
-      if (!orderId) return;
-      setIsLoading(true);
-      setError(null);
+      if (!orderId) {
+        if (isMounted) setIsLoading(false);
+        return;
+      }
       try {
         const res = await apiRequest<OrderDetail>(
           `/orders/${encodeURIComponent(orderId)}`,
@@ -164,20 +167,32 @@ export default function TenantAdminOrderDetailPage({
             },
           },
         );
-        if (res.data) {
-          setOrder(res.data);
-          setSelectedStatus(res.data.status.toLowerCase());
-          setTrackingNotes(res.data.metadata_json?.tracking_notes || "");
-        } else {
-          setError("Order not found");
+        if (isMounted) {
+          if (res.data) {
+            setOrder(res.data);
+            setSelectedStatus(res.data.status.toLowerCase());
+            setTrackingNotes(res.data.metadata_json?.tracking_notes || "");
+          } else {
+            setError("Order not found");
+          }
         }
-      } catch (err: any) {
-        setError(err.message || "Failed to load order details");
+      } catch (err: unknown) {
+        if (isMounted) {
+          const msg =
+            err instanceof Error ? err.message : "Failed to load order details";
+          setError(msg);
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     }
+
     fetchOrder();
+    return () => {
+      isMounted = false;
+    };
   }, [orderId, tenantSlug]);
 
   const handleUpdateStatus = async () => {
@@ -201,8 +216,10 @@ export default function TenantAdminOrderDetailPage({
         setTrackingNotes(res.data.metadata_json?.tracking_notes || "");
         toast.success(`Order updated to "${selectedStatus}"`);
       }
-    } catch (err: any) {
-      toast.error(err.message || "Failed to update order status");
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : "Failed to update order status";
+      toast.error(msg);
     } finally {
       setIsUpdatingStatus(false);
     }

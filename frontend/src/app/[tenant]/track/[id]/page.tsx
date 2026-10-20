@@ -276,17 +276,18 @@ export default function OrderTrackingStatusPage({ params }: TrackPageProps) {
   const orderDisplayId =
     order.gateway_reference || `#${order.id.slice(0, 8).toUpperCase()}`;
 
-  const formatDeliveryAddress = (raw: any): string => {
+  const formatDeliveryAddress = (raw: unknown): string => {
     if (!raw) return "Standard Domestic Shipping";
     if (typeof raw === "string") return raw;
-    if (typeof raw === "object") {
+    if (typeof raw === "object" && raw !== null) {
+      const record = raw as Record<string, unknown>;
       const parts = [
-        raw.address || raw.street || raw.line1,
-        raw.suite || raw.apartment || raw.line2,
-        raw.city,
-        raw.state,
-        raw.zip || raw.postal_code,
-        raw.country,
+        record.address || record.street || record.line1,
+        record.suite || record.apartment || record.line2,
+        record.city,
+        record.state,
+        record.zip || record.postal_code,
+        record.country,
       ].filter(Boolean);
       return parts.join(", ");
     }
@@ -376,6 +377,7 @@ export default function OrderTrackingStatusPage({ params }: TrackPageProps) {
                         isPassed
                           ? "bg-primary/10 text-primary"
                           : "bg-muted/60 text-muted-foreground/60",
+                        isCurrent && "ring-2 ring-primary/40 shadow-xs",
                       )}
                       style={{
                         color: isPassed ? primaryColor : undefined,

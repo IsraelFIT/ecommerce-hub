@@ -88,6 +88,7 @@ class PostgresAdapter(ProductRepositoryAdapter):
 
         return ProductSummaryResponse(
             id=product.id,
+            tenant_id=product.tenant_id,
             name=product.name,
             slug=product.slug,
             description=product.description,
@@ -105,7 +106,11 @@ class PostgresAdapter(ProductRepositoryAdapter):
     async def get_by_id(self, product_id: uuid.UUID) -> Optional[ProductResponse]:
         query = (
             select(Product)
-            .where(Product.id == product_id, Product.is_deleted == False)
+            .where(
+                Product.id == product_id,
+                Product.tenant_id == self.tenant_id,
+                Product.is_deleted == False,
+            )
             .options(selectinload(Product.variants), selectinload(Product.category))
         )
         result = await self.session.execute(query)
@@ -117,7 +122,11 @@ class PostgresAdapter(ProductRepositoryAdapter):
     async def get_by_slug(self, slug: str) -> Optional[ProductResponse]:
         query = (
             select(Product)
-            .where(Product.slug == slug, Product.is_deleted == False)
+            .where(
+                Product.slug == slug,
+                Product.tenant_id == self.tenant_id,
+                Product.is_deleted == False,
+            )
             .options(selectinload(Product.variants), selectinload(Product.category))
         )
         result = await self.session.execute(query)
@@ -148,7 +157,10 @@ class PostgresAdapter(ProductRepositoryAdapter):
                 selectinload(Product.category),
             )
         )
-        query = query.where(Product.is_deleted == False)
+        query = query.where(
+            Product.tenant_id == self.tenant_id,
+            Product.is_deleted == False,
+        )
         if published_only:
             query = query.where(Product.is_published == True)
 
@@ -305,7 +317,11 @@ class PostgresAdapter(ProductRepositoryAdapter):
     ) -> Optional[ProductResponse]:
         query = (
             select(Product)
-            .where(Product.id == product_id)
+            .where(
+                Product.id == product_id,
+                Product.tenant_id == self.tenant_id,
+                Product.is_deleted == False,
+            )
             .options(selectinload(Product.variants), selectinload(Product.category))
         )
         result = await self.session.execute(query)
@@ -408,7 +424,11 @@ class PostgresAdapter(ProductRepositoryAdapter):
         return await self.get_by_id(product.id)
 
     async def delete_product(self, product_id: uuid.UUID) -> bool:
-        query = select(Product).where(Product.id == product_id, Product.is_deleted == False)
+        query = select(Product).where(
+            Product.id == product_id,
+            Product.tenant_id == self.tenant_id,
+            Product.is_deleted == False,
+        )
         result = await self.session.execute(query)
         product = result.scalar_one_or_none()
         if not product:

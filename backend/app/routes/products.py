@@ -55,6 +55,29 @@ def _extract_user_id(
     return None
 
 
+async def _verify_tenant_write_permission(
+    adapter: ProductRepositoryAdapter,
+    authorization: Optional[str] = None,
+    request: Optional[Request] = None,
+    db: Optional[AsyncSession] = None,
+) -> None:
+    if not db:
+        return
+    user_id = _extract_user_id(authorization, request)
+    if user_id:
+        from app.models.user import User
+        user_res = await db.execute(select(User).where(User.id == user_id))
+        user = user_res.scalar_one_or_none()
+        if user:
+            adapter_tenant_id = getattr(adapter, "tenant_id", None)
+            if user.role not in ("super_admin", "admin"):
+                if user.role == "tenant_admin" and adapter_tenant_id and user.tenant_id != adapter_tenant_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="You do not have administrative access to manage products for this tenant store.",
+                    )
+
+
 async def enrich_products_metadata(
     products: List[ProductResponse],
     db: AsyncSession,
@@ -186,10 +209,30 @@ async def list_products(
             if qv not in parsed_filters[slug]:
                 parsed_filters[slug].append(qv)
 
+    user_id = _extract_user_id(authorization, request)
+
+    # Restrict unpublished/draft items:
+    # Only super_admin, or admin/tenant_admin belonging to this active tenant can see unpublished products.
+    effective_published_only = published_only
+    if not published_only:
+        is_authorized_admin = False
+        if user_id:
+            from app.models.user import User
+            user_res = await db.execute(select(User).where(User.id == user_id))
+            user = user_res.scalar_one_or_none()
+            adapter_tenant_id = getattr(adapter, "tenant_id", None)
+            if user:
+                if user.role in ("super_admin", "admin"):
+                    is_authorized_admin = True
+                elif user.role == "tenant_admin" and adapter_tenant_id and user.tenant_id == adapter_tenant_id:
+                    is_authorized_admin = True
+        if not is_authorized_admin:
+            effective_published_only = True
+
     products = await adapter.list_products(
         skip=skip,
         limit=per_page,
-        published_only=published_only,
+        published_only=effective_published_only,
         category=category,
         min_price=min_price,
         max_price=max_price,
@@ -199,7 +242,6 @@ async def list_products(
         product_class=product_class,
     )
     
-    user_id = _extract_user_id(authorization, request)
     active_session_id = x_session_id or session_id or request.headers.get("x-session-id")
 
     enriched_products = await enrich_products_metadata(
@@ -212,7 +254,7 @@ async def list_products(
             p for p in enriched_products if (getattr(p, "average_rating", 0.0) or 0.0) >= rating
         ]
 
-    target_schema = ProductMenuSummaryResponse if published_only else ProductSummaryResponse
+    target_schema = ProductMenuSummaryResponse if effective_published_only else ProductSummaryResponse
     items = [
         target_schema.model_validate(p).model_dump(mode="json")
         if isinstance(p, (ProductResponse, ProductSummaryResponse, ProductMenuSummaryResponse)) or hasattr(p, "model_dump")
@@ -310,8 +352,14 @@ async def get_product(
 )
 async def create_product(
     product_in: ProductCreate,
+    request: Request,
+    authorization: Optional[str] = Header(None, alias="Authorization"),
     adapter: ProductRepositoryAdapter = Depends(get_product_adapter),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
+    await _verify_tenant_write_permission(
+        adapter=adapter, authorization=authorization, request=request, db=db
+    )
     product = await adapter.create_product(product_in)
     return success_response(
         data=product.model_dump(mode="json") if hasattr(product, "model_dump") else product,
@@ -332,8 +380,14 @@ async def create_product(
 async def update_product(
     product_id: uuid.UUID,
     product_in: ProductUpdate,
+    request: Request,
+    authorization: Optional[str] = Header(None, alias="Authorization"),
     adapter: ProductRepositoryAdapter = Depends(get_product_adapter),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
+    await _verify_tenant_write_permission(
+        adapter=adapter, authorization=authorization, request=request, db=db
+    )
     product = await adapter.update_product(product_id, product_in)
     if not product:
         raise HTTPException(
@@ -353,8 +407,14 @@ async def update_product(
 )
 async def delete_product(
     product_id: uuid.UUID,
+    request: Request,
+    authorization: Optional[str] = Header(None, alias="Authorization"),
     adapter: ProductRepositoryAdapter = Depends(get_product_adapter),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
+    await _verify_tenant_write_permission(
+        adapter=adapter, authorization=authorization, request=request, db=db
+    )
     success = await adapter.delete_product(product_id)
     if not success:
         raise HTTPException(

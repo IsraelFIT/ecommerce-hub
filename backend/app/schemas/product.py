@@ -203,6 +203,7 @@ class ProductVariantSummaryResponse(BaseModel):
 
 class ProductMenuSummaryResponse(BaseModel):
     id: uuid.UUID
+    tenant_id: Optional[uuid.UUID] = None
     name: str
     description: Optional[str] = None
     product_class: ProductClass = ProductClass.PHYSICAL
@@ -222,6 +223,7 @@ class ProductMenuSummaryResponse(BaseModel):
 
 class ProductSummaryResponse(BaseModel):
     id: uuid.UUID
+    tenant_id: Optional[uuid.UUID] = None
     name: str
     slug: str
     description: Optional[str] = None

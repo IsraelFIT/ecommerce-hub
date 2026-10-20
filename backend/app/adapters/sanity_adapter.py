@@ -218,7 +218,7 @@ class SanityAdapter(ProductRepositoryAdapter):
 
     async def get_by_slug(self, slug: str) -> Optional[ProductResponse]:
         url = f"{self.base_url}/query/{self.dataset}"
-        query = f'*[_type == "product" && slug.current == "{slug}"][0]'
+        query = f'*[_type == "product" && (tenant_id == "{str(self.tenant_id)}" || !defined(tenant_id)) && slug.current == "{slug}"][0]'
 
         async with httpx.AsyncClient(timeout=10.0) as client:
             try:
@@ -244,7 +244,8 @@ class SanityAdapter(ProductRepositoryAdapter):
     ) -> List[ProductResponse]:
         url = f"{self.base_url}/query/{self.dataset}"
         filter_expr = '!(_id in path("drafts.**"))' if published_only else "true"
-        query = f'*[_type == "product" && {filter_expr}] | order(_createdAt desc) [{skip}...{skip + limit}]'
+        tenant_filter = f'(tenant_id == "{str(self.tenant_id)}" || !defined(tenant_id))'
+        query = f'*[_type == "product" && {tenant_filter} && {filter_expr}] | order(_createdAt desc) [{skip}...{skip + limit}]'
 
         async with httpx.AsyncClient(timeout=10.0) as client:
             try:
@@ -272,6 +273,7 @@ class SanityAdapter(ProductRepositoryAdapter):
 
         doc_body: Dict[str, Any] = {
             "_type": "product",
+            "tenant_id": str(self.tenant_id),
             "name": prod_name,
             "title": prod_name,
             "slug": {"_type": "slug", "current": product_in.slug},

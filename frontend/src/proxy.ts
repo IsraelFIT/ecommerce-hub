@@ -321,12 +321,22 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  // 6. Redirect root domain /core/* to core.{domain}/*
+  // 6. Handle /core/* (Super Admin console)
   if (pathname === "/core" || pathname.startsWith("/core/")) {
     const subPath = pathname.slice(5) || "/";
     const port = request.nextUrl.port ? `:${request.nextUrl.port}` : "";
     const isLocal =
       currentHost === "localhost" || currentHost.endsWith(".localhost");
+
+    // On *.vercel.app without custom wildcard subdomains, rewrite internally instead of redirecting
+    if (currentHost.endsWith(".vercel.app")) {
+      const targetPath =
+        subPath === "/login"
+          ? "/core/login"
+          : `/core/core${subPath === "/" || subPath === "" ? "" : subPath}`;
+      return NextResponse.rewrite(new URL(targetPath, request.url));
+    }
+
     const targetHost = isLocal ? `core.localhost${port}` : `core.${rootDomain}`;
     const redirectUrl = new URL(
       `${request.nextUrl.protocol}//${targetHost}${subPath}`,

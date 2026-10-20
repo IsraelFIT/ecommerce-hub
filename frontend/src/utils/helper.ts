@@ -131,26 +131,33 @@ export function getTenantSubdomainUrl(
  * Checks if the current browser window is running on a tenant subdomain.
  */
 export function isSubdomainEnv(): boolean {
-  if (typeof window === "undefined") return false;
-  const host = window.location.hostname.toLowerCase();
   const rootDomain = (
     process.env.NEXT_PUBLIC_ROOT_DOMAIN || "ecommerce-hub.com"
   ).toLowerCase();
 
   // *.vercel.app never supports wildcard tenant subdomains
-  if (host.endsWith(".vercel.app")) {
+  if (rootDomain.endsWith(".vercel.app")) {
     return false;
   }
 
-  const isDevSub = host.endsWith(".localhost") && host !== "localhost";
-  const isProdSub =
-    host.endsWith(`.${rootDomain}`) &&
-    host !== rootDomain &&
-    !host.startsWith("www.") &&
-    !host.startsWith("app.") &&
-    !host.startsWith("core.");
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname.toLowerCase();
+    if (host.endsWith(".vercel.app")) {
+      return false;
+    }
+    const isDevSub = host.endsWith(".localhost") && host !== "localhost";
+    const isProdSub =
+      host.endsWith(`.${rootDomain}`) &&
+      host !== rootDomain &&
+      !host.startsWith("www.") &&
+      !host.startsWith("app.") &&
+      !host.startsWith("core.");
 
-  return isDevSub || isProdSub;
+    return isDevSub || isProdSub;
+  }
+
+  // On SSR, default to true for subdomain multi-tenancy unless deployed on vercel.app
+  return true;
 }
 
 /**

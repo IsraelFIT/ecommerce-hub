@@ -343,23 +343,10 @@ export default function OrderTrackingStatusPage({ params }: TrackPageProps) {
         </div>
 
         {/* Timeline Status Card (Matches Image 1) */}
-        <div className="bg-card rounded-2xl border border-border/80 p-6 sm:p-10 shadow-sm relative overflow-hidden">
-          {/* Step Icons & Progress Bar Container */}
-          <div className="relative">
-            {/* Horizontal Line Background */}
-            <div className="hidden sm:block absolute top-17 left-[10%] right-[10%] h-0.75 bg-muted z-0" />
-
-            {/* Filled Progress Line */}
-            <div
-              className="hidden sm:block absolute top-17 left-[10%] h-0.75 transition-all duration-700 ease-out z-0"
-              style={{
-                width: `${Math.min(100, Math.max(0, ((currentStep - 1) / (steps.length - 1)) * 80))}%`,
-                backgroundColor: primaryColor,
-              }}
-            />
-
-            {/* Stepper Columns */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-6 sm:gap-2 relative z-10">
+        <div className="bg-card rounded-2xl border border-border/80 p-6 sm:p-10 shadow-sm relative overflow-x-auto custom-scrollbar">
+          <div className="min-w-140">
+            {/* Row 1: Step Icons & Titles */}
+            <div className="grid grid-cols-5 gap-2 text-center">
               {steps.map((st) => {
                 const isPassed = currentStep >= st.stepNumber;
                 const isCurrent = currentStep === st.stepNumber;
@@ -368,9 +355,8 @@ export default function OrderTrackingStatusPage({ params }: TrackPageProps) {
                 return (
                   <div
                     key={st.stepNumber}
-                    className="flex flex-col items-center text-center group"
+                    className="flex flex-col items-center group"
                   >
-                    {/* Top Icon */}
                     <div
                       className={cn(
                         "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300",
@@ -389,7 +375,6 @@ export default function OrderTrackingStatusPage({ params }: TrackPageProps) {
                       <IconComponent className="h-6 w-6 stroke-[1.8]" />
                     </div>
 
-                    {/* Step Title */}
                     <h3
                       className={cn(
                         "text-xs sm:text-sm font-bold mt-2.5 transition-colors",
@@ -400,15 +385,41 @@ export default function OrderTrackingStatusPage({ params }: TrackPageProps) {
                     >
                       {st.title}
                     </h3>
+                  </div>
+                );
+              })}
+            </div>
 
-                    {/* Circle Checkmark Badge on Progress Line */}
-                    <div className="my-3 flex items-center justify-center">
+            {/* Row 2: Checkmark Circles with Connecting Progress Line */}
+            <div className="relative my-4">
+              {/* Gray Background Track Line */}
+              <div className="absolute top-1/2 left-[10%] right-[10%] -translate-y-1/2 h-1 bg-muted rounded-full z-0" />
+
+              {/* Active Filled Progress Line */}
+              <div
+                className="absolute top-1/2 left-[10%] -translate-y-1/2 h-1 rounded-full transition-all duration-700 ease-out z-0"
+                style={{
+                  width: `${Math.min(80, Math.max(0, ((currentStep - 1) / (steps.length - 1)) * 80))}%`,
+                  backgroundColor: primaryColor,
+                }}
+              />
+
+              {/* Checkmark Circles Row */}
+              <div className="grid grid-cols-5 relative z-10">
+                {steps.map((st) => {
+                  const isPassed = currentStep >= st.stepNumber;
+
+                  return (
+                    <div
+                      key={st.stepNumber}
+                      className="flex items-center justify-center"
+                    >
                       <div
                         className={cn(
                           "w-6 h-6 rounded-full flex items-center justify-center transition-all duration-300 border-2",
                           isPassed
                             ? "text-white border-transparent shadow-xs"
-                            : "bg-muted/80 text-muted-foreground/40 border-muted-foreground/20",
+                            : "bg-card text-muted-foreground/40 border-muted-foreground/30",
                         )}
                         style={{
                           backgroundColor: isPassed ? primaryColor : undefined,
@@ -417,23 +428,31 @@ export default function OrderTrackingStatusPage({ params }: TrackPageProps) {
                         <Check className="h-3.5 w-3.5 stroke-[2.8]" />
                       </div>
                     </div>
+                  );
+                })}
+              </div>
+            </div>
 
-                    {/* Date / Time Subtitle */}
-                    <div className="text-[11px] sm:text-xs">
-                      <p
-                        className={cn(
-                          "font-semibold",
-                          isPassed
-                            ? "text-foreground"
-                            : "text-muted-foreground/70",
-                        )}
-                      >
-                        {st.primaryText}
-                      </p>
-                      <p className="text-muted-foreground text-[10px] sm:text-[11px] mt-0.5">
-                        {st.secondaryText}
-                      </p>
-                    </div>
+            {/* Row 3: Date / Time Subtitles */}
+            <div className="grid grid-cols-5 gap-2 text-center">
+              {steps.map((st) => {
+                const isPassed = currentStep >= st.stepNumber;
+
+                return (
+                  <div key={st.stepNumber} className="text-[11px] sm:text-xs">
+                    <p
+                      className={cn(
+                        "font-semibold",
+                        isPassed
+                          ? "text-foreground"
+                          : "text-muted-foreground/70",
+                      )}
+                    >
+                      {st.primaryText}
+                    </p>
+                    <p className="text-muted-foreground text-[10px] sm:text-[11px] mt-0.5">
+                      {st.secondaryText}
+                    </p>
                   </div>
                 );
               })}

@@ -403,7 +403,7 @@ export default function TenantAdminOrderDetailPage({
             <div className="grid grid-cols-5 text-center relative">
               {/* Connector line behind circles */}
               <div
-                className="absolute top-1/2 left-0 right-0 h-1 -translate-y-1/2 bg-muted rounded-full"
+                className="absolute top-4.5 left-[10%] right-[10%] h-1 -translate-y-1/2 bg-muted rounded-full"
                 style={{ zIndex: 0 }}
               >
                 <div

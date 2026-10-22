@@ -9,7 +9,7 @@ import {
   ReactNode,
 } from "react";
 import { BrandingConfig, Tenant } from "@/types/users";
-import { apiRequest } from "@/lib/api/client";
+import { getTenantBySlug } from "@/lib/api/tenants";
 import { useUserStore } from "@/store/user";
 
 export const DEFAULT_BRANDING: BrandingConfig = {
@@ -113,7 +113,7 @@ export function TenantThemeProvider({
 
     try {
       setIsLoading(true);
-      const res = await apiRequest<Tenant>(`/tenants/by-slug/${tenantSlug}`);
+      const res = await getTenantBySlug(tenantSlug);
       if (res.data) {
         setTenant(res.data);
         const resolvedBranding = {

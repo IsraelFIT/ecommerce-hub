@@ -222,3 +222,57 @@ export function getRootAppUrl(path: string = "/"): string {
   }
   return `https://${rootDomain}${cleanPath}`;
 }
+
+/**
+ * Truncates an ID or UUID to a specified length (default: 7 characters).
+ * Supports options for stripping leading hash, adding custom prefixes, and casing.
+ */
+export function truncateId(
+  id?: string | null,
+  length: number = 7,
+  options?: {
+    prefix?: string;
+    uppercase?: boolean;
+    stripLeadingHash?: boolean;
+  },
+): string {
+  if (!id) return "";
+  let clean = id.trim();
+  if (options?.stripLeadingHash !== false && clean.startsWith("#")) {
+    clean = clean.slice(1);
+  }
+  const sliced = clean.length > length ? clean.slice(0, length) : clean;
+  const cased = options?.uppercase ? sliced.toUpperCase() : sliced;
+  return options?.prefix ? `${options.prefix}${cased}` : cased;
+}
+
+/**
+ * Safely copies any text/ID to the clipboard across modern and legacy browsers.
+ */
+export async function copyToClipboard(text: string): Promise<boolean> {
+  if (!text) return false;
+  try {
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // Fallback for non-secure contexts or legacy browsers
+    try {
+      if (typeof document !== "undefined") {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        const success = document.execCommand("copy");
+        document.body.removeChild(textarea);
+        return success;
+      }
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}

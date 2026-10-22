@@ -523,22 +523,28 @@ async def update_me(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
+    # Lock the user row to prevent concurrent race condition updates
+    user_res = await db.execute(
+        select(User).where(User.id == current_user.id).with_for_update()
+    )
+    user_to_update = user_res.scalar_one_or_none() or current_user
+
     if payload.first_name is not None and payload.first_name.strip():
-        current_user.first_name = payload.first_name.strip()
+        user_to_update.first_name = payload.first_name.strip()
     if payload.last_name is not None and payload.last_name.strip():
-        current_user.last_name = payload.last_name.strip()
+        user_to_update.last_name = payload.last_name.strip()
     if payload.phone_number is not None:
-        current_user.phone_number = payload.phone_number.strip() or None
+        user_to_update.phone_number = payload.phone_number.strip() or None
     if payload.avatar_url is not None:
-        current_user.avatar_url = payload.avatar_url.strip() or None
+        user_to_update.avatar_url = payload.avatar_url.strip() or None
     if payload.gender is not None:
-        current_user.gender = payload.gender.strip() or None
+        user_to_update.gender = payload.gender.strip() or None
 
     await db.commit()
-    await db.refresh(current_user)
+    await db.refresh(user_to_update)
 
-    user_data = UserResponse.model_validate(current_user).model_dump(mode="json")
-    user_data["full_name"] = f"{current_user.first_name} {current_user.last_name}"
+    user_data = UserResponse.model_validate(user_to_update).model_dump(mode="json")
+    user_data["full_name"] = f"{user_to_update.first_name} {user_to_update.last_name}"
     return success_response(
         data=user_data,
         message="Profile updated successfully",
@@ -646,10 +652,14 @@ async def update_user_address(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
-    query = select(UserAddress).where(
-        UserAddress.id == address_id,
-        UserAddress.user_id == current_user.id,
-        UserAddress.is_deleted == False,
+    query = (
+        select(UserAddress)
+        .where(
+            UserAddress.id == address_id,
+            UserAddress.user_id == current_user.id,
+            UserAddress.is_deleted == False,
+        )
+        .with_for_update()
     )
     result = await db.execute(query)
     address = result.scalar_one_or_none()
@@ -688,10 +698,14 @@ async def delete_user_address(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
-    query = select(UserAddress).where(
-        UserAddress.id == address_id,
-        UserAddress.user_id == current_user.id,
-        UserAddress.is_deleted == False,
+    query = (
+        select(UserAddress)
+        .where(
+            UserAddress.id == address_id,
+            UserAddress.user_id == current_user.id,
+            UserAddress.is_deleted == False,
+        )
+        .with_for_update()
     )
     result = await db.execute(query)
     address = result.scalar_one_or_none()

@@ -31,7 +31,11 @@ import {
   TableRow,
   TableCell,
 } from "@/components/ui/table";
-import { apiRequest } from "@/lib/api/client";
+import {
+  getTenantBrandings,
+  getCustomizationRequests,
+  updateCustomizationRequest,
+} from "@/lib/api/customizations";
 import { CustomizationRequest, TenantBrandingSummary } from "@/types/users";
 import { getTenantSubdomainUrl } from "@/utils/helper";
 
@@ -58,12 +62,8 @@ export default function CoreCustomizationsPage() {
     try {
       setIsLoading(true);
       const [brandingsRes, requestsRes] = await Promise.all([
-        apiRequest<{ items: TenantBrandingSummary[] }>(
-          "/customizations/tenant-brandings?per_page=100",
-        ),
-        apiRequest<{ items: CustomizationRequest[] }>(
-          "/customizations/requests?per_page=100",
-        ),
+        getTenantBrandings({ per_page: 100 }),
+        getCustomizationRequests({ per_page: 100 }),
       ]);
 
       if (brandingsRes.data?.items) {
@@ -92,16 +92,10 @@ export default function CoreCustomizationsPage() {
   ) => {
     try {
       setUpdatingStatusId(requestId);
-      const res = await apiRequest<CustomizationRequest>(
-        `/customizations/requests/${requestId}`,
-        {
-          method: "PATCH",
-          body: JSON.stringify({
-            status: newStatus,
-            admin_notes: notes !== undefined ? notes : undefined,
-          }),
-        },
-      );
+      const res = await updateCustomizationRequest(requestId, {
+        status: newStatus,
+        admin_notes: notes !== undefined ? notes : undefined,
+      });
 
       if (res.data) {
         toast.success(`Request status updated to "${newStatus}"`);

@@ -65,18 +65,26 @@ async def toggle_like(
     user_id = _extract_user_id(authorization, request)
     session_id = payload.session_id or request.headers.get("x-session-id")
 
-    # Check existing like
+    # Check existing like with row lock
     if user_id:
-        existing_query = select(ProductLike).where(
-            ProductLike.tenant_id == tenant.id,
-            ProductLike.product_id == payload.product_id,
-            ProductLike.user_id == user_id,
+        existing_query = (
+            select(ProductLike)
+            .where(
+                ProductLike.tenant_id == tenant.id,
+                ProductLike.product_id == payload.product_id,
+                ProductLike.user_id == user_id,
+            )
+            .with_for_update()
         )
     elif session_id:
-        existing_query = select(ProductLike).where(
-            ProductLike.tenant_id == tenant.id,
-            ProductLike.product_id == payload.product_id,
-            ProductLike.session_id == session_id,
+        existing_query = (
+            select(ProductLike)
+            .where(
+                ProductLike.tenant_id == tenant.id,
+                ProductLike.product_id == payload.product_id,
+                ProductLike.session_id == session_id,
+            )
+            .with_for_update()
         )
     else:
         existing_query = None
@@ -103,8 +111,12 @@ async def toggle_like(
             session_id=session_id,
         )
         db.add(new_like)
-        await db.commit()
-        is_liked = True
+        try:
+            await db.commit()
+            is_liked = True
+        except Exception:
+            await db.rollback()
+            is_liked = True
 
     # Count total likes on this product
     count_res = await db.execute(

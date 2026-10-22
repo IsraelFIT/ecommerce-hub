@@ -201,8 +201,10 @@ async def update_category(
     current_user: User = Depends(get_current_tenant_admin),
     db: AsyncSession = Depends(get_rls_db_session),
 ) -> Dict[str, Any]:
-    query = select(Category).where(
-        Category.id == category_id, Category.tenant_id == tenant.id
+    query = (
+        select(Category)
+        .where(Category.id == category_id, Category.tenant_id == tenant.id)
+        .with_for_update()
     )
     result = await db.execute(query)
     category = result.scalar_one_or_none()
@@ -256,10 +258,14 @@ async def delete_category(
     current_user: User = Depends(get_current_tenant_admin),
     db: AsyncSession = Depends(get_rls_db_session),
 ) -> Dict[str, Any]:
-    query = select(Category).where(
-        Category.id == category_id,
-        Category.tenant_id == tenant.id,
-        Category.is_deleted == False,
+    query = (
+        select(Category)
+        .where(
+            Category.id == category_id,
+            Category.tenant_id == tenant.id,
+            Category.is_deleted == False,
+        )
+        .with_for_update()
     )
     result = await db.execute(query)
     category = result.scalar_one_or_none()

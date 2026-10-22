@@ -6,7 +6,7 @@ from typing import Dict, Any, Optional
 import httpx
 import boto3
 import botocore.client
-from fastapi import APIRouter, UploadFile, File, Header, HTTPException, status, Depends
+from fastapi import APIRouter, UploadFile, File, Header, HTTPException, status, Depends, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
@@ -189,3 +189,34 @@ async def upload_image(
         },
         message="Image uploaded and stored successfully",
     )
+
+
+@router.api_route("/proxy", methods=["GET", "HEAD"], summary="Proxy image to bypass CORS for client-side PDF export")
+async def proxy_image(url: str):
+    """
+    Fetches an image from an external or S3 URL and returns it with CORS headers,
+    enabling client-side canvas and jsPDF exports without cross-origin tainted canvas issues.
+    """
+    if not (url.startswith("http://") or url.startswith("https://")):
+        raise HTTPException(status_code=400, detail="Invalid URL protocol")
+
+    async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+        try:
+            resp = await client.get(url)
+            if resp.status_code != 200:
+                raise HTTPException(status_code=resp.status_code, detail=f"Failed to fetch image: {resp.status_code}")
+
+            content_type = resp.headers.get("content-type", "image/png")
+            return Response(
+                content=resp.content,
+                media_type=content_type,
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Cache-Control": "public, max-age=86400",
+                },
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+

@@ -33,33 +33,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { UserAvatar } from "@/components/shared/user-avatar";
-import { apiRequest } from "@/lib/api/client";
+import { CopyableId } from "@/components/shared/copyable-id";
+import { ApiOrder } from "@/types/order";
+import { fetchOrders, updateOrderStatus } from "@/lib/api/order";
 import { formatCurrency, formatDate, getTenantRoute } from "@/utils/helper";
 
 interface OrdersPageProps {
   params?: Promise<{
     tenant: string;
   }>;
-}
-
-interface ApiOrder {
-  id: string;
-  tenant_id: string;
-  user_id?: string | null;
-  customer_email: string;
-  customer_name: string;
-  customer_avatar_url?: string | null;
-  total_amount: number;
-  platform_fee: number;
-  tenant_payout_amount: number;
-  currency: string;
-  status: string;
-  payment_gateway: string;
-  gateway_reference: string;
-  items: unknown[];
-  metadata_json?: Record<string, unknown>;
-  created_at: string;
-  updated_at: string;
 }
 
 export default function TenantOrdersPage({ params }: OrdersPageProps) {
@@ -84,14 +66,10 @@ export default function TenantOrdersPage({ params }: OrdersPageProps) {
 
     async function loadOrders() {
       try {
-        const res = await apiRequest<{ items: ApiOrder[]; total?: number }>(
-          "/orders?per_page=100",
-          {
-            headers: {
-              "X-Tenant-Slug": tenantSlug,
-            },
-          },
-        );
+        const res = await fetchOrders({
+          tenantSlug,
+          per_page: 100,
+        });
         if (isMounted) {
           setOrders(res.data?.items || []);
         }
@@ -131,15 +109,11 @@ export default function TenantOrdersPage({ params }: OrdersPageProps) {
   ) => {
     setUpdatingId(orderId);
     try {
-      const res = await apiRequest<ApiOrder>(`/orders/${orderId}/status`, {
-        method: "PATCH",
-        headers: {
-          "X-Tenant-Slug": tenantSlug,
-        },
-        body: JSON.stringify({
-          status: nextStatus,
-        }),
-      });
+      const res = await updateOrderStatus(
+        orderId,
+        { status: nextStatus },
+        tenantSlug,
+      );
 
       if (res.data) {
         setOrders((prev) =>
@@ -156,6 +130,28 @@ export default function TenantOrdersPage({ params }: OrdersPageProps) {
     } finally {
       setUpdatingId(null);
     }
+  };
+
+  const handleStatusSelect = (order: ApiOrder, nextStatus: string) => {
+    if (nextStatus.toLowerCase() === "cancelled") {
+      const displayRef =
+        order.gateway_reference || order.id.slice(0, 8).toUpperCase();
+      toast(`Cancel Order #${displayRef}?`, {
+        description:
+          "Are you sure you want to cancel this order? This will mark it as cancelled.",
+        action: {
+          label: "Yes, Cancel",
+          onClick: () => handleUpdateOrderStatus(order.id, "cancelled"),
+        },
+        cancel: {
+          label: "Keep Order",
+          onClick: () => {},
+        },
+        duration: 8000,
+      });
+      return;
+    }
+    handleUpdateOrderStatus(order.id, nextStatus);
   };
 
   const filteredOrders = orders.filter((o) => {
@@ -295,8 +291,6 @@ export default function TenantOrdersPage({ params }: OrdersPageProps) {
               filteredOrders
                 .slice((currentPage - 1) * pageSize, currentPage * pageSize)
                 .map((ord) => {
-                  const displayId =
-                    ord.gateway_reference || `#${ord.id.slice(0, 8)}`;
                   const orderDetailUrl = getTenantRoute(
                     tenantSlug,
                     `/orders/${ord.id}`,
@@ -307,13 +301,14 @@ export default function TenantOrdersPage({ params }: OrdersPageProps) {
                       key={ord.id}
                       className="border-border hover:bg-muted/40 transition-colors group"
                     >
-                      <TableCell className="p-4 font-bold text-foreground text-xs">
-                        <Link
-                          href={orderDetailUrl}
-                          className="hover:text-primary hover:underline transition-colors block"
-                        >
-                          {displayId}
-                        </Link>
+                      <TableCell className="p-4 text-xs font-semibold text-foreground">
+                        <CopyableId
+                          id={ord.gateway_reference || ord.id}
+                          length={7}
+                          prefix="#"
+                          asLink={orderDetailUrl}
+                          textClassName="hover:text-primary font-bold"
+                        />
                         <span className="text-[10px] text-muted-foreground font-normal block mt-0.5">
                           {formatDate(ord.created_at)}
                         </span>
@@ -381,7 +376,7 @@ export default function TenantOrdersPage({ params }: OrdersPageProps) {
                             value={ord.status.toLowerCase()}
                             disabled={updatingId === ord.id}
                             onValueChange={(val) =>
-                              handleUpdateOrderStatus(ord.id, val)
+                              handleStatusSelect(ord, val)
                             }
                           >
                             <SelectTrigger className="h-8 w-28 text-xs bg-background border-border text-foreground">

@@ -22,7 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { UserProfileSettingsCard } from "@/components/shared/user-profile-settings-card";
 import { useUserStore } from "@/store/user";
-import { apiRequest } from "@/lib/api/client";
+import { getTenantBySlug, updateTenantBySlug } from "@/lib/api/tenants";
 import { Tenant } from "@/types/users";
 import { getCurrencySymbol } from "@/utils/helper";
 
@@ -62,7 +62,7 @@ export default function TenantSettingsPage({ params }: SettingsPageProps) {
     async function loadTenant() {
       try {
         setIsLoading(true);
-        const res = await apiRequest<Tenant>(`/tenants/by-slug/${tenantSlug}`);
+        const res = await getTenantBySlug(tenantSlug);
         if (res.data && isMounted) {
           const t = res.data;
           setTenantData(t);
@@ -142,10 +142,7 @@ export default function TenantSettingsPage({ params }: SettingsPageProps) {
         },
       };
 
-      const res = await apiRequest<Tenant>(`/tenants/by-slug/${tenantSlug}`, {
-        method: "PATCH",
-        body: JSON.stringify(payload),
-      });
+      const res = await updateTenantBySlug(tenantSlug, payload);
 
       if (res.data) {
         setTenantData(res.data);

@@ -101,13 +101,14 @@ export function MenuCard({
   const description =
     raw.description ||
     "Exquisitely crafted with premium artisanal ingredients and finest quality finishing.";
-  const hasImage =
-    (raw.images && raw.images.length > 0 && raw.images[0]) || raw.image;
+  const hasImage = Boolean(
+    (raw.images && raw.images.length > 0 && raw.images[0]) || raw.image,
+  );
   const imageUrl = hasImage
     ? raw.images && raw.images.length > 0
-      ? raw.images[0]
+      ? (raw.images[0] as string)
       : (raw.image as string)
-    : "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=800&q=80";
+    : "";
 
   const categoryBadge = raw.category || "Signature";
   const currency = raw.currency || tenantCurrency;
@@ -119,20 +120,39 @@ export function MenuCard({
 
   // Determine stock / tag / class badge text
   let stockBadgeText = "In Stock";
+  let isLowStock = false;
+  let isOutOfStock = false;
+
+  const totalStock =
+    variants.length > 0
+      ? variants.reduce(
+          (acc, v) => acc + (v.track_inventory ? v.stock_quantity : 0),
+          0,
+        )
+      : (raw.inventory_count ?? 0);
+
+  const tracksInventory =
+    variants.length > 0
+      ? variants.some((v) => v.track_inventory)
+      : raw.inventory_count !== undefined && raw.inventory_count !== null;
+
   if (raw.product_class === "service") {
     stockBadgeText = "Service";
   } else if (raw.product_class === "digital") {
     stockBadgeText = "Digital";
+  } else if (tracksInventory && totalStock <= 0) {
+    stockBadgeText = "Out of Stock";
+    isOutOfStock = true;
+  } else if (tracksInventory && totalStock < 5) {
+    stockBadgeText = `Low Stock: ${totalStock} left`;
+    isLowStock = true;
   } else if (variants.length > 1) {
     stockBadgeText = `${variants.length} Options`;
   } else if (raw.tags && raw.tags.length > 0) {
     stockBadgeText = raw.tags.join(" • ");
   } else if (primaryVariant && !primaryVariant.track_inventory) {
     stockBadgeText = "Unlimited";
-  } else if (
-    (primaryVariant && primaryVariant.stock_quantity > 0) ||
-    (raw.inventory_count && raw.inventory_count > 0)
-  ) {
+  } else if (totalStock > 0) {
     stockBadgeText = "In Stock";
   } else {
     stockBadgeText = "Exclusive";
@@ -184,6 +204,11 @@ export function MenuCard({
     e.preventDefault();
     e.stopPropagation();
 
+    if (isOutOfStock) {
+      toast.error(`The item '${title}' is out of stock and is not available.`);
+      return;
+    }
+
     addToCart(
       {
         id: primaryVariant ? primaryVariant.id : product.id,
@@ -214,13 +239,19 @@ export function MenuCard({
         {/* Visual Image Header */}
         <div className="relative aspect-square w-full rounded-xl bg-stone-100 mb-2 flex flex-col justify-between p-1.5 overflow-hidden border border-stone-100">
           {/* Product Thumbnail */}
-          <Image
-            src={imageUrl}
-            alt={title}
-            fill
-            sizes="(max-width: 768px) 288px, 320px"
-            className="object-cover group-hover:scale-105 transition-transform duration-500"
-          />
+          {imageUrl ? (
+            <Image
+              src={imageUrl}
+              alt={title}
+              fill
+              sizes="(max-width: 768px) 288px, 320px"
+              className="object-cover group-hover:scale-105 transition-transform duration-500"
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center bg-stone-100 text-stone-400">
+              <ShoppingBag className="w-12 h-12 stroke-[1.5] opacity-40" />
+            </div>
+          )}
           <div className="absolute inset-0 bg-linear-to-t from-stone-950/40 via-transparent to-transparent pointer-events-none" />
 
           {/* Floating Badges & Like Button */}
@@ -228,7 +259,11 @@ export function MenuCard({
             <div className="flex items-center gap-1.5 flex-wrap">
               <Badge
                 style={{
-                  backgroundColor: `${primaryColor}e6`,
+                  backgroundColor: isOutOfStock
+                    ? "#e11d48"
+                    : isLowStock
+                      ? "#d97706"
+                      : `${primaryColor}e6`,
                 }}
                 className="text-white text-[10px] font-bold uppercase tracking-wider backdrop-blur-xs shadow-xs border-transparent rounded-md px-2 py-0.5"
               >
@@ -305,13 +340,28 @@ export function MenuCard({
         <Button
           size="default"
           onClick={handleAddToCart}
+          disabled={isOutOfStock}
           style={{
-            backgroundColor: isAdded ? secondaryColor : primaryColor,
+            backgroundColor: isOutOfStock
+              ? "#9ca3af"
+              : isAdded
+                ? secondaryColor
+                : primaryColor,
             color: "#ffffff",
           }}
-          className="group/btn text-xs font-semibold rounded-lg transition-all hover:opacity-90 active:scale-95 cursor-pointer px-2.5 py-1.5 h-8.5 flex items-center gap-0 overflow-hidden"
+          className={cn(
+            "group/btn text-xs font-semibold rounded-lg transition-all hover:opacity-90 active:scale-95 px-2.5 py-1.5 h-8.5 flex items-center gap-0 overflow-hidden",
+            isOutOfStock ? "cursor-not-allowed opacity-60" : "cursor-pointer",
+          )}
         >
-          {isAdded ? (
+          {isOutOfStock ? (
+            <>
+              <ShoppingBag className="h-3.5 w-3.5 shrink-0" />
+              <span className="max-w-0 group-hover/btn:pl-1.5 opacity-0 group-hover/btn:max-w-28 group-hover/btn:opacity-100 transition-all duration-300 overflow-hidden whitespace-nowrap">
+                Sold Out
+              </span>
+            </>
+          ) : isAdded ? (
             <>
               <Check className="h-3.5 w-3.5 shrink-0" />
               <span className="max-w-0 group-hover/btn:pl-1.5 opacity-0 group-hover/btn:max-w-28 group-hover/btn:opacity-100 transition-all duration-300 overflow-hidden whitespace-nowrap">

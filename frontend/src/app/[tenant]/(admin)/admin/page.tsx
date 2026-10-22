@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, use } from "react";
+import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import {
   DollarSign,
@@ -32,41 +32,26 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useUserStore } from "@/store/user";
 import { useTenantTheme } from "@/components/providers/tenant-theme-provider";
-import { getTenantSubdomainUrl, getTenantRoute } from "@/utils/helper";
+import {
+  getTenantSubdomainUrl,
+  getTenantRoute,
+  formatCurrency,
+} from "@/utils/helper";
 import { Badge } from "@/components/ui/badge";
 import { UserAvatar } from "@/components/shared/user-avatar";
+import { fetchOrders } from "@/lib/api/order";
+import { getProducts } from "@/lib/api/products";
+import { ApiOrder } from "@/types/order";
+import { Product } from "@/types/products";
+import CopyableId from "@/components/shared/copyable-id";
 
 interface AdminPageProps {
   params: Promise<{
     tenant: string;
   }>;
-}
-
-interface ProductItem {
-  id: string;
-  name: string;
-  sku: string;
-  category: string;
-  price: number;
-  stock: number;
-  status: "active" | "draft" | "low_stock";
-  sales: number;
-}
-
-interface OrderItem {
-  id: string;
-  customerName: string;
-  customerEmail: string;
-  customerAvatar?: string;
-  itemsCount: number;
-  grossAmount: number;
-  netPayout: number;
-  platformFee: number;
-  gateway: "Stripe Connect" | "Paystack Split";
-  status: "paid" | "processing" | "shipped" | "delivered";
-  createdAt: string;
 }
 
 export default function TenantOverviewPage({ params }: AdminPageProps) {
@@ -78,6 +63,7 @@ export default function TenantOverviewPage({ params }: AdminPageProps) {
 
   const formattedStoreName =
     user?.tenant_name ||
+    branding?.storeHeadline ||
     tenantSlug
       .split("-")
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
@@ -86,127 +72,57 @@ export default function TenantOverviewPage({ params }: AdminPageProps) {
   const subdomainUrl = getTenantSubdomainUrl(tenantSlug);
   const [copiedUrl, setCopiedUrl] = useState(false);
 
-  // Products
-  const products: ProductItem[] = [
-    {
-      id: "prod-1",
-      name: "Minimalist Leather Travel Backpack",
-      sku: "SKU-BP-001",
-      category: "Fashion & Apparel",
-      price: 149.0,
-      stock: 34,
-      status: "active",
-      sales: 128,
-    },
-    {
-      id: "prod-2",
-      name: "Studio Wireless Noise-Cancelling Headphones",
-      sku: "SKU-HP-002",
-      category: "Tech & Electronics",
-      price: 299.0,
-      stock: 12,
-      status: "active",
-      sales: 64,
-    },
-    {
-      id: "prod-3",
-      name: "Ceramic Matte Artisan Coffee Mug",
-      sku: "SKU-MUG-003",
-      category: "Home & Living",
-      price: 28.0,
-      stock: 4,
-      status: "low_stock",
-      sales: 312,
-    },
-    {
-      id: "prod-4",
-      name: "Tactile Mechanical Desk Keyboard (RGB)",
-      sku: "SKU-KB-004",
-      category: "Tech & Electronics",
-      price: 185.0,
-      stock: 22,
-      status: "active",
-      sales: 95,
-    },
-    {
-      id: "prod-5",
-      name: "Organic Botanical Face Serum 50ml",
-      sku: "SKU-SRM-005",
-      category: "Health & Beauty",
-      price: 45.0,
-      stock: 0,
-      status: "draft",
-      sales: 42,
-    },
-  ];
+  // Live Database States
+  const [orders, setOrders] = useState<ApiOrder[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Orders
-  const orders: OrderItem[] = [
-    {
-      id: "ORD-9421",
-      customerName: "Sarah Jenkins",
-      customerEmail: "sarah.j@example.com",
-      customerAvatar:
-        "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80",
-      itemsCount: 2,
-      grossAmount: 448.0,
-      netPayout: 436.8,
-      platformFee: 11.2,
-      gateway: "Stripe Connect",
-      status: "processing",
-      createdAt: "10 mins ago",
-    },
-    {
-      id: "ORD-9420",
-      customerName: "Tunde Adeyemi",
-      customerEmail: "tunde.a@example.com",
-      customerAvatar:
-        "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80",
-      itemsCount: 1,
-      grossAmount: 149.0,
-      netPayout: 145.28,
-      platformFee: 3.72,
-      gateway: "Paystack Split",
-      status: "paid",
-      createdAt: "45 mins ago",
-    },
-    {
-      id: "ORD-9419",
-      customerName: "Marcus Vance",
-      customerEmail: "marcus.v@example.com",
-      customerAvatar:
-        "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80",
-      itemsCount: 3,
-      grossAmount: 241.0,
-      netPayout: 234.97,
-      platformFee: 6.03,
-      gateway: "Stripe Connect",
-      status: "shipped",
-      createdAt: "3 hours ago",
-    },
-    {
-      id: "ORD-9418",
-      customerName: "Elena Rostova",
-      customerEmail: "elena.r@example.com",
-      customerAvatar:
-        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80",
-      itemsCount: 1,
-      grossAmount: 299.0,
-      netPayout: 291.52,
-      platformFee: 7.48,
-      gateway: "Stripe Connect",
-      status: "delivered",
-      createdAt: "Yesterday",
-    },
-  ];
-
+  // Pagination for Orders Table
   const [orderPage, setOrderPage] = useState(1);
-  const pageSize = 3;
-  const totalOrderPages = Math.ceil(orders.length / pageSize);
-  const paginatedOrders = orders.slice(
-    (orderPage - 1) * pageSize,
-    orderPage * pageSize,
-  );
+  const pageSize = 5;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadDashboardData() {
+      setIsLoading(true);
+      try {
+        const [ordersRes, productsRes] = await Promise.all([
+          fetchOrders({ tenantSlug, per_page: 50 }).catch((err) => {
+            console.warn("Could not fetch orders for overview:", err);
+            return null;
+          }),
+          getProducts({ tenantSlug, per_page: 100 }).catch((err) => {
+            console.warn("Could not fetch products for overview:", err);
+            return null;
+          }),
+        ]);
+
+        if (!isMounted) return;
+
+        if (ordersRes?.data?.items && Array.isArray(ordersRes.data.items)) {
+          setOrders(ordersRes.data.items);
+        } else {
+          setOrders([]);
+        }
+
+        if (productsRes?.data?.items && Array.isArray(productsRes.data.items)) {
+          setProducts(productsRes.data.items);
+        } else {
+          setProducts([]);
+        }
+      } catch (err) {
+        console.error("Failed to load live dashboard metrics:", err);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    }
+
+    loadDashboardData();
+    return () => {
+      isMounted = false;
+    };
+  }, [tenantSlug]);
 
   const handleCopySubdomain = () => {
     navigator.clipboard.writeText(subdomainUrl);
@@ -215,9 +131,47 @@ export default function TenantOverviewPage({ params }: AdminPageProps) {
     setTimeout(() => setCopiedUrl(false), 2000);
   };
 
-  const totalRevenue = orders.reduce((acc, o) => acc + o.grossAmount, 0);
-  const totalNetPayout = orders.reduce((acc, o) => acc + o.netPayout, 0);
-  const totalPlatformFees = orders.reduce((acc, o) => acc + o.platformFee, 0);
+  // Derive Real KPI Metrics
+  const primaryCurrency =
+    orders[0]?.currency ||
+    products[0]?.currency ||
+    user?.tenant_currency ||
+    "NGN";
+
+  const totalRevenue = orders.reduce(
+    (acc, o) => acc + (Number(o.total_amount) || 0),
+    0,
+  );
+  const totalNetPayout = orders.reduce(
+    (acc, o) =>
+      acc +
+      (Number(o.tenant_payout_amount) || (Number(o.total_amount) || 0) * 0.975),
+    0,
+  );
+  const totalPlatformFees = orders.reduce(
+    (acc, o) =>
+      acc + (Number(o.platform_fee) || (Number(o.total_amount) || 0) * 0.025),
+    0,
+  );
+
+  const activeProducts = products.filter((p) => p.is_published !== false);
+  const lowStockProducts = products.filter((p) => {
+    const variantsList = p.variants || [];
+    const totalStock =
+      variantsList.length > 0
+        ? variantsList.reduce(
+            (acc, v) => acc + (v.track_inventory ? v.stock_quantity : 0),
+            0,
+          )
+        : (p.inventory_count ?? 0);
+    return totalStock <= 5;
+  });
+
+  const totalOrderPages = Math.max(1, Math.ceil(orders.length / pageSize));
+  const paginatedOrders = orders.slice(
+    (orderPage - 1) * pageSize,
+    orderPage * pageSize,
+  );
 
   return (
     <div className="space-y-6 w-full text-foreground">
@@ -290,12 +244,18 @@ export default function TenantOverviewPage({ params }: AdminPageProps) {
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-bold text-foreground">
-              ${totalRevenue.toFixed(2)}
-            </div>
+            {isLoading ? (
+              <Skeleton className="h-8 w-28" />
+            ) : (
+              <div className="text-2xl font-bold text-foreground">
+                {formatCurrency(totalRevenue, primaryCurrency)}
+              </div>
+            )}
             <div className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-1">
               <TrendingUp className="h-3 w-3" />
-              <span>+18.4% vs last period</span>
+              <span>
+                {orders.length} order{orders.length === 1 ? "" : "s"} processed
+              </span>
             </div>
           </div>
         </div>
@@ -311,9 +271,13 @@ export default function TenantOverviewPage({ params }: AdminPageProps) {
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-bold text-foreground">
-              ${totalNetPayout.toFixed(2)}
-            </div>
+            {isLoading ? (
+              <Skeleton className="h-8 w-28" />
+            ) : (
+              <div className="text-2xl font-bold text-foreground">
+                {formatCurrency(totalNetPayout, primaryCurrency)}
+              </div>
+            )}
             <div className="text-xs text-muted-foreground mt-1">
               97.5% direct subaccount split
             </div>
@@ -331,9 +295,13 @@ export default function TenantOverviewPage({ params }: AdminPageProps) {
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-bold text-foreground">
-              ${totalPlatformFees.toFixed(2)}
-            </div>
+            {isLoading ? (
+              <Skeleton className="h-8 w-28" />
+            ) : (
+              <div className="text-2xl font-bold text-foreground">
+                {formatCurrency(totalPlatformFees, primaryCurrency)}
+              </div>
+            )}
             <div className="text-xs text-muted-foreground mt-1">
               2.5% hub transaction routing
             </div>
@@ -351,13 +319,19 @@ export default function TenantOverviewPage({ params }: AdminPageProps) {
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-bold text-foreground">
-              {products.filter((p) => p.status === "active").length} /{" "}
-              {products.length}
-            </div>
+            {isLoading ? (
+              <Skeleton className="h-8 w-20" />
+            ) : (
+              <div className="text-2xl font-bold text-foreground">
+                {activeProducts.length} / {products.length}
+              </div>
+            )}
             <div className="text-xs text-muted-foreground mt-1">
-              {products.filter((p) => p.status === "low_stock").length} items
-              low on stock
+              {isLoading
+                ? "Calculating inventory..."
+                : lowStockProducts.length > 0
+                  ? `${lowStockProducts.length} items low on stock`
+                  : "All inventory in healthy stock"}
             </div>
           </div>
         </div>
@@ -409,66 +383,141 @@ export default function TenantOverviewPage({ params }: AdminPageProps) {
               </TableRow>
             </TableHeader>
             <TableBody className="divide-y divide-border">
-              {paginatedOrders.map((ord) => (
-                <TableRow
-                  key={ord.id}
-                  className="border-border hover:bg-muted/40 transition-colors"
-                >
-                  <TableCell className="p-3.5 font-semibold text-foreground">
-                    {ord.id}
-                  </TableCell>
-                  <TableCell className="p-3.5">
-                    <div className="flex items-center gap-3">
-                      <UserAvatar
-                        src={ord.customerAvatar}
-                        name={ord.customerName}
-                        email={ord.customerEmail}
-                        size="sm"
-                        shape="rounded"
-                      />
-                      <div className="min-w-0">
-                        <div className="font-medium text-foreground text-xs truncate">
-                          {ord.customerName}
-                        </div>
-                        <div className="text-muted-foreground text-[11px] truncate">
-                          {ord.customerEmail}
+              {isLoading ? (
+                Array.from({ length: 4 }).map((_, idx) => (
+                  <TableRow key={idx} className="border-border">
+                    <TableCell className="p-3.5">
+                      <Skeleton className="h-4 w-16" />
+                    </TableCell>
+                    <TableCell className="p-3.5">
+                      <div className="flex items-center gap-3">
+                        <Skeleton className="h-8 w-8 rounded-full" />
+                        <div className="space-y-1">
+                          <Skeleton className="h-3.5 w-24" />
+                          <Skeleton className="h-3 w-32" />
                         </div>
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="p-3.5">
-                    <Badge className="bg-muted border border-border px-2 py-1 text-xs font-medium text-foreground">
-                      {ord.gateway}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="p-3.5 font-semibold text-foreground">
-                    ${ord.grossAmount.toFixed(2)}
-                  </TableCell>
-                  <TableCell className="p-3.5 font-semibold text-emerald-600 dark:text-emerald-400">
-                    ${ord.netPayout.toFixed(2)}
-                  </TableCell>
-                  <TableCell className="p-3.5">
-                    <Badge
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${
-                        ord.status === "delivered"
-                          ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
-                          : ord.status === "shipped"
-                            ? "bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20"
-                            : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20"
-                      }`}
-                    >
-                      {ord.status.toUpperCase()}
-                    </Badge>
+                    </TableCell>
+                    <TableCell className="p-3.5">
+                      <Skeleton className="h-6 w-20 rounded-full" />
+                    </TableCell>
+                    <TableCell className="p-3.5">
+                      <Skeleton className="h-4 w-14" />
+                    </TableCell>
+                    <TableCell className="p-3.5">
+                      <Skeleton className="h-4 w-14" />
+                    </TableCell>
+                    <TableCell className="p-3.5">
+                      <Skeleton className="h-5 w-16 rounded-full" />
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : paginatedOrders.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={6}
+                    className="h-36 text-center text-muted-foreground text-xs"
+                  >
+                    No storefront orders received yet. Once customers checkout,
+                    orders and automated split settlements will appear here.
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                paginatedOrders.map((ord) => {
+                  const customerName = ord.customer_name || "Customer";
+                  const customerEmail = ord.customer_email || "—";
+                  const customerAvatar = ord.customer_avatar_url || undefined;
+                  const gatewayName = ord.payment_gateway
+                    ? ord.payment_gateway.toLowerCase().includes("stripe")
+                      ? "Stripe Connect"
+                      : ord.payment_gateway.toLowerCase().includes("paystack")
+                        ? "Paystack Split"
+                        : ord.payment_gateway.toUpperCase()
+                    : "Direct Split";
+                  const grossVal = Number(ord.total_amount) || 0;
+                  const netVal =
+                    Number(ord.tenant_payout_amount) || grossVal * 0.975;
+                  const ordCurrency = ord.currency || primaryCurrency;
+                  const rawStatus = (ord.status || "pending").toLowerCase();
+
+                  return (
+                    <TableRow
+                      key={ord.id}
+                      className="border-border hover:bg-muted/40 transition-colors"
+                    >
+                      <TableCell className="p-3.5 font-semibold text-foreground text-xs">
+                        <CopyableId
+                          id={ord.gateway_reference || ord.id}
+                          length={7}
+                          prefix="#"
+                          asLink={getTenantRoute(
+                            tenantSlug,
+                            `/orders/${ord.id}`,
+                          )}
+                          textClassName="hover:text-primary font-bold"
+                        />
+                      </TableCell>
+                      <TableCell className="p-3.5">
+                        <div className="flex items-center gap-3">
+                          <UserAvatar
+                            src={customerAvatar}
+                            name={customerName}
+                            email={customerEmail}
+                            size="sm"
+                            shape="rounded"
+                          />
+                          <div className="min-w-0">
+                            <div className="font-medium text-foreground text-xs truncate">
+                              {customerName}
+                            </div>
+                            <div className="text-muted-foreground text-[11px] truncate">
+                              {customerEmail}
+                            </div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="p-3.5">
+                        <Badge className="bg-muted border border-border px-2 py-0.5 text-[11px] font-medium text-foreground">
+                          {gatewayName}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="p-3.5 font-semibold text-foreground text-xs">
+                        {formatCurrency(grossVal, ordCurrency)}
+                      </TableCell>
+                      <TableCell className="p-3.5 font-semibold text-emerald-600 dark:text-emerald-400 text-xs">
+                        {formatCurrency(netVal, ordCurrency)}
+                      </TableCell>
+                      <TableCell className="p-3.5">
+                        <Badge
+                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${
+                            rawStatus === "delivered" ||
+                            rawStatus === "fulfilled"
+                              ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
+                              : rawStatus === "shipped"
+                                ? "bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20"
+                                : rawStatus === "cancelled" ||
+                                    rawStatus === "failed"
+                                  ? "bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/20"
+                                  : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20"
+                          }`}
+                        >
+                          {rawStatus.toUpperCase()}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
             </TableBody>
           </Table>
 
           {/* Pagination */}
           <div className="p-3.5 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
             <span className="text-[11px]">
-              Showing {Math.min((orderPage - 1) * pageSize + 1, orders.length)}{" "}
+              Showing{" "}
+              {orders.length === 0
+                ? 0
+                : Math.min((orderPage - 1) * pageSize + 1, orders.length)}{" "}
               to {Math.min(orderPage * pageSize, orders.length)} of{" "}
               {orders.length} orders
             </span>
@@ -543,7 +592,7 @@ export default function TenantOverviewPage({ params }: AdminPageProps) {
               </div>
               <div className="flex items-center justify-between py-1.5 border-b border-border">
                 <span className="text-muted-foreground">Subdomain Route</span>
-                <span className=" text-foreground">
+                <span className="text-foreground">
                   {tenantSlug}.ecommerce-hub.com
                 </span>
               </div>

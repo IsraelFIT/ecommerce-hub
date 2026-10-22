@@ -104,6 +104,11 @@ export function useStoreInvalidPaths(): boolean {
     normalizedPath = normalizedPath.slice(`/${tenant}`.length) || "/";
   }
 
+  // Customer storefront profile pages (/profile, /profile/orders, /profile/address, etc.) MUST always show StoreHeader and StoreFooter
+  if (normalizedPath === "/profile" || normalizedPath.startsWith("/profile/")) {
+    return false;
+  }
+
   // Customer storefront order confirmation page MUST always show StoreHeader and StoreFooter
   if (
     normalizedPath === "/orders/confirmation" ||
@@ -130,9 +135,6 @@ export function useStoreInvalidPaths(): boolean {
   ];
 
   return storeExcludedPaths.some(
-    (path) =>
-      normalizedPath === path ||
-      normalizedPath.startsWith(`${path}/`) ||
-      pathname.includes(path),
+    (path) => normalizedPath === path || normalizedPath.startsWith(`${path}/`),
   );
 }

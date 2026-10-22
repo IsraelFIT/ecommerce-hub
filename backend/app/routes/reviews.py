@@ -266,7 +266,10 @@ async def update_review_status(
     current_user: User = Depends(get_current_tenant_admin),
 ) -> Dict[str, Any]:
     result = await db.execute(
-        select(Review).where(Review.id == review_id, Review.tenant_id == tenant.id).options(selectinload(Review.product))
+        select(Review)
+        .where(Review.id == review_id, Review.tenant_id == tenant.id)
+        .options(selectinload(Review.product))
+        .with_for_update()
     )
     review = result.scalar_one_or_none()
     if not review:
@@ -301,11 +304,13 @@ async def delete_review(
     current_user: User = Depends(get_current_tenant_admin),
 ) -> Dict[str, Any]:
     result = await db.execute(
-        select(Review).where(
+        select(Review)
+        .where(
             Review.id == review_id,
             Review.tenant_id == tenant.id,
             Review.is_deleted == False,
         )
+        .with_for_update()
     )
     review = result.scalar_one_or_none()
     if not review:

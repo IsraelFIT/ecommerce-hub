@@ -15,7 +15,18 @@ import { APP_CONFIG } from "@/constants";
 interface ParsedData {
   status?: "success" | "error";
   message?: string;
-  detail?: string;
+  detail?:
+    | string
+    | Array<
+        | {
+            loc?: (string | number)[];
+            msg?: string;
+            message?: string;
+            type?: string;
+          }
+        | string
+      >;
+  error?: string;
   data?: unknown;
   pagination?: Record<string, unknown>;
   filters?: Record<string, unknown>;
@@ -57,6 +68,70 @@ function normalizeEndpoint(endpoint: string): string {
     return `/api${clean}`;
   }
   return clean;
+}
+
+/**
+ * Universally extracts human-readable backend error messages from various API response shapes:
+ * - { status: "error", message: "..." }
+ * - { detail: "..." }
+ * - { detail: [{ loc: [...], msg: "..." }] } (FastAPI default validation errors)
+ * - { errors: { field: ["..."] } }
+ * - { error: "..." }
+ */
+export function extractBackendErrorMessage(
+  data: ParsedData | null | undefined,
+  fallbackStatus?: number,
+): string {
+  if (data && typeof data === "object") {
+    // 1. Direct message string from uniform ApiResponse envelope
+    if (typeof data.message === "string" && data.message.trim()) {
+      return data.message.trim();
+    }
+    // 2. Direct detail string from FastAPI HTTPException
+    if (typeof data.detail === "string" && data.detail.trim()) {
+      return data.detail.trim();
+    }
+    // 3. Array of validation errors (FastAPI default 422 format)
+    if (Array.isArray(data.detail) && data.detail.length > 0) {
+      const messages = data.detail
+        .map((errItem) => {
+          if (typeof errItem === "string") return errItem;
+          if (typeof errItem === "object" && errItem !== null) {
+            const locArr = Array.isArray(errItem.loc) ? errItem.loc : [];
+            const field =
+              locArr.length > 0 ? String(locArr[locArr.length - 1]) : "";
+            const msg = (errItem.msg ||
+              errItem.message ||
+              JSON.stringify(errItem)) as string;
+            return field && field !== "body" ? `${field}: ${msg}` : msg;
+          }
+          return String(errItem);
+        })
+        .filter(Boolean);
+      if (messages.length > 0) {
+        return messages.join("; ");
+      }
+    }
+    // 4. Object of field-level errors
+    if (data.errors && typeof data.errors === "object") {
+      const fieldErrors = Object.entries(data.errors)
+        .map(([field, messages]) => {
+          if (Array.isArray(messages)) {
+            return `${field}: ${messages.join(", ")}`;
+          }
+          return `${field}: ${messages}`;
+        })
+        .join(" | ");
+      if (fieldErrors) return fieldErrors;
+    }
+    // 5. Alternate error field
+    if (typeof data.error === "string" && data.error.trim()) {
+      return data.error.trim();
+    }
+  }
+  return fallbackStatus
+    ? `Request failed with status ${fallbackStatus}`
+    : "An unexpected error occurred. Please try again.";
 }
 
 let refreshPromise: Promise<string | null> | null = null;
@@ -218,8 +293,15 @@ export const apiRequest = async <T = unknown>(
       });
     }
 
-    // Handle token expiration (401 errors)
-    if (response.status === 401) {
+    // Check if this is an authentication endpoint (login, register, reset password, etc.)
+    const isAuthEndpoint =
+      endpoint.includes("/login") ||
+      endpoint.includes("/register") ||
+      endpoint.includes("/forgot-password") ||
+      endpoint.includes("/reset-password");
+
+    // Handle token expiration (401 errors) ONLY for authenticated session requests, NOT for auth endpoints
+    if (response.status === 401 && !isAuthEndpoint) {
       const isRefreshEndpoint = endpoint.includes("/refresh-token");
       const refreshTokenValue = session?.refreshToken || getRefreshToken();
 
@@ -269,6 +351,12 @@ export const apiRequest = async <T = unknown>(
                 | Record<string, string[] | string>
                 | undefined,
             };
+          } else {
+            const retryErrorMessage = extractBackendErrorMessage(
+              retryData,
+              retryResponse.status,
+            );
+            throw new Error(retryErrorMessage);
           }
         }
       }
@@ -276,14 +364,13 @@ export const apiRequest = async <T = unknown>(
       console.log("⚠️ Session expired or invalid, clearing session...");
       await deleteSession();
       clearAuthSession();
-      throw new Error("Session expired. Please login again.");
+      const backendMessage = extractBackendErrorMessage(data);
+      throw new Error(backendMessage || "Session expired. Please login again.");
     }
 
     // Handle non-OK error responses
     if (!response.ok) {
-      let errorMessage =
-        data.message || data.detail || `HTTP error! status: ${response.status}`;
-
+      const errorMessage = extractBackendErrorMessage(data, response.status);
       const errorMsgLower = errorMessage.toLowerCase();
 
       // 1. Session Revoked (401)
@@ -293,7 +380,7 @@ export const apiRequest = async <T = unknown>(
           errorMsgLower.includes("invalid token"))
       ) {
         await deleteSession();
-        throw new Error(errorMessage);
+        clearAuthSession();
       }
 
       // 2. Account Blocked / Inactive (403)
@@ -304,23 +391,7 @@ export const apiRequest = async <T = unknown>(
       ) {
         console.log("🚫 Account blocked or inactive, clearing session...");
         await deleteSession();
-        throw new Error(errorMessage);
-      }
-
-      // 3. Validation errors mapping
-      if (data.errors && typeof data.errors === "object") {
-        const fieldErrors = Object.entries(data.errors)
-          .map(([field, messages]) => {
-            if (Array.isArray(messages)) {
-              return `${field}: ${messages.join(", ")}`;
-            }
-            return `${field}: ${messages}`;
-          })
-          .join(" | ");
-
-        if (fieldErrors) {
-          errorMessage = fieldErrors;
-        }
+        clearAuthSession();
       }
 
       throw new Error(errorMessage);
@@ -394,7 +465,13 @@ export const apiFormDataRequest = async <T = unknown>(
       );
     }
 
-    if (response.status === 401) {
+    const isAuthEndpoint =
+      endpoint.includes("/login") ||
+      endpoint.includes("/register") ||
+      endpoint.includes("/forgot-password") ||
+      endpoint.includes("/reset-password");
+
+    if (response.status === 401 && !isAuthEndpoint) {
       const refreshTokenValue = session?.refreshToken || getRefreshToken();
 
       const hasRecentActivity = isUserRecentlyActive(12 * 60 * 60 * 1000);
@@ -432,6 +509,12 @@ export const apiFormDataRequest = async <T = unknown>(
                 | Record<string, string[] | string>
                 | undefined,
             };
+          } else {
+            const retryErrorMessage = extractBackendErrorMessage(
+              retryData,
+              retryResponse.status,
+            );
+            throw new Error(retryErrorMessage);
           }
         }
       }
@@ -441,28 +524,12 @@ export const apiFormDataRequest = async <T = unknown>(
       );
       await deleteSession();
       clearAuthSession();
-      throw new Error("Session expired. Please login again.");
+      const backendMessage = extractBackendErrorMessage(data);
+      throw new Error(backendMessage || "Session expired. Please login again.");
     }
 
     if (!response.ok) {
-      let errorMessage =
-        data.message || data.detail || `HTTP error! status: ${response.status}`;
-
-      if (data.errors && typeof data.errors === "object") {
-        const fieldErrors = Object.entries(data.errors)
-          .map(([field, messages]) => {
-            if (Array.isArray(messages)) {
-              return `${field}: ${messages.join(", ")}`;
-            }
-            return `${field}: ${messages}`;
-          })
-          .join(" | ");
-
-        if (fieldErrors) {
-          errorMessage = fieldErrors;
-        }
-      }
-
+      const errorMessage = extractBackendErrorMessage(data, response.status);
       throw new Error(errorMessage);
     }
 

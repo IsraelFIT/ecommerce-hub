@@ -28,6 +28,7 @@ function TenantLoginForm({ tenantSlug }: { tenantSlug: string }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (searchParams.get("reason") === "inactivity") {
@@ -47,8 +48,11 @@ function TenantLoginForm({ tenantSlug }: { tenantSlug: string }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMessage(null);
     if (!email || !password) {
-      toast.error("Please enter both email and password");
+      const msg = "Please enter both email and password";
+      setErrorMessage(msg);
+      toast.error(msg);
       return;
     }
 
@@ -135,6 +139,7 @@ function TenantLoginForm({ tenantSlug }: { tenantSlug: string }) {
         err instanceof Error
           ? err.message
           : "Failed to sign in. Please check your credentials.";
+      setErrorMessage(msg);
       toast.error(msg);
       setIsLoading(false);
     }
@@ -172,7 +177,10 @@ function TenantLoginForm({ tenantSlug }: { tenantSlug: string }) {
               placeholder="you@example.com"
               className="pl-9 h-10 text-xs bg-background border-input"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (errorMessage) setErrorMessage(null);
+              }}
               required
               autoFocus
             />
@@ -196,7 +204,10 @@ function TenantLoginForm({ tenantSlug }: { tenantSlug: string }) {
               placeholder="••••••••"
               className="pl-9 h-10 text-xs bg-background border-input"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (errorMessage) setErrorMessage(null);
+              }}
               required
             />
           </div>

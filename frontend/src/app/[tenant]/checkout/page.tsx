@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
+import { CopyableId } from "@/components/shared/copyable-id";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -40,7 +41,9 @@ import {
 import { useCartStore } from "@/store/cart";
 import { useUserStore } from "@/store/user";
 import { formatCurrency, getTenantRoute } from "@/utils/helper";
-import { apiRequest } from "@/lib/api/client";
+import { getTenantBySlug } from "@/lib/api/tenants";
+import { createOrder } from "@/lib/api/order";
+import { createCheckoutSession, verifyPayment } from "@/lib/api/payments";
 import { getUserAddresses, addUserAddress } from "@/lib/api/auth";
 import { Tenant, UserAddress } from "@/types/users";
 import { Order, CheckoutSessionResponse } from "@/types";
@@ -63,7 +66,7 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     let isMounted = true;
-    apiRequest<Tenant>(`/tenants/by-slug/${tenantSlug}`)
+    getTenantBySlug(tenantSlug)
       .then((res) => {
         if (isMounted && res.data) {
           setTenantData(res.data);
@@ -308,30 +311,27 @@ export default function CheckoutPage() {
         })),
       };
 
-      const orderRes = await apiRequest<Order>("/orders", {
-        method: "POST",
-        body: JSON.stringify(orderPayload),
-      });
+      const orderRes = await createOrder(
+        orderPayload as unknown as Parameters<typeof createOrder>[0],
+        tenantSlug,
+      );
 
       if (!orderRes.data) {
         throw new Error(orderRes.message || "Failed to create order");
       }
 
-      const createdOrder = orderRes.data;
+      const createdOrder = orderRes.data as unknown as Order;
       setActiveOrder(createdOrder);
 
       // 2. Initialize checkout session via chosen provider (Paystack or Stripe)
       const callbackUrl = `${window.location.origin}/${tenantSlug}/orders/confirmation?reference=${createdOrder.gateway_reference}`;
-      const sessionRes = await apiRequest<CheckoutSessionResponse>(
-        "/payments/checkout-session",
+      const sessionRes = await createCheckoutSession(
         {
-          method: "POST",
-          body: JSON.stringify({
-            order_id: createdOrder.id,
-            gateway: paymentGateway,
-            callback_url: callbackUrl,
-          }),
+          order_id: createdOrder.id,
+          gateway: paymentGateway,
+          callback_url: callbackUrl,
         },
+        tenantSlug,
       );
 
       if (!sessionRes.data) {
@@ -384,11 +384,7 @@ export default function CheckoutPage() {
 
     try {
       setIsVerifyingPayment(true);
-      const verifyRes = await apiRequest<{
-        status: string;
-        order_id: string;
-        reference: string;
-      }>(`/payments/verify/${reference}`);
+      const verifyRes = await verifyPayment(reference, undefined, tenantSlug);
 
       if (verifyRes.data && verifyRes.data.status === "paid") {
         toast.success("Payment authorized successfully!");
@@ -509,10 +505,14 @@ export default function CheckoutPage() {
                   <span className="text-muted-foreground">
                     Order Reference:
                   </span>
-                  <span className="font-mono font-bold text-stone-900 select-all">
-                    {checkoutSession?.reference ||
-                      activeOrder.gateway_reference}
-                  </span>
+                  <CopyableId
+                    id={
+                      checkoutSession?.reference ||
+                      activeOrder.gateway_reference
+                    }
+                    length={10}
+                    textClassName="font-mono font-bold text-stone-900"
+                  />
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Customer:</span>

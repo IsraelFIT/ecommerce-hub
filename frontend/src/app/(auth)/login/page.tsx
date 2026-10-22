@@ -34,6 +34,7 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (searchParams.get("reason") === "inactivity") {
@@ -54,8 +55,11 @@ function LoginForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMessage(null);
     if (!email || !password) {
-      toast.error("Please fill in all fields");
+      const msg = "Please fill in all fields";
+      setErrorMessage(msg);
+      toast.error(msg);
       return;
     }
 
@@ -144,6 +148,7 @@ function LoginForm() {
         err instanceof Error
           ? err.message
           : "Failed to sign in. Please check your credentials.";
+      setErrorMessage(msg);
       toast.error(msg);
       setIsLoading(false);
     }
@@ -273,7 +278,10 @@ function LoginForm() {
               placeholder="owner@yourstore.com"
               className="pl-9 h-10 text-xs bg-background border-input"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (errorMessage) setErrorMessage(null);
+              }}
               required
             />
           </div>
@@ -296,7 +304,10 @@ function LoginForm() {
               placeholder="••••••••"
               className="pl-9 h-10 text-xs bg-background border-input"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (errorMessage) setErrorMessage(null);
+              }}
               required
             />
           </div>

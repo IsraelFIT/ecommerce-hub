@@ -1004,6 +1004,7 @@ export default function TenantProductDetailPage({
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
+          <div className="h-4 w-px bg-border hidden sm:block" />
           <div className="flex flex-col gap-0.5">
             <div className="flex items-center gap-2">
               <h4 className="font-bold font-secondary text-foreground">
@@ -1045,7 +1046,7 @@ export default function TenantProductDetailPage({
             onClick={handleToggleStatus}
             className="text-xs h-8 gap-1.5"
           >
-            <Globe className="h-3.5 w-3.5 text-stone-500" />
+            <Globe className="h-3.5 w-3.5 text-muted-foreground" />
             <span>{isPublished ? "Set to Draft" : "Publish Live"}</span>
           </Button>
 
@@ -1443,7 +1444,7 @@ export default function TenantProductDetailPage({
                   {specifications.length > 1 && (
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
                       onClick={() => handleRemoveSpec(idx)}
                       className="h-8 w-8 p-0 text-muted-foreground hover:text-rose-500"
@@ -1603,7 +1604,7 @@ export default function TenantProductDetailPage({
                       <button
                         type="button"
                         onClick={() => handleAddVariantOption(vIdx)}
-                        className="text-[11px] text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
+                        className="text-[11px] text-primary hover:underline flex items-center gap-1 cursor-pointer"
                       >
                         <Plus className="h-3 w-3" /> Add Option
                       </button>
@@ -1694,7 +1695,7 @@ export default function TenantProductDetailPage({
                     onClick={() => setSelectedImageIndex(i)}
                     className={`relative w-14 h-14 rounded-lg overflow-hidden border-2 cursor-pointer shrink-0 ${
                       selectedImageIndex === i
-                        ? "border-emerald-600"
+                        ? "border-primary"
                         : "border-border"
                     }`}
                   >
@@ -1734,7 +1735,7 @@ export default function TenantProductDetailPage({
               className={`border-2 border-dashed rounded-xl p-3 text-center transition-colors flex flex-col items-center justify-center gap-1 ${
                 images.length >= 5
                   ? "border-border/50 bg-muted/10 opacity-60 cursor-not-allowed"
-                  : "border-border hover:border-emerald-500 bg-muted/20 cursor-pointer"
+                  : "border-border hover:border-primary/70 bg-muted/20 cursor-pointer"
               }`}
             >
               <input

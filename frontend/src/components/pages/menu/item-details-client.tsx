@@ -18,6 +18,7 @@ import {
   BadgeCheck,
   Truck,
   Clock,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -378,6 +379,18 @@ export function ItemDetailsClient({
   const currentPrice = currentVariant?.price ?? item.price;
   const compareAtPrice =
     currentVariant?.compare_at_price ?? item.compare_at_price;
+  const currentStock =
+    currentVariant?.stock_quantity ?? item.stock_quantity ?? 0;
+  const tracksInventory =
+    currentVariant?.track_inventory ??
+    (item.product_class !== "service" && item.product_class !== "digital");
+  const isOutOfStock =
+    item.availability === "out_of_stock" ||
+    (tracksInventory && currentStock <= 0);
+  const isLowStock =
+    !isOutOfStock &&
+    (item.availability === "low_stock" ||
+      (tracksInventory && currentStock > 0 && currentStock < 5));
 
   // Options attached to the selected variant
   const colorOptions = useMemo(() => {
@@ -471,6 +484,12 @@ export function ItemDetailsClient({
   };
 
   const handleAddToCart = (redirectAfter = false) => {
+    if (isOutOfStock) {
+      toast.error(
+        `The item '${item.name}' is out of stock and is not available.`,
+      );
+      return;
+    }
     const selectedSizeLabel =
       selectedFilters["sizes"] ||
       selectedFilters["size"] ||
@@ -910,8 +929,19 @@ export function ItemDetailsClient({
                   </span>
                   <button
                     type="button"
-                    onClick={() => setQuantity(quantity + 1)}
-                    className="text-stone-400 hover:text-foreground transition-colors p-0.5 cursor-pointer"
+                    disabled={isOutOfStock}
+                    onClick={() => {
+                      if (
+                        tracksInventory &&
+                        currentStock > 0 &&
+                        quantity >= currentStock
+                      ) {
+                        toast.error(`Only ${currentStock} units available.`);
+                        return;
+                      }
+                      setQuantity(quantity + 1);
+                    }}
+                    className="text-stone-400 hover:text-foreground transition-colors p-0.5 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                     aria-label="Increase quantity"
                   >
                     <Plus className="h-3.5 w-3.5" />
@@ -952,7 +982,19 @@ export function ItemDetailsClient({
             )}
 
             {/* Availability */}
-            {item.availability === "preorder" ? (
+            {isOutOfStock ? (
+              <div className="flex items-center gap-2 text-xs font-medium text-rose-700 bg-rose-50/80 border border-rose-200/70 px-3.5 py-2.5 rounded-xl">
+                <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                <span>Out of Stock: This item is currently not available</span>
+              </div>
+            ) : isLowStock ? (
+              <div className="flex items-center gap-2 text-xs font-medium text-amber-700 bg-amber-50/80 border border-amber-200/70 px-3.5 py-2.5 rounded-xl">
+                <Clock className="h-4 w-4 text-amber-600 shrink-0" />
+                <span>
+                  Low Quantity: Only {currentStock} left in stock - order soon!
+                </span>
+              </div>
+            ) : item.availability === "preorder" ? (
               <div className="flex items-center gap-2 text-xs font-medium text-amber-700 bg-amber-50/80 border border-amber-200/70 px-3.5 py-2.5 rounded-xl">
                 <Clock className="h-4 w-4 text-amber-600 shrink-0" />
                 <span>Preorder: Made to order / Schedule for later</span>
@@ -960,7 +1002,12 @@ export function ItemDetailsClient({
             ) : (
               <div className="flex items-center gap-2 text-xs font-medium text-emerald-700 bg-emerald-50/70 border border-emerald-200/60 px-3.5 py-2.5 rounded-xl">
                 <Truck className="h-4 w-4 text-emerald-600 shrink-0" />
-                <span>In Stock: Ships in 1–2 business days</span>
+                <span>
+                  In Stock: Ships in 1–2 business days
+                  {tracksInventory && currentStock > 0
+                    ? ` (${currentStock} available)`
+                    : ""}
+                </span>
               </div>
             )}
 
@@ -1020,9 +1067,16 @@ export function ItemDetailsClient({
               <Button
                 variant="outline"
                 size="lg"
+                disabled={isOutOfStock}
                 onClick={() => handleAddToCart(false)}
+                className={isOutOfStock ? "opacity-50 cursor-not-allowed" : ""}
               >
-                {isAdded ? (
+                {isOutOfStock ? (
+                  <>
+                    <ShoppingBag className="h-4 w-4 text-stone-400" />
+                    <span>Out of Stock</span>
+                  </>
+                ) : isAdded ? (
                   <>
                     <Check className="h-4 w-4 text-emerald-600" />
                     <span>Added to Cart</span>
@@ -1035,9 +1089,14 @@ export function ItemDetailsClient({
                 )}
               </Button>
 
-              <Button size="lg" onClick={() => handleAddToCart(true)}>
+              <Button
+                size="lg"
+                disabled={isOutOfStock}
+                onClick={() => handleAddToCart(true)}
+                className={isOutOfStock ? "opacity-50 cursor-not-allowed" : ""}
+              >
                 <Zap className="h-4 w-4" />
-                <span>Buy Now</span>
+                <span>{isOutOfStock ? "Unavailable" : "Buy Now"}</span>
               </Button>
             </div>
           </div>

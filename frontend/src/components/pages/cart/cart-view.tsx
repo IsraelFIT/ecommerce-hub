@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useCartStore } from "@/store/cart";
 import { formatCurrency, getTenantRoute } from "@/utils/helper";
 import { useTenantTheme } from "@/components/providers/tenant-theme-provider";
-import { apiRequest } from "@/lib/api/client";
+import { getTenantBySlug } from "@/lib/api/tenants";
 import { Tenant } from "@/types/users";
 
 export function CartView() {
@@ -39,7 +39,7 @@ export function CartView() {
     let isMounted = true;
     async function loadTenant() {
       try {
-        const res = await apiRequest<Tenant>(`/tenants/by-slug/${tenantSlug}`);
+        const res = await getTenantBySlug(tenantSlug);
         if (res.data && isMounted) {
           setTenantData(res.data);
         }
@@ -78,7 +78,7 @@ export function CartView() {
 
   if (!mounted) {
     return (
-      <div className="py-32 bg-stone-50 flex items-center justify-center min-h-[50vh]">
+      <div className="w-full py-32 bg-stone-50 flex items-center justify-center min-h-[50vh]">
         <div className="animate-pulse flex flex-col items-center gap-4">
           <div className="w-12 h-12 bg-muted rounded-full" />
           <div className="h-4 w-32 bg-muted rounded" />

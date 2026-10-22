@@ -62,6 +62,22 @@ export interface CustomizationRequest {
   updated_at: string;
 }
 
+export interface CustomLandingPageRequestInput {
+  tenant_id?: string | null;
+  tenant_slug?: string;
+  details?: string;
+  primary_color?: string;
+  secondary_color?: string;
+  store_headline?: string;
+  contact_email?: string;
+}
+
+export interface TenantCustomizationStatusResponse {
+  request: CustomizationRequest | null;
+  has_custom_request: boolean;
+  branding_config: BrandingConfig;
+}
+
 export interface TenantBrandingSummary {
   tenant_id: string;
   name: string;

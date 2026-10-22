@@ -41,5 +41,6 @@ dist/
 # Custom Exclusions
 CONTEXT.md
 API_DOCUMENTATION.md
+AGENTS.md
 skills-lock.json
 .agents/

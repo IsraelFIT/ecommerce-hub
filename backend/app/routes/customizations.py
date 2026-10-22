@@ -69,7 +69,7 @@ async def submit_landing_page_request(
                 detail="You do not have administrative access to this tenant store.",
             )
 
-    # 2. Check for existing pending/in_progress request for this tenant
+    # 2. Check for existing pending/in_progress request for this tenant with row lock
     req_query = await db.execute(
         select(CustomizationRequest)
         .where(
@@ -77,6 +77,7 @@ async def submit_landing_page_request(
             CustomizationRequest.request_type == "custom_landing_page",
         )
         .order_by(desc(CustomizationRequest.created_at))
+        .with_for_update()
     )
     existing_request = req_query.scalars().first()
 

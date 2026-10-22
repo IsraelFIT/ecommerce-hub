@@ -19,7 +19,9 @@ import {
   Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { apiRequest } from "@/lib/api/client";
+import { CopyableId } from "@/components/shared/copyable-id";
+import { ApiOrder, ApiOrderItem } from "@/types/order";
+import { fetchOrderById } from "@/lib/api/order";
 import { formatCurrency, getTenantRoute } from "@/utils/helper";
 import { useTenantTheme } from "@/components/providers/tenant-theme-provider";
 import { cn } from "@/lib/utils";
@@ -31,39 +33,8 @@ interface TrackPageProps {
   }>;
 }
 
-interface OrderItem {
-  product_id?: string;
-  title?: string;
-  product_title?: string;
-  quantity?: number;
-  unit_price?: number | string;
-  image?: string;
-  image_url?: string;
-  images?: string[];
-  options?: Record<string, unknown>;
-}
-
-interface OrderDetails {
-  id: string;
-  gateway_reference?: string;
-  customer_name?: string;
-  customer_email?: string;
-  total_amount: number;
-  currency: string;
-  status: string;
-  payment_gateway: string;
-  created_at: string;
-  items: OrderItem[];
-  metadata_json?: {
-    fulfillment_type?: string;
-    delivery_fee?: number;
-    delivery_address?: unknown;
-    fulfillment_date?: string;
-    fulfillment_time?: string;
-    gift_message?: string;
-    tracking_notes?: string;
-  };
-}
+export type OrderDetails = ApiOrder;
+export type OrderItem = ApiOrderItem;
 
 export default function OrderTrackingStatusPage({ params }: TrackPageProps) {
   const unwrappedParams = use(params);
@@ -90,13 +61,10 @@ export default function OrderTrackingStatusPage({ params }: TrackPageProps) {
       setIsLoading(true);
       setError(null);
       try {
-        const res = await apiRequest<OrderDetails>(
-          `/orders/${orderIdentifier}`,
-          {
-            headers: {
-              "X-Tenant-Slug": tenantSlug,
-            },
-          },
+        const res = await fetchOrderById(
+          orderIdentifier,
+          undefined,
+          tenantSlug,
         );
         if (res.data && isMounted) {
           setOrder(res.data);
@@ -273,9 +241,6 @@ export default function OrderTrackingStatusPage({ params }: TrackPageProps) {
     },
   ];
 
-  const orderDisplayId =
-    order.gateway_reference || `#${order.id.slice(0, 8).toUpperCase()}`;
-
   const formatDeliveryAddress = (raw: unknown): string => {
     if (!raw) return "Standard Domestic Shipping";
     if (typeof raw === "string") return raw;
@@ -300,9 +265,9 @@ export default function OrderTrackingStatusPage({ params }: TrackPageProps) {
 
   return (
     <div className="min-h-screen bg-stone-50/60 py-10 px-4 sm:px-6 lg:px-8 font-sans">
-      <div className="max-w-4xl mx-auto space-y-8">
+      <div className="container flex-col gap-5">
         {/* Navigation Breadcrumb */}
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <div className="w-full flex items-center justify-between text-xs text-muted-foreground">
           <Link
             href={getTenantRoute(tenantSlug, "/profile")}
             className="inline-flex items-center gap-1.5 hover:text-foreground font-medium transition-colors"
@@ -324,7 +289,6 @@ export default function OrderTrackingStatusPage({ params }: TrackPageProps) {
                   "_blank",
                 );
               }}
-              className="h-8 rounded-full border-border text-foreground hover:bg-muted text-xs font-semibold cursor-pointer"
             >
               <Download className="h-3.5 w-3.5 mr-1.5" />
               Invoice
@@ -333,17 +297,23 @@ export default function OrderTrackingStatusPage({ params }: TrackPageProps) {
         </div>
 
         {/* Title Header */}
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
+        <div className="w-full">
+          <h3 className="font-extrabold tracking-tight text-foreground">
             Order Status
-          </h1>
-          <p className="text-sm font-semibold text-muted-foreground mt-1">
-            Order ID : <span className="text-foreground">{orderDisplayId}</span>
-          </p>
+          </h3>
+          <div className="font-semibold text-muted-foreground mt-1 flex items-center gap-1.5">
+            <span>Order ID :</span>
+            <CopyableId
+              id={order.gateway_reference || order.id}
+              length={7}
+              prefix="#"
+              textClassName="text-foreground font-bold font-mono"
+            />
+          </div>
         </div>
 
         {/* Timeline Status Card (Matches Image 1) */}
-        <div className="bg-card rounded-2xl border border-border/80 p-6 sm:p-10 shadow-sm relative overflow-x-auto custom-scrollbar">
+        <div className="w-full bg-card rounded-xl border border-border/80 p-6 md:p-10 relative overflow-x-auto custom-scrollbar">
           <div className="min-w-140">
             {/* Row 1: Step Icons & Titles */}
             <div className="grid grid-cols-5 gap-2 text-center">
@@ -461,9 +431,9 @@ export default function OrderTrackingStatusPage({ params }: TrackPageProps) {
         </div>
 
         {/* Products Card (Matches Image 1) */}
-        <div className="bg-card rounded-2xl border border-border/80 overflow-hidden shadow-sm">
+        <div className="w-full bg-card rounded-xl border border-border/80 overflow-hidden">
           <div className="px-6 py-5 border-b border-border/60">
-            <h2 className="text-lg font-bold text-foreground">Products</h2>
+            <h4 className="font-bold text-foreground">Products</h4>
           </div>
 
           <div className="divide-y divide-border/60">
@@ -473,7 +443,7 @@ export default function OrderTrackingStatusPage({ params }: TrackPageProps) {
                   it.image ||
                   it.image_url ||
                   (Array.isArray(it.images) && it.images[0]) ||
-                  "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=400&q=80";
+                  null;
 
                 const optionsStr = it.options
                   ? Object.entries(it.options)
@@ -496,32 +466,34 @@ export default function OrderTrackingStatusPage({ params }: TrackPageProps) {
                   >
                     <div className="flex items-center gap-4 min-w-0">
                       {/* Product Thumbnail */}
-                      <div className="h-18 w-18 sm:h-20 sm:w-20 shrink-0 rounded-xl overflow-hidden border border-border/80 bg-muted/30 relative shadow-2xs">
-                        <Image
-                          src={itemImg}
-                          alt={it.title || it.product_title || "Ordered Item"}
-                          fill
-                          className="object-cover"
-                          unoptimized
-                        />
+                      <div className="h-18 w-18 sm:h-20 sm:w-20 shrink-0 rounded-xl overflow-hidden border border-border/80 bg-muted/40 flex items-center justify-center relative shadow-2xs">
+                        {itemImg ? (
+                          <Image
+                            src={itemImg}
+                            alt={it.title || it.product_title || "Ordered Item"}
+                            fill
+                            className="object-cover"
+                            unoptimized
+                          />
+                        ) : (
+                          <Package className="h-8 w-8 text-muted-foreground/60" />
+                        )}
                       </div>
 
                       {/* Product Title & Attributes */}
                       <div className="min-w-0">
-                        <h3 className="text-sm sm:text-base font-bold text-foreground truncate">
+                        <h5 className="font-bold text-foreground truncate">
                           {it.title ||
                             it.product_title ||
                             "Custom Product Item"}
-                        </h3>
-                        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                          {specs}
-                        </p>
+                        </h5>
+                        <p className="text-muted-foreground mt-1">{specs}</p>
                       </div>
                     </div>
 
                     {/* Price */}
                     <div className="text-right shrink-0">
-                      <p className="text-sm sm:text-base font-bold text-foreground">
+                      <p className="font-bold text-foreground">
                         {formatCurrency(priceNum, order.currency)}
                       </p>
                       <p className="text-[11px] text-muted-foreground mt-0.5">
@@ -540,9 +512,9 @@ export default function OrderTrackingStatusPage({ params }: TrackPageProps) {
         </div>
 
         {/* Delivery & Payment Summary Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Delivery Details */}
-          <div className="bg-card rounded-2xl border border-border/80 p-6 shadow-sm">
+          <div className="bg-card rounded-xl border border-border/80 p-6">
             <div className="flex items-center gap-2.5 mb-4">
               <div
                 className="w-8 h-8 rounded-lg flex items-center justify-center text-white"
@@ -550,11 +522,11 @@ export default function OrderTrackingStatusPage({ params }: TrackPageProps) {
               >
                 <MapPin className="h-4 w-4" />
               </div>
-              <h3 className="text-sm font-bold text-foreground">
+              <h5 className="font-bold font-secondary text-foreground">
                 Delivery Information
-              </h3>
+              </h5>
             </div>
-            <div className="space-y-2 text-xs">
+            <div className="space-y-2">
               <p className="text-muted-foreground">Recipient:</p>
               <p className="font-bold text-foreground text-sm">
                 {order.customer_name || "Valued Customer"}
@@ -575,7 +547,7 @@ export default function OrderTrackingStatusPage({ params }: TrackPageProps) {
           </div>
 
           {/* Payment Breakdown */}
-          <div className="bg-card rounded-2xl border border-border/80 p-6 shadow-sm">
+          <div className="bg-card rounded-xl border border-border/80 p-6">
             <div className="flex items-center gap-2.5 mb-4">
               <div
                 className="w-8 h-8 rounded-lg flex items-center justify-center text-white"
@@ -583,11 +555,11 @@ export default function OrderTrackingStatusPage({ params }: TrackPageProps) {
               >
                 <CreditCard className="h-4 w-4" />
               </div>
-              <h3 className="text-sm font-bold text-foreground">
+              <h5 className="font-bold font-secondary text-foreground">
                 Payment Breakdown
-              </h3>
+              </h5>
             </div>
-            <div className="space-y-2.5 text-xs">
+            <div className="space-y-2.5">
               <div className="flex justify-between text-muted-foreground">
                 <span>Payment Method</span>
                 <span className="font-semibold text-foreground uppercase">
@@ -610,7 +582,7 @@ export default function OrderTrackingStatusPage({ params }: TrackPageProps) {
               </div>
               <div className="border-t border-border/60 pt-2.5 flex justify-between font-bold text-sm text-foreground">
                 <span>Total Paid</span>
-                <span style={{ color: primaryColor }}>
+                <span className="text-base" style={{ color: primaryColor }}>
                   {formatCurrency(order.total_amount, order.currency)}
                 </span>
               </div>
@@ -619,22 +591,18 @@ export default function OrderTrackingStatusPage({ params }: TrackPageProps) {
         </div>
 
         {/* Footer Support Banner */}
-        <div className="rounded-2xl border border-border/80 bg-muted/20 p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="w-full rounded-xl border border-border/80 bg-muted/20 p-5 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="text-center sm:text-left">
-            <h4 className="text-xs font-bold text-foreground">
+            <h4 className="font-bold font-secondary text-foreground">
               Questions about your delivery?
             </h4>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
+            <p className="text-muted-foreground mt-1">
               Contact our store customer concierge for real-time dispatch
               assistance.
             </p>
           </div>
           <Link href={getTenantRoute(tenantSlug, "/menu")}>
-            <Button
-              size="sm"
-              className="rounded-full px-5 text-xs font-semibold cursor-pointer text-white"
-              style={{ backgroundColor: primaryColor }}
-            >
+            <Button style={{ backgroundColor: primaryColor }}>
               Continue Shopping
               <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
             </Button>

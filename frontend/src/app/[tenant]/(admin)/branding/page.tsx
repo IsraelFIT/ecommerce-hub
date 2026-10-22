@@ -28,8 +28,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useUserStore } from "@/store/user";
 import { getTenantSubdomainUrl } from "@/utils/helper";
-import { apiRequest } from "@/lib/api/client";
-import { Tenant, BrandingConfig, CustomizationRequest } from "@/types/users";
+import {
+  getTenantBySlug,
+  updateTenant,
+  uploadImage,
+  submitLandingPageRequest,
+  setLandingPageType as apiSetLandingPageType,
+  getTenantCustomizationStatus,
+} from "@/lib/api/tenants";
+import { BrandingConfig, CustomizationRequest } from "@/types/users";
 import { useTenantTheme } from "@/components/providers/tenant-theme-provider";
 
 interface BrandingPageProps {
@@ -104,12 +111,8 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
       try {
         setIsLoading(true);
         const [resTenant, resCustom] = await Promise.all([
-          apiRequest<Tenant>(`/tenants/by-slug/${tenantSlug}`),
-          apiRequest<{
-            request: CustomizationRequest | null;
-            has_custom_request: boolean;
-            branding_config: BrandingConfig;
-          }>(`/customizations/tenant/${tenantSlug}/status`).catch(() => null),
+          getTenantBySlug(tenantSlug),
+          getTenantCustomizationStatus(tenantSlug).catch(() => null),
         ]);
 
         if (resTenant.data && isMounted) {
@@ -178,27 +181,15 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
 
     try {
       setIsUploadingLogo(true);
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("tenant_id", tenantId || tenantSlug);
-
-      const res = await fetch("/api/uploads/image", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.detail || "Failed to upload image");
-      }
-
-      const resData = await res.json();
-      const uploadedUrl = resData.data?.url || resData.url;
+      const res = await uploadImage(file, tenantId || tenantSlug);
+      const uploadedUrl = res.data?.url;
 
       if (uploadedUrl) {
         setLogoUrl(uploadedUrl);
         applyBranding({ logoUrl: uploadedUrl });
         toast.success("Store logo uploaded to Neon Object Storage!");
+      } else {
+        throw new Error(res.message || "Failed to upload store logo");
       }
     } catch (err: unknown) {
       const error = err as Error;
@@ -229,23 +220,16 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
 
     try {
       setIsSubmittingCustomReq(true);
-      const res = await apiRequest<CustomizationRequest>(
-        "/customizations/landing-page-request",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            tenant_id: tenantId,
-            tenant_slug: tenantSlug,
-            details:
-              customReqDetails.trim() ||
-              "Bespoke custom landing page requested.",
-            primary_color: brandColor,
-            secondary_color: accentColor,
-            store_headline: storeHeadline,
-            contact_email: contactEmail.trim() || user?.email,
-          }),
-        },
-      );
+      const res = await submitLandingPageRequest({
+        tenant_id: tenantId,
+        tenant_slug: tenantSlug,
+        details:
+          customReqDetails.trim() || "Bespoke custom landing page requested.",
+        primary_color: brandColor,
+        secondary_color: accentColor,
+        store_headline: storeHeadline,
+        contact_email: contactEmail.trim() || user?.email,
+      });
 
       if (res.data) {
         setActiveCustomRequest(res.data);
@@ -272,10 +256,7 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
     applyBranding({ landingPageType: type });
 
     try {
-      await apiRequest(
-        `/customizations/set-landing-page-type?tenant_slug=${tenantSlug}&landing_page_type=${type}`,
-        { method: "POST" },
-      );
+      await apiSetLandingPageType(tenantSlug, type);
       toast.success(
         type === "custom"
           ? "Switched to Custom Landing Page mode"
@@ -307,12 +288,9 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
         announcementText: announcementText,
       };
 
-      const res = await apiRequest<Tenant>(`/tenants/${tenantId}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          branding_config: brandingPayload,
-          custom_domain: customDomain.trim() || null,
-        }),
+      const res = await updateTenant(tenantId, {
+        branding_config: brandingPayload,
+        custom_domain: customDomain.trim() || null,
       });
 
       if (res.data) {

@@ -2,6 +2,7 @@ import uuid
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy import select, func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -190,16 +191,24 @@ async def sync_cart(
     tenant = await _resolve_tenant(tenant_slug, db, current_user, request)
     tenant_id = tenant.id if tenant else None
 
-    # Find existing cart
+    # Find existing cart with row lock
     if tenant_id:
-        stmt = select(UserCart).where(
-            UserCart.user_id == current_user.id,
-            UserCart.tenant_id == tenant_id,
+        stmt = (
+            select(UserCart)
+            .where(
+                UserCart.user_id == current_user.id,
+                UserCart.tenant_id == tenant_id,
+            )
+            .with_for_update()
         )
     else:
-        stmt = select(UserCart).where(
-            UserCart.user_id == current_user.id,
-            UserCart.tenant_id.is_(None),
+        stmt = (
+            select(UserCart)
+            .where(
+                UserCart.user_id == current_user.id,
+                UserCart.tenant_id.is_(None),
+            )
+            .with_for_update()
         )
 
     res = await db.execute(stmt)
@@ -213,6 +222,7 @@ async def sync_cart(
     if cart:
         cart.items = serialized_items
         cart.updated_at = func.now()
+        await db.commit()
     else:
         cart = UserCart(
             user_id=current_user.id,
@@ -220,8 +230,17 @@ async def sync_cart(
             items=serialized_items,
         )
         db.add(cart)
+        try:
+            await db.commit()
+        except IntegrityError:
+            await db.rollback()
+            res = await db.execute(stmt)
+            cart = res.scalar_one_or_none()
+            if cart:
+                cart.items = serialized_items
+                cart.updated_at = func.now()
+                await db.commit()
 
-    await db.commit()
     await db.refresh(cart)
 
     sanitized_output = [sanitize_cart_item(it) for it in cart.items]
@@ -257,14 +276,22 @@ async def merge_cart(
     tenant_id = tenant.id if tenant else None
 
     if tenant_id:
-        stmt = select(UserCart).where(
-            UserCart.user_id == current_user.id,
-            UserCart.tenant_id == tenant_id,
+        stmt = (
+            select(UserCart)
+            .where(
+                UserCart.user_id == current_user.id,
+                UserCart.tenant_id == tenant_id,
+            )
+            .with_for_update()
         )
     else:
-        stmt = select(UserCart).where(
-            UserCart.user_id == current_user.id,
-            UserCart.tenant_id.is_(None),
+        stmt = (
+            select(UserCart)
+            .where(
+                UserCart.user_id == current_user.id,
+                UserCart.tenant_id.is_(None),
+            )
+            .with_for_update()
         )
 
     res = await db.execute(stmt)
@@ -303,6 +330,7 @@ async def merge_cart(
     if cart:
         cart.items = final_items
         cart.updated_at = func.now()
+        await db.commit()
     else:
         cart = UserCart(
             user_id=current_user.id,
@@ -310,6 +338,16 @@ async def merge_cart(
             items=final_items,
         )
         db.add(cart)
+        try:
+            await db.commit()
+        except IntegrityError:
+            await db.rollback()
+            res = await db.execute(stmt)
+            cart = res.scalar_one_or_none()
+            if cart:
+                cart.items = final_items
+                cart.updated_at = func.now()
+                await db.commit()
 
     await db.commit()
     await db.refresh(cart)

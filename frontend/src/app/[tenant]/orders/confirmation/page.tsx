@@ -8,6 +8,7 @@ import { format } from "date-fns";
 import {
   Check,
   Download,
+  Printer,
   ShoppingBag,
   FileText,
   Package,
@@ -15,10 +16,20 @@ import {
   Loader2,
   AlertCircle,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { apiRequest } from "@/lib/api/client";
+import { CopyableId } from "@/components/shared/copyable-id";
+import { getTenantBySlug } from "@/lib/api/tenants";
+import { verifyPayment } from "@/lib/api/payments";
+import { fetchOrderById } from "@/lib/api/order";
 import { useCartStore } from "@/store/cart";
+import { useTenantTheme } from "@/components/providers/tenant-theme-provider";
 import { formatCurrency, getTenantRoute } from "@/utils/helper";
+import {
+  downloadInvoicePdf,
+  printInvoice,
+  buildInvoiceFromOrder,
+} from "@/utils/pdf-download";
 import { Order, Tenant } from "@/types";
 
 interface ConfirmationPageProps {
@@ -37,6 +48,7 @@ export default function OrderConfirmationPage({
   const sessionId = searchParams.get("session_id") || "";
 
   const { clearCart } = useCartStore();
+  const { branding } = useTenantTheme();
   const [isLoading, setIsLoading] = useState(true);
   const [order, setOrder] = useState<Order | null>(null);
   const [tenant, setTenant] = useState<Tenant | null>(null);
@@ -56,9 +68,7 @@ export default function OrderConfirmationPage({
         setIsLoading(true);
 
         // 1. Fetch tenant details for currency & branding
-        const tenantRes = await apiRequest<Tenant>(
-          `/tenants/by-slug/${tenantSlug}`,
-        );
+        const tenantRes = await getTenantBySlug(tenantSlug);
         if (tenantRes.data && isMounted) {
           setTenant(tenantRes.data);
         }
@@ -66,9 +76,9 @@ export default function OrderConfirmationPage({
         // 2. Fetch order record by reference or ID first
         let fetchedOrder: Order | null = null;
         try {
-          const orderRes = await apiRequest<Order>(`/orders/${reference}`);
+          const orderRes = await fetchOrderById(reference);
           if (orderRes.data) {
-            fetchedOrder = orderRes.data;
+            fetchedOrder = orderRes.data as unknown as Order;
             if (isMounted) setOrder(fetchedOrder);
           }
         } catch {
@@ -78,23 +88,18 @@ export default function OrderConfirmationPage({
         // 3. If sessionId provided or order still pending, verify with payment provider
         if (sessionId || (!fetchedOrder && reference)) {
           try {
-            const verifyQuery = sessionId
-              ? `?session_id=${encodeURIComponent(sessionId)}`
-              : "";
-            const verifyRes = await apiRequest<{
-              status: string;
-              order_id: string;
-              reference: string;
-            }>(`/payments/verify/${reference}${verifyQuery}`);
+            const verifyRes = await verifyPayment(
+              reference,
+              sessionId || undefined,
+              tenantSlug,
+            );
 
             if (verifyRes.data) {
               clearCart(tenantSlug, true);
-              const reloadedOrder = await apiRequest<Order>(
-                `/orders/${reference}`,
-              );
+              const reloadedOrder = await fetchOrderById(reference);
               if (reloadedOrder.data && isMounted) {
-                setOrder(reloadedOrder.data);
-                fetchedOrder = reloadedOrder.data;
+                setOrder(reloadedOrder.data as unknown as Order);
+                fetchedOrder = reloadedOrder.data as unknown as Order;
               }
             }
           } catch (verifyErr) {
@@ -209,9 +214,39 @@ export default function OrderConfirmationPage({
     null;
   const formattedDeliveryAddress = formatDeliveryAddress(deliveryAddressRaw);
 
-  const handleDownloadInvoice = () => {
-    if (typeof window !== "undefined") {
-      window.print();
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  const handlePrintInvoice = () => {
+    if (!order) {
+      if (typeof window !== "undefined") window.print();
+      return;
+    }
+    const invoiceData = buildInvoiceFromOrder(
+      order,
+      tenant,
+      tenantSlug,
+      branding?.logoUrl,
+    );
+    printInvoice(invoiceData);
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!order) return;
+    try {
+      setIsGeneratingPdf(true);
+      const invoiceData = buildInvoiceFromOrder(
+        order,
+        tenant,
+        tenantSlug,
+        branding?.logoUrl,
+      );
+      await downloadInvoicePdf(invoiceData);
+      toast.success("Invoice PDF downloaded successfully!");
+    } catch (err) {
+      console.error("Failed to generate PDF invoice:", err);
+      toast.error("Failed to download PDF invoice. Please try again.");
+    } finally {
+      setIsGeneratingPdf(false);
     }
   };
 
@@ -244,12 +279,6 @@ export default function OrderConfirmationPage({
       </div>
     );
   }
-
-  const orderIdDisplay = order
-    ? `#${order.id.slice(0, 8).toUpperCase()}`
-    : reference
-      ? `#${reference.slice(-8).toUpperCase()}`
-      : "#PENDING";
 
   const transactionIdDisplay = reference || order?.gateway_reference || "N/A";
 
@@ -341,9 +370,16 @@ export default function OrderConfirmationPage({
                 <span className="text-primary-foreground/75 text-xs uppercase font-bold tracking-wider block shrink-0">
                   Order ID
                 </span>
-                <p className="font-bold text-primary-foreground select-all print:text-right">
-                  {orderIdDisplay}
-                </p>
+                <div className="print:text-right">
+                  <CopyableId
+                    id={order?.gateway_reference || order?.id || reference}
+                    length={7}
+                    prefix="#"
+                    uppercase
+                    textClassName="text-primary-foreground font-bold text-sm md:text-base font-mono"
+                    iconClassName="text-primary-foreground/80 hover:text-primary-foreground hover:bg-primary-foreground/20"
+                  />
+                </div>
               </div>
 
               <div className="flex flex-col gap-1 print:flex-row print:justify-between print:items-center print:border-b print:border-primary-foreground/20 print:pb-2">
@@ -359,12 +395,19 @@ export default function OrderConfirmationPage({
                 <span className="text-primary-foreground/75 text-xs uppercase font-bold tracking-wider block shrink-0">
                   Transaction ID
                 </span>
-                <p
-                  className="font-bold text-primary-foreground select-all print:text-right break-all max-w-[65%]"
-                  title={transactionIdDisplay}
-                >
-                  {transactionIdDisplay}
-                </p>
+                <div className="print:text-right">
+                  {transactionIdDisplay !== "N/A" ? (
+                    <CopyableId
+                      id={transactionIdDisplay}
+                      length={7}
+                      uppercase
+                      textClassName="text-primary-foreground font-bold text-sm md:text-base font-mono"
+                      iconClassName="text-primary-foreground/80 hover:text-primary-foreground hover:bg-primary-foreground/20"
+                    />
+                  ) : (
+                    <p className="font-bold text-primary-foreground">N/A</p>
+                  )}
+                </div>
               </div>
 
               <div className="flex flex-col gap-1 print:flex-row print:justify-between print:items-center">
@@ -377,14 +420,30 @@ export default function OrderConfirmationPage({
               </div>
             </div>
 
-            <div className="shrink-0 flex items-center justify-end no-print">
+            <div className="shrink-0 flex items-center gap-2.5 no-print">
               <button
                 type="button"
-                onClick={handleDownloadInvoice}
-                className="bg-accent text-white hover:bg-accent/80 transition-all px-5 py-2.5 rounded-full text-xs font-semibold flex items-center gap-2 cursor-pointer hover:scale-105 active:scale-95"
+                onClick={handlePrintInvoice}
+                className="bg-white/15 text-primary-foreground hover:bg-white/25 border border-white/20 transition-all px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 cursor-pointer hover:scale-105 active:scale-95 shadow-xs"
               >
-                <Download className="h-3.5 w-3.5" />
-                <span>Download Invoice</span>
+                <Printer className="h-3.5 w-3.5" />
+                <span>Print Invoice</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDownloadPdf}
+                disabled={isGeneratingPdf || !order}
+                className="bg-accent text-white hover:bg-accent/85 transition-all px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 cursor-pointer hover:scale-105 active:scale-95 shadow-xs disabled:opacity-50"
+              >
+                {isGeneratingPdf ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Download className="h-3.5 w-3.5" />
+                )}
+                <span>
+                  {isGeneratingPdf ? "Generating..." : "Download PDF"}
+                </span>
               </button>
             </div>
           </div>
@@ -538,7 +597,7 @@ export default function OrderConfirmationPage({
           {/* Action Buttons */}
           <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-4 no-print">
             <Link
-              href={getTenantRoute(tenantSlug, "/profile?tab=orders")}
+              href={getTenantRoute(tenantSlug, "/profile/orders")}
               className="w-full sm:w-auto"
             >
               <Button size="lg" variant="outline">

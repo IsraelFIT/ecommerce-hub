@@ -7,7 +7,7 @@ import { Loader2, AlertCircle, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { apiRequest } from "@/lib/api/client";
+import { fetchOrderById } from "@/lib/api/order";
 import { getTenantRoute } from "@/utils/helper";
 import { useTenantTheme } from "@/components/providers/tenant-theme-provider";
 import { toast } from "sonner";
@@ -38,45 +38,29 @@ export default function TrackOrderSearchPage({ params }: TrackOrderPageProps) {
     const cleanOrderId = orderId.trim().replace(/^#/, "");
     const cleanEmail = billingEmail.trim().toLowerCase();
 
-    if (!cleanOrderId) {
-      toast.error("Please enter your Order ID");
-      return;
-    }
-    if (!cleanEmail) {
-      toast.error("Please enter your Billing Email");
+    if (!cleanOrderId && !cleanEmail) {
+      toast.error("Please enter your Order ID or Billing Email");
+      setErrorMessage(
+        "Please provide your Order ID or Billing Email to track your order.",
+      );
       return;
     }
 
     setIsLoading(true);
 
     try {
-      // Look up order by identifier
-      const res = await apiRequest<{
-        id: string;
-        customer_email?: string;
-        gateway_reference?: string;
-      }>(`/orders/${encodeURIComponent(cleanOrderId)}`, {
-        headers: {
-          "X-Tenant-Slug": tenantSlug,
-        },
-      });
+      const searchTarget = cleanOrderId || cleanEmail;
+      const emailFilter = cleanOrderId && cleanEmail ? cleanEmail : undefined;
+
+      const res = await fetchOrderById(searchTarget, emailFilter, tenantSlug);
 
       if (!res.data) {
         setErrorMessage(
-          "We could not find an order matching that Order ID. Please check the ID on your receipt and try again.",
+          "We could not find an order matching that information. Please check your details and try again.",
         );
         return;
       }
 
-      const orderEmail = (res.data.customer_email || "").trim().toLowerCase();
-      if (orderEmail && orderEmail !== cleanEmail) {
-        setErrorMessage(
-          "The billing email does not match the email associated with this Order ID.",
-        );
-        return;
-      }
-
-      // Successfully matched, route to tracking details
       toast.success("Order located!");
       router.push(getTenantRoute(tenantSlug, `/track/${res.data.id}`));
     } catch (err: unknown) {
@@ -84,7 +68,7 @@ export default function TrackOrderSearchPage({ params }: TrackOrderPageProps) {
       setErrorMessage(
         err instanceof Error
           ? err.message
-          : "We could not find an order matching that Order ID. Please verify your receipt.",
+          : "We could not find an order matching that information. Please verify your receipt and try again.",
       );
     } finally {
       setIsLoading(false);
@@ -93,9 +77,9 @@ export default function TrackOrderSearchPage({ params }: TrackOrderPageProps) {
 
   return (
     <div className="min-h-screen bg-stone-50/50 py-16 px-4 sm:px-6 lg:px-8 font-sans">
-      <div className="max-w-2xl mx-auto space-y-8">
+      <div className="container flex-col gap-6">
         {/* Breadcrumb / Top Header */}
-        <div className="text-center space-y-3">
+        <div className="w-full text-center space-y-3">
           <span
             className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold tracking-wide uppercase"
             style={{
@@ -105,20 +89,19 @@ export default function TrackOrderSearchPage({ params }: TrackOrderPageProps) {
           >
             Live Tracking
           </span>
-          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground">
+          <h2 className="font-extrabold tracking-tight text-foreground">
             Track Your Order
-          </h1>
-          <p className="text-sm sm:text-base text-muted-foreground max-w-lg mx-auto leading-relaxed">
-            To track your order please enter your Order ID in the box below and
-            press the &ldquo;Track Order&rdquo; button. This was given to you on
-            your receipt and in the confirmation email you should have received.
+          </h2>
+          <p className="text-muted-foreground max-w-lg mx-auto leading-relaxed">
+            To track your order, enter your Order ID or Billing Email in the box
+            below and press the &ldquo;Track Order&rdquo; button.
           </p>
         </div>
 
         {/* Tracking Lookup Card (Matches Image 2) */}
-        <div className="bg-card rounded-2xl border border-border/80 p-6 sm:p-10 shadow-sm space-y-6">
+        <div className="w-full lg:w-[70%] bg-card rounded-xl border border-border/80 p-6 md:p-10 space-y-6">
           {errorMessage && (
-            <div className="rounded-xl bg-destructive/10 border border-destructive/20 p-4 flex items-start gap-3 text-destructive text-xs sm:text-sm">
+            <div className="rounded-xl bg-destructive/10 border border-destructive/20 p-4 flex items-start gap-3 text-destructive">
               <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
               <div className="flex-1 font-medium">{errorMessage}</div>
             </div>
@@ -131,16 +114,15 @@ export default function TrackOrderSearchPage({ params }: TrackOrderPageProps) {
                 htmlFor="orderId"
                 className="text-xs sm:text-sm font-bold text-foreground"
               >
-                Order ID <span className="text-rose-500">*</span>
+                Order ID
               </Label>
               <Input
                 id="orderId"
                 type="text"
                 value={orderId}
                 onChange={(e) => setOrderId(e.target.value)}
-                placeholder="Enter Your Order ID"
-                required
-                className="h-12 rounded-full px-5 text-sm border-border/80 focus-visible:ring-1 focus-visible:ring-primary shadow-2xs"
+                placeholder="Enter Your Order ID (e.g. #ORD-1234 or ECH-...)"
+                className="h-10"
               />
             </div>
 
@@ -150,16 +132,15 @@ export default function TrackOrderSearchPage({ params }: TrackOrderPageProps) {
                 htmlFor="billingEmail"
                 className="text-xs sm:text-sm font-bold text-foreground"
               >
-                Billing Email <span className="text-rose-500">*</span>
+                Billing Email
               </Label>
               <Input
                 id="billingEmail"
                 type="email"
                 value={billingEmail}
                 onChange={(e) => setBillingEmail(e.target.value)}
-                placeholder="Enter Email Address"
-                required
-                className="h-12 rounded-full px-5 text-sm border-border/80 focus-visible:ring-1 focus-visible:ring-primary shadow-2xs"
+                placeholder="Enter Email Address (e.g. name@example.com)"
+                className="h-10"
               />
             </div>
 
@@ -167,7 +148,6 @@ export default function TrackOrderSearchPage({ params }: TrackOrderPageProps) {
             <Button
               type="submit"
               disabled={isLoading}
-              className="h-12 rounded-full px-8 font-bold text-sm text-white cursor-pointer transition-transform active:scale-[0.98] shadow-sm w-auto"
               style={{ backgroundColor: primaryColor }}
             >
               {isLoading ? (
@@ -183,22 +163,18 @@ export default function TrackOrderSearchPage({ params }: TrackOrderPageProps) {
         </div>
 
         {/* Helpful Shortcut Card */}
-        <div className="rounded-2xl border border-border/80 bg-card p-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left shadow-2xs">
+        <div className="w-full lg:w-[70%] rounded-xl border border-border/80 bg-card p-6 flex flex-col md:flex-row items-center justify-between gap-4 text-center sm:text-left">
           <div>
-            <h3 className="text-sm font-bold text-foreground">
+            <h4 className="font-bold text-foreground">
               Have an account with us?
-            </h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
+            </h4>
+            <p className="text-muted-foreground mt-1.5">
               Sign in to view all your past order receipts and invoices in one
               place.
             </p>
           </div>
           <Link href={getTenantRoute(tenantSlug, "/profile")}>
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-full px-5 text-xs font-semibold"
-            >
+            <Button size="lg" variant="outline">
               View Profile Orders
               <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
             </Button>

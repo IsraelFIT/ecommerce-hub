@@ -89,7 +89,9 @@ async def update_tenant_by_slug(
     current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     result = await db.execute(
-        select(Tenant).where(Tenant.slug == slug.lower(), Tenant.is_deleted == False)
+        select(Tenant)
+        .where(Tenant.slug == slug.lower(), Tenant.is_deleted == False)
+        .with_for_update()
     )
     tenant = result.scalar_one_or_none()
     if not tenant:
@@ -156,7 +158,9 @@ async def update_tenant(
     current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     result = await db.execute(
-        select(Tenant).where(Tenant.id == tenant_id, Tenant.is_deleted == False)
+        select(Tenant)
+        .where(Tenant.id == tenant_id, Tenant.is_deleted == False)
+        .with_for_update()
     )
     tenant = result.scalar_one_or_none()
     if not tenant:

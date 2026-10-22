@@ -36,6 +36,7 @@ import { useUserStore } from "@/store/user";
 import { useTenantTheme } from "@/components/providers/tenant-theme-provider";
 import { formatCurrency } from "@/utils/helper";
 import { UserAvatar } from "@/components/shared/user-avatar";
+import { CopyableId } from "@/components/shared/copyable-id";
 
 export default function TenantUsersAdminPage() {
   const params = useParams();
@@ -313,11 +314,6 @@ export default function TenantUsersAdminPage() {
                   item.full_name ||
                   `${item.first_name || ""} ${item.last_name || ""}`.trim() ||
                   "Customer";
-                const initial =
-                  item.first_name?.charAt(0)?.toUpperCase() ||
-                  item.full_name?.charAt(0)?.toUpperCase() ||
-                  item.email?.charAt(0)?.toUpperCase() ||
-                  "U";
 
                 return (
                   <TableRow
@@ -344,9 +340,19 @@ export default function TenantUsersAdminPage() {
                               </span>
                             )}
                           </div>
-                          <span className="text-[11px] text-muted-foreground block truncate">
-                            {item.email}
-                          </span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[11px] text-muted-foreground block truncate">
+                              {item.email}
+                            </span>
+                            <span className="text-muted-foreground/40 text-[10px]">•</span>
+                            <CopyableId
+                              id={item.id}
+                              length={7}
+                              textClassName="text-[10px] text-muted-foreground/80 font-mono"
+                              iconClassName="p-0.5 text-muted-foreground/60 h-3 w-3"
+                              title={`User ID: ${item.id}`}
+                            />
+                          </div>
                         </div>
                       </div>
                     </TableCell>

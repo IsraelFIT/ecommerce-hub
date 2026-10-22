@@ -49,10 +49,13 @@ async def process_webhook_event_task(
 
         if reference and status == "paid":
             try:
-                # Update matching order status to PAID
+                # Update matching order status to PAID atomically if not already paid
                 query = (
                     update(Order)
-                    .where(Order.gateway_reference == reference)
+                    .where(
+                        Order.gateway_reference == reference,
+                        Order.status != OrderStatus.PAID,
+                    )
                     .values(
                         status=OrderStatus.PAID,
                         metadata_json={

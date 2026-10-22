@@ -17,21 +17,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { apiRequest } from "@/lib/api/client";
+import { getTenantBySlug, updateTenant } from "@/lib/api/tenants";
 
 interface AdaptersPageProps {
   params: Promise<{
     tenant: string;
   }>;
-}
-
-interface TenantData {
-  id?: string;
-  name?: string;
-  slug?: string;
-  backend_type?: "postgres" | "sanity";
-  sanity_project_id?: string;
-  sanity_dataset?: string;
 }
 
 export default function TenantAdaptersPage({ params }: AdaptersPageProps) {
@@ -54,9 +45,7 @@ export default function TenantAdaptersPage({ params }: AdaptersPageProps) {
   useEffect(() => {
     async function fetchTenantConfig() {
       try {
-        const res = await apiRequest<TenantData>(
-          `/tenants/by-slug/${tenantSlug}`,
-        );
+        const res = await getTenantBySlug(tenantSlug);
         if (res.status === "success" && res.data) {
           const t = res.data;
           if (t.id) setTenantId(t.id);
@@ -123,10 +112,7 @@ export default function TenantAdaptersPage({ params }: AdaptersPageProps) {
       };
 
       if (tenantId) {
-        await apiRequest(`/tenants/${tenantId}`, {
-          method: "PATCH",
-          body: JSON.stringify(payload),
-        });
+        await updateTenant(tenantId, payload);
       }
 
       toast.success(

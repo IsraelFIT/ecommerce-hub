@@ -184,8 +184,10 @@ async def update_filter(
     current_user: User = Depends(get_current_tenant_admin),
     db: AsyncSession = Depends(get_rls_db_session),
 ) -> Dict[str, Any]:
-    query = select(ProductFilter).where(
-        ProductFilter.id == filter_id, ProductFilter.tenant_id == tenant.id
+    query = (
+        select(ProductFilter)
+        .where(ProductFilter.id == filter_id, ProductFilter.tenant_id == tenant.id)
+        .with_for_update()
     )
     result = await db.execute(query)
     product_filter = result.scalar_one_or_none()
@@ -236,10 +238,14 @@ async def delete_filter(
     current_user: User = Depends(get_current_tenant_admin),
     db: AsyncSession = Depends(get_rls_db_session),
 ) -> Dict[str, Any]:
-    query = select(ProductFilter).where(
-        ProductFilter.id == filter_id,
-        ProductFilter.tenant_id == tenant.id,
-        ProductFilter.is_deleted == False,
+    query = (
+        select(ProductFilter)
+        .where(
+            ProductFilter.id == filter_id,
+            ProductFilter.tenant_id == tenant.id,
+            ProductFilter.is_deleted == False,
+        )
+        .with_for_update()
     )
     result = await db.execute(query)
     product_filter = result.scalar_one_or_none()

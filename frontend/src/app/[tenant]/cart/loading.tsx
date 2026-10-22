@@ -3,16 +3,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function CartLoading() {
   return (
     <div className="py-24 bg-stone-50 text-stone-900 min-h-screen">
-      <div className="container mx-auto px-4 md:px-8 max-w-6xl">
+      <div className="container">
         {/* Header Skeleton */}
-        <div className="mb-12 space-y-3">
+        <div className="w-full mb-12 space-y-3">
           <Skeleton className="h-4 w-32 rounded-md" />
           <Skeleton className="h-10 w-64 rounded-xl" />
           <Skeleton className="h-4 w-80 rounded-md" />
         </div>
 
         {/* Cart Grid Skeleton */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+        <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
           {/* Items List Skeleton (8 cols) */}
           <div className="lg:col-span-8 space-y-4">
             {[1, 2, 3].map((i) => (

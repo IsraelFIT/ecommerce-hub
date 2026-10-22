@@ -34,7 +34,9 @@ async def create_checkout_session(
     tenant: Tenant = Depends(get_tenant_context),
     db: AsyncSession = Depends(get_rls_db_session),
 ) -> Dict[str, Any]:
-    result = await db.execute(select(Order).where(Order.id == payload.order_id))
+    result = await db.execute(
+        select(Order).where(Order.id == payload.order_id).with_for_update()
+    )
     order = result.scalar_one_or_none()
     if not order:
         raise HTTPException(
@@ -69,7 +71,9 @@ async def verify_payment(
     db: AsyncSession = Depends(get_rls_db_session),
     tenant: Tenant = Depends(get_tenant_context),
 ) -> Dict[str, Any]:
-    result = await db.execute(select(Order).where(Order.gateway_reference == reference))
+    result = await db.execute(
+        select(Order).where(Order.gateway_reference == reference).with_for_update()
+    )
     order = result.scalar_one_or_none()
     if not order:
         raise HTTPException(

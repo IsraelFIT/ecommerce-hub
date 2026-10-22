@@ -36,7 +36,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { UserAvatar } from "@/components/shared/user-avatar";
-import { apiRequest } from "@/lib/api/client";
+import { CopyableId } from "@/components/shared/copyable-id";
+import { OrderDetail } from "@/types/order";
+import { fetchOrderById, updateOrderStatus } from "@/lib/api/order";
 import { formatCurrency, formatDate, getTenantRoute } from "@/utils/helper";
 
 interface OrderDetailPageProps {
@@ -44,57 +46,6 @@ interface OrderDetailPageProps {
     tenant: string;
     id: string;
   }>;
-}
-
-interface OrderItem {
-  product_id?: string;
-  title: string;
-  quantity: number;
-  unit_price: number;
-  image?: string;
-  image_url?: string;
-  images?: string[];
-  options?: Record<string, unknown>;
-}
-
-interface OrderDetail {
-  id: string;
-  tenant_id: string;
-  user_id?: string | null;
-  customer_email: string;
-  customer_name: string;
-  customer_avatar_url?: string | null;
-  total_amount: number;
-  platform_fee: number;
-  tenant_payout_amount: number;
-  currency: string;
-  status: string;
-  payment_gateway: string;
-  gateway_reference: string;
-  items: OrderItem[];
-  metadata_json?: {
-    tenant_slug?: string;
-    fulfillment_type?: string;
-    delivery_fee?: number;
-    delivery_address?: {
-      address?: string;
-      street?: string;
-      city?: string;
-      state?: string;
-      country?: string;
-      zip?: string;
-      postal_code?: string;
-      phone?: string;
-      additional_info?: string;
-    };
-    fulfillment_date?: string;
-    fulfillment_time?: string;
-    gift_message?: string;
-    tracking_notes?: string;
-    [key: string]: unknown;
-  };
-  created_at: string;
-  updated_at: string;
 }
 
 const TIMELINE_STEPS = [
@@ -159,14 +110,7 @@ export default function TenantAdminOrderDetailPage({
         return;
       }
       try {
-        const res = await apiRequest<OrderDetail>(
-          `/orders/${encodeURIComponent(orderId)}`,
-          {
-            headers: {
-              "X-Tenant-Slug": tenantSlug,
-            },
-          },
-        );
+        const res = await fetchOrderById(orderId, undefined, tenantSlug);
         if (isMounted) {
           if (res.data) {
             setOrder(res.data);
@@ -195,26 +139,24 @@ export default function TenantAdminOrderDetailPage({
     };
   }, [orderId, tenantSlug]);
 
-  const handleUpdateStatus = async () => {
+  const executeUpdateStatus = async (statusToApply: string) => {
     if (!order) return;
     setIsUpdatingStatus(true);
     try {
-      const res = await apiRequest<OrderDetail>(`/orders/${order.id}/status`, {
-        method: "PATCH",
-        headers: {
-          "X-Tenant-Slug": tenantSlug,
+      const res = await updateOrderStatus(
+        order.id,
+        {
+          status: statusToApply,
+          tracking_notes: trackingNotes.trim() || undefined,
         },
-        body: JSON.stringify({
-          status: selectedStatus,
-          tracking_notes: trackingNotes.trim() || null,
-        }),
-      });
+        tenantSlug,
+      );
 
       if (res.data) {
         setOrder(res.data);
         setSelectedStatus(res.data.status.toLowerCase());
         setTrackingNotes(res.data.metadata_json?.tracking_notes || "");
-        toast.success(`Order updated to "${selectedStatus}"`);
+        toast.success(`Order updated to "${statusToApply}"`);
       }
     } catch (err: unknown) {
       const msg =
@@ -223,6 +165,32 @@ export default function TenantAdminOrderDetailPage({
     } finally {
       setIsUpdatingStatus(false);
     }
+  };
+
+  const handleUpdateStatus = async () => {
+    if (!order) return;
+    if (
+      selectedStatus === "cancelled" &&
+      order.status.toLowerCase() !== "cancelled"
+    ) {
+      const displayRef =
+        order.gateway_reference || order.id.slice(0, 8).toUpperCase();
+      toast(`Cancel Order #${displayRef}?`, {
+        description:
+          "Are you sure you want to cancel this order? This will mark it as cancelled.",
+        action: {
+          label: "Yes, Cancel",
+          onClick: () => executeUpdateStatus("cancelled"),
+        },
+        cancel: {
+          label: "Keep Order",
+          onClick: () => {},
+        },
+        duration: 8000,
+      });
+      return;
+    }
+    await executeUpdateStatus(selectedStatus);
   };
 
   const handlePrintSlip = () => {
@@ -236,15 +204,15 @@ export default function TenantAdminOrderDetailPage({
           <Skeleton className="h-9 w-40 rounded-xl" />
           <Skeleton className="h-9 w-32 rounded-xl" />
         </div>
-        <Skeleton className="h-32 w-full rounded-2xl" />
+        <Skeleton className="h-32 w-full rounded-xl" />
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
-            <Skeleton className="h-72 w-full rounded-2xl" />
-            <Skeleton className="h-48 w-full rounded-2xl" />
+            <Skeleton className="h-72 w-full rounded-xl" />
+            <Skeleton className="h-48 w-full rounded-xl" />
           </div>
           <div className="space-y-6">
-            <Skeleton className="h-56 w-full rounded-2xl" />
-            <Skeleton className="h-56 w-full rounded-2xl" />
+            <Skeleton className="h-56 w-full rounded-xl" />
+            <Skeleton className="h-56 w-full rounded-xl" />
           </div>
         </div>
       </div>
@@ -253,7 +221,7 @@ export default function TenantAdminOrderDetailPage({
 
   if (error || !order) {
     return (
-      <div className="p-12 text-center bg-card rounded-2xl border border-border shadow-xs my-8 max-w-xl mx-auto">
+      <div className="p-12 text-center bg-card rounded-xl border border-border  my-8 max-w-xl mx-auto">
         <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
         <h2 className="text-xl font-bold text-foreground mb-2">
           Order Not Found
@@ -284,47 +252,57 @@ export default function TenantAdminOrderDetailPage({
   const fulfillmentType = order.metadata_json?.fulfillment_type || "delivery";
 
   return (
-    <div className="space-y-6 w-full text-foreground pb-12">
+    <div className="w-full flex flex-col gap-5 pb-16 text-foreground">
       {/* Top Navigation & Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-border">
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => router.push(getTenantRoute(tenantSlug, "/orders"))}
-            className="text-muted-foreground hover:text-foreground rounded-xl"
+            className="h-8 w-8 p-0 bg-muted hover:bg-muted/80 text-foreground"
           >
-            <ArrowLeft className="w-4 h-4 mr-1.5" /> Back to Orders
+            <ArrowLeft className="w-4 h-4" />
           </Button>
           <div className="h-4 w-px bg-border hidden sm:block" />
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-xl md:text-2xl font-bold tracking-tight text-foreground">
-              Order #{order.gateway_reference || order.id.slice(0, 8)}
-            </h1>
-            <Badge
-              className={`rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${
-                order.status === "delivered" || order.status === "fulfilled"
-                  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
-                  : order.status === "shipped"
-                    ? "bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20"
-                    : isCancelled
-                      ? "bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/20"
-                      : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20"
-              }`}
-            >
-              {order.status}
-            </Badge>
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
+                <span className="font-bold font-secondary text-foreground text-lg">
+                  Order
+                </span>
+                <CopyableId
+                  id={order.gateway_reference || order.id}
+                  length={7}
+                  prefix="#"
+                  textClassName="text-lg font-bold font-secondary text-foreground"
+                />
+              </div>
+              <Badge
+                className={`text-xs font-semibold capitalize ${
+                  order.status === "delivered" || order.status === "fulfilled"
+                    ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
+                    : order.status === "shipped"
+                      ? "bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20"
+                      : isCancelled
+                        ? "bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/20"
+                        : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20"
+                }`}
+              >
+                {order.status}
+              </Badge>
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
             onClick={handlePrintSlip}
-            className="rounded-xl border-border bg-card text-foreground hover:bg-muted font-medium"
+            className="text-xs h-8 gap-1.5"
           >
-            <Printer className="w-4 h-4 mr-2 text-muted-foreground" />
+            <Printer className="w-3.5 h-3.5 text-muted-foreground" />
             Print Packing Slip
           </Button>
 
@@ -332,13 +310,13 @@ export default function TenantAdminOrderDetailPage({
             variant="outline"
             size="sm"
             asChild
-            className="rounded-xl border-border bg-card text-foreground hover:bg-muted font-medium"
+            className="text-xs h-8 gap-1.5"
           >
             <Link
               href={getTenantRoute(tenantSlug, `/track/${order.id}`)}
               target="_blank"
             >
-              <ExternalLink className="w-4 h-4 mr-2 text-muted-foreground" />
+              <ExternalLink className="w-3.5 h-3.5 text-muted-foreground" />
               Public Tracking
             </Link>
           </Button>
@@ -346,13 +324,13 @@ export default function TenantAdminOrderDetailPage({
       </div>
 
       {/* Fulfillment Status Banner & Timeline */}
-      <div className="bg-card border border-border rounded-2xl p-6 shadow-xs space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
+      <div className="bg-card border border-border rounded-xl p-6  space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-border pb-4">
           <div>
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Fulfillment Status
             </span>
-            <p className="text-sm text-foreground mt-0.5">
+            <p className="text-foreground mt-0.5">
               Placed on {formatDate(order.created_at)} • Updated on{" "}
               {formatDate(order.updated_at)}
             </p>
@@ -364,7 +342,7 @@ export default function TenantAdminOrderDetailPage({
               value={selectedStatus}
               onValueChange={(val) => setSelectedStatus(val)}
             >
-              <SelectTrigger className="h-9 w-40 text-xs bg-background border-border text-foreground">
+              <SelectTrigger className="h-9 w-40 text-foreground">
                 <SelectValue placeholder="Update status" />
               </SelectTrigger>
               <SelectContent className="bg-card border-border text-foreground">
@@ -379,18 +357,16 @@ export default function TenantAdminOrderDetailPage({
             </Select>
 
             <Button
-              size="sm"
               onClick={handleUpdateStatus}
               disabled={
                 isUpdatingStatus ||
                 selectedStatus === order.status.toLowerCase()
               }
-              className="bg-primary text-primary-foreground font-semibold rounded-xl"
             >
               {isUpdatingStatus ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                <Save className="w-4 h-4 mr-1.5" />
+                <Save className="w-4 h-4" />
               )}
               Save
             </Button>
@@ -407,7 +383,7 @@ export default function TenantAdminOrderDetailPage({
                 style={{ zIndex: 0 }}
               >
                 <div
-                  className="h-full bg-emerald-600 dark:bg-emerald-500 rounded-full transition-all duration-500"
+                  className="h-full bg-primary rounded-full transition-all duration-500"
                   style={{
                     width: `${(Math.max(0, activeStepIdx) / 4) * 100}%`,
                   }}
@@ -427,7 +403,7 @@ export default function TenantAdminOrderDetailPage({
                     <div
                       className={`w-9 h-9 rounded-full flex items-center justify-center border-2 transition-all ${
                         isCompleted
-                          ? "bg-emerald-600 dark:bg-emerald-500 text-white border-emerald-600 dark:border-emerald-500 shadow-xs"
+                          ? "bg-primary text-white border-primary"
                           : "bg-background text-muted-foreground border-muted-foreground/30"
                       }`}
                     >
@@ -464,13 +440,13 @@ export default function TenantAdminOrderDetailPage({
         {/* Left Column (Span 2): Products and Cost Breakdown */}
         <div className="lg:col-span-2 space-y-6">
           {/* Ordered Products Card */}
-          <div className="bg-card border border-border rounded-2xl p-6 shadow-xs space-y-4">
+          <div className="bg-card border border-border rounded-xl p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div className="flex items-center gap-2">
                 <ShoppingBag className="w-4 h-4 text-primary" />
-                <h3 className="font-semibold text-foreground text-sm">
+                <h6 className="font-secondary font-semibold text-foreground">
                   Ordered Products ({order.items?.length || 0})
-                </h3>
+                </h6>
               </div>
               <span className="text-xs text-muted-foreground">
                 Pricing in {order.currency}
@@ -483,7 +459,7 @@ export default function TenantAdminOrderDetailPage({
                   item.image ||
                   item.image_url ||
                   (Array.isArray(item.images) && item.images[0]) ||
-                  "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=300&q=80";
+                  null;
 
                 return (
                   <div
@@ -491,19 +467,23 @@ export default function TenantAdminOrderDetailPage({
                     className="py-4 first:pt-2 last:pb-2 flex items-center justify-between gap-4"
                   >
                     <div className="flex items-center gap-3.5 min-w-0">
-                      <div className="w-14 h-14 rounded-xl border border-border overflow-hidden bg-muted relative shrink-0">
-                        <Image
-                          src={itemImg}
-                          alt={item.title}
-                          fill
-                          className="object-cover"
-                          sizes="56px"
-                        />
+                      <div className="w-14 h-14 rounded-xl border border-border overflow-hidden bg-muted flex items-center justify-center relative shrink-0">
+                        {itemImg ? (
+                          <Image
+                            src={itemImg}
+                            alt={item.title}
+                            fill
+                            className="object-cover"
+                            sizes="56px"
+                          />
+                        ) : (
+                          <Package className="w-6 h-6 text-muted-foreground/60" />
+                        )}
                       </div>
                       <div className="min-w-0">
-                        <h4 className="font-semibold text-foreground text-sm truncate">
+                        <h6 className="font-semibold text-foreground truncate">
                           {item.title}
-                        </h4>
+                        </h6>
                         <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5 flex-wrap">
                           <span>Qty: {item.quantity}</span>
                           <span>•</span>
@@ -525,12 +505,12 @@ export default function TenantAdminOrderDetailPage({
                     </div>
 
                     <div className="text-right shrink-0">
-                      <span className="font-bold text-foreground text-sm">
+                      <p className="font-bold text-foreground">
                         {formatCurrency(
                           item.unit_price * item.quantity,
                           order.currency,
                         )}
-                      </span>
+                      </p>
                     </div>
                   </div>
                 );
@@ -539,15 +519,15 @@ export default function TenantAdminOrderDetailPage({
           </div>
 
           {/* Payment Breakdown Card */}
-          <div className="bg-card border border-border rounded-2xl p-6 shadow-xs space-y-4">
+          <div className="bg-card border border-border rounded-xl p-6  space-y-4">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div className="flex items-center gap-2">
                 <CreditCard className="w-4 h-4 text-primary" />
-                <h3 className="font-semibold text-foreground text-sm">
+                <h6 className="font-secondary font-semibold text-foreground">
                   Financial & Payout Breakdown
-                </h3>
+                </h6>
               </div>
-              <Badge className="bg-muted border border-border px-2 py-0.5 text-xs font-medium text-foreground capitalize">
+              <Badge className="bg-muted border border-border px-2 py-1.5 text-xs font-medium text-foreground capitalize">
                 {order.payment_gateway}
               </Badge>
             </div>
@@ -602,9 +582,11 @@ export default function TenantAdminOrderDetailPage({
 
             <div className="text-xs text-muted-foreground pt-2 flex items-center justify-between border-t border-border">
               <span>Gateway Reference:</span>
-              <code className="bg-muted px-2 py-1 rounded font-mono text-[11px] text-foreground">
-                {order.gateway_reference}
-              </code>
+              <CopyableId
+                id={order.gateway_reference}
+                length={12}
+                textClassName="bg-muted px-2 py-0.5 rounded font-mono text-[11px] text-foreground"
+              />
             </div>
           </div>
         </div>
@@ -612,12 +594,12 @@ export default function TenantAdminOrderDetailPage({
         {/* Right Column: Customer Info & Delivery Details */}
         <div className="space-y-6">
           {/* Customer Profile Card */}
-          <div className="bg-card border border-border rounded-2xl p-6 shadow-xs space-y-4">
+          <div className="bg-card border border-border rounded-xl p-6  space-y-4">
             <div className="flex items-center gap-2 border-b border-border pb-3">
               <UserIcon className="w-4 h-4 text-primary" />
-              <h3 className="font-semibold text-foreground text-sm">
+              <h6 className="font-secondary font-semibold text-foreground">
                 Customer Details
-              </h3>
+              </h6>
             </div>
 
             <div className="flex items-center gap-3">
@@ -632,42 +614,29 @@ export default function TenantAdminOrderDetailPage({
                 <div className="font-semibold text-foreground text-sm truncate">
                   {order.customer_name}
                 </div>
-                <div className="text-xs text-muted-foreground truncate">
-                  {order.customer_email}
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2 pt-2 border-t border-border text-xs">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Mail className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                <a
-                  href={`mailto:${order.customer_email}`}
-                  className="hover:text-primary transition-colors truncate"
-                >
-                  {order.customer_email}
-                </a>
-              </div>
-              {order.user_id && (
                 <div className="flex items-center gap-2 text-muted-foreground">
-                  <span className="font-mono text-[10px] bg-muted px-1.5 py-0.5 rounded truncate">
-                    User ID: {order.user_id}
-                  </span>
+                  <Mail className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  <Link
+                    href={`mailto:${order.customer_email}`}
+                    className="hover:text-primary text-xs transition-colors truncate"
+                  >
+                    {order.customer_email}
+                  </Link>
                 </div>
-              )}
+              </div>
             </div>
           </div>
 
           {/* Delivery & Fulfillment Details Card */}
-          <div className="bg-card border border-border rounded-2xl p-6 shadow-xs space-y-4">
+          <div className="bg-card border border-border rounded-xl p-6  space-y-4">
             <div className="flex items-center gap-2 border-b border-border pb-3">
               <Truck className="w-4 h-4 text-primary" />
-              <h3 className="font-semibold text-foreground text-sm">
+              <h6 className="font-secondary font-semibold text-foreground">
                 Fulfillment & Destination
-              </h3>
+              </h6>
             </div>
 
-            <div className="space-y-3 text-xs">
+            <div className="space-y-3">
               <div>
                 <span className="text-muted-foreground font-medium">
                   Method:
@@ -708,8 +677,8 @@ export default function TenantAdminOrderDetailPage({
               )}
 
               {order.metadata_json?.fulfillment_date && (
-                <div className="flex items-center gap-2 text-foreground pt-2 border-t border-border">
-                  <Calendar className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                <div className="flex items-start gap-2 text-foreground pt-2 border-t border-border">
+                  <Calendar className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
                   <span>
                     Requested Schedule: {order.metadata_json.fulfillment_date}{" "}
                     {order.metadata_json.fulfillment_time || ""}
@@ -722,7 +691,7 @@ export default function TenantAdminOrderDetailPage({
                   <span className="font-semibold text-[11px] text-foreground block mb-1">
                     Gift / Special Message:
                   </span>
-                  <p className="italic text-muted-foreground text-[11px]">
+                  <p className="text-muted-foreground text-[11px]">
                     &quot;{order.metadata_json.gift_message}&quot;
                   </p>
                 </div>
@@ -731,12 +700,12 @@ export default function TenantAdminOrderDetailPage({
           </div>
 
           {/* Courier & Tracking Notes */}
-          <div className="bg-card border border-border rounded-2xl p-6 shadow-xs space-y-4">
+          <div className="bg-card border border-border rounded-xl p-6  space-y-4">
             <div className="flex items-center gap-2 border-b border-border pb-3">
               <FileText className="w-4 h-4 text-primary" />
-              <h3 className="font-semibold text-foreground text-sm">
+              <h6 className="font-secondary font-semibold text-foreground">
                 Tracking Notes & Courier Info
-              </h3>
+              </h6>
             </div>
 
             <div className="space-y-3">
@@ -748,14 +717,13 @@ export default function TenantAdminOrderDetailPage({
                 value={trackingNotes}
                 onChange={(e) => setTrackingNotes(e.target.value)}
                 rows={3}
-                className="text-xs bg-background border-border"
+                className="bg-background border-border"
               />
               <Button
-                size="sm"
                 variant="outline"
                 onClick={handleUpdateStatus}
                 disabled={isUpdatingStatus}
-                className="w-full text-xs font-semibold rounded-xl"
+                className="w-full"
               >
                 {isUpdatingStatus ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />

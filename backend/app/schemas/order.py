@@ -116,3 +116,9 @@ class OrderResponse(BaseModel):
 class OrderStatusUpdate(BaseModel):
     status: str
     tracking_notes: Optional[str] = None
+
+
+class OrderCancelRequest(BaseModel):
+    reason: Optional[str] = None
+    customer_email: Optional[str] = None
+

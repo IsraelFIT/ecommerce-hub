@@ -51,6 +51,14 @@ class PostgresAdapter(ProductRepositoryAdapter):
         inventory_count = sum(v.stock_quantity for v in variants_list if v.track_inventory)
         prod_currency = product.currency or self.currency or "NGN"
 
+        has_tracked_inv = any(v.track_inventory for v in variants_list)
+        if has_tracked_inv and inventory_count <= 0:
+            avail = "out_of_stock"
+        elif has_tracked_inv and inventory_count < 5:
+            avail = "low_stock"
+        else:
+            avail = getattr(product, "availability", "available") or "available"
+
         return ProductResponse(
             id=product.id,
             tenant_id=product.tenant_id,
@@ -64,7 +72,7 @@ class PostgresAdapter(ProductRepositoryAdapter):
             category_id=product.category_id,
             category=product.category_str,
             images=product.images or [],
-            availability=getattr(product, "availability", "available") or "available",
+            availability=avail,
             is_published=product.is_published,
             variants=variants_list,
             sku=sku,
@@ -83,6 +91,14 @@ class PostgresAdapter(ProductRepositoryAdapter):
         inventory_count = sum(v.stock_quantity for v in variants_list if v.track_inventory) if variants_list else (product.inventory_count or 0)
         prod_currency = product.currency or self.currency or "NGN"
 
+        has_tracked_inv = any(v.track_inventory for v in variants_list) if variants_list else True
+        if has_tracked_inv and inventory_count <= 0:
+            avail = "out_of_stock"
+        elif has_tracked_inv and inventory_count < 5:
+            avail = "low_stock"
+        else:
+            avail = getattr(product, "availability", "available") or "available"
+
         first_img = product.images[0] if (product.images and len(product.images) > 0) else None
         images = [first_img] if first_img else []
 
@@ -96,7 +112,7 @@ class PostgresAdapter(ProductRepositoryAdapter):
             filters=product.filters or {},
             category=product.category_str,
             images=images,
-            availability=getattr(product, "availability", "available") or "available",
+            availability=avail,
             is_published=product.is_published,
             price=price,
             currency=prod_currency,
@@ -323,6 +339,7 @@ class PostgresAdapter(ProductRepositoryAdapter):
                 Product.is_deleted == False,
             )
             .options(selectinload(Product.variants), selectinload(Product.category))
+            .with_for_update()
         )
         result = await self.session.execute(query)
         product = result.scalar_one_or_none()
@@ -420,14 +437,31 @@ class PostgresAdapter(ProductRepositoryAdapter):
             if product_in.sku is not None:
                 primary_v.sku = product_in.sku
 
+        # Recalculate remaining total stock per product and apply draft/low_stock states if inventory is tracked
+        tracked = [v for v in (product.variants or []) if v.track_inventory]
+        if tracked:
+            total_stock = sum(v.stock_quantity for v in tracked)
+            if total_stock <= 0:
+                product.is_published = False
+                product.availability = "out_of_stock"
+            elif total_stock < 5:
+                if product.availability not in ("preorder",):
+                    product.availability = "low_stock"
+            elif product.availability in ("out_of_stock", "low_stock"):
+                product.availability = "available"
+
         await self.session.commit()
         return await self.get_by_id(product.id)
 
     async def delete_product(self, product_id: uuid.UUID) -> bool:
-        query = select(Product).where(
-            Product.id == product_id,
-            Product.tenant_id == self.tenant_id,
-            Product.is_deleted == False,
+        query = (
+            select(Product)
+            .where(
+                Product.id == product_id,
+                Product.tenant_id == self.tenant_id,
+                Product.is_deleted == False,
+            )
+            .with_for_update()
         )
         result = await self.session.execute(query)
         product = result.scalar_one_or_none()

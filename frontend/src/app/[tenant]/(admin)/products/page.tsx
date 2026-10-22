@@ -1786,9 +1786,7 @@ export default function TenantProductsPage({ params }: ProductsPageProps) {
                   pClass === "service" ||
                   variantsList.some((v) => !v.track_inventory);
 
-                const imageUrl =
-                  (p.images && p.images[0]) ||
-                  "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=600&auto=format&fit=crop&q=80";
+                const imageUrl = (p.images && p.images[0]) || null;
 
                 return (
                   <TableRow
@@ -1797,14 +1795,18 @@ export default function TenantProductsPage({ params }: ProductsPageProps) {
                   >
                     <TableCell className="py-3">
                       <div className="flex items-center gap-3">
-                        <div className="relative w-10 h-10 rounded-lg bg-muted overflow-hidden shrink-0 border border-border">
-                          <Image
-                            src={imageUrl}
-                            alt={name}
-                            fill
-                            sizes="40px"
-                            className="object-cover"
-                          />
+                        <div className="relative w-10 h-10 rounded-lg bg-muted overflow-hidden shrink-0 border border-border flex items-center justify-center">
+                          {imageUrl ? (
+                            <Image
+                              src={imageUrl}
+                              alt={name}
+                              fill
+                              sizes="40px"
+                              className="object-cover"
+                            />
+                          ) : (
+                            <Package className="w-5 h-5 text-muted-foreground/60" />
+                          )}
                         </div>
                         <div className="min-w-0">
                           <Link

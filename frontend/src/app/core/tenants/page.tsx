@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { PaymentGatewayLogo } from "@/components/shared/payment-gateway-logo";
 
 interface TenantRecord {
   id: string;
@@ -255,9 +256,9 @@ export default function CoreTenantsPage() {
                       </span>
                     )}
                   </td>
-                  <td className="p-3.5  text-[11px]">
-                    <div className="font-semibold text-foreground">
-                      {t.gateway.toUpperCase()}
+                  <td className="p-3.5 text-[11px]">
+                    <div className="font-semibold text-foreground mb-1">
+                      <PaymentGatewayLogo gateway={t.gateway} />
                     </div>
                     <div className="text-muted-foreground text-[10px]">
                       {t.subaccount}

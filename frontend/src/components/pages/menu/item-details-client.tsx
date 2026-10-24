@@ -529,6 +529,9 @@ export function ItemDetailsClient({
         ...(Object.keys(selectedOptions).length > 0
           ? { options: selectedOptions }
           : {}),
+        stock_quantity: tracksInventory ? currentStock : undefined,
+        track_inventory: tracksInventory,
+        product_id: item.id,
       },
       quantity,
     );
@@ -936,7 +939,11 @@ export function ItemDetailsClient({
                         currentStock > 0 &&
                         quantity >= currentStock
                       ) {
-                        toast.error(`Only ${currentStock} units available.`);
+                        toast.error(
+                          currentStock === 1
+                            ? "Only 1 order left."
+                            : `Only ${currentStock} orders left.`,
+                        );
                         return;
                       }
                       setQuantity(quantity + 1);

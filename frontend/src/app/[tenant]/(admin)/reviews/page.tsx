@@ -40,6 +40,7 @@ import {
   type ReviewStats,
 } from "@/lib/api/reviews";
 import { UserAvatar } from "@/components/shared/user-avatar";
+import { PaginationMeta } from "@/types";
 
 export default function TenantReviewsAdminPage() {
   const params = useParams();
@@ -47,6 +48,7 @@ export default function TenantReviewsAdminPage() {
 
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [, setStats] = useState<ReviewStats | null>(null);
+  const [pagination, setPagination] = useState<PaginationMeta | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -59,12 +61,15 @@ export default function TenantReviewsAdminPage() {
     try {
       setIsRefreshing(true);
       const [reviewsRes, statsRes] = await Promise.all([
-        getReviews({ tenantSlug: activeTenantSlug, perPage: 100 }),
+        getReviews({ tenantSlug: activeTenantSlug, perPage: 10 }),
         getReviewStats({ tenantSlug: activeTenantSlug }),
       ]);
 
       if (reviewsRes.status === "success" && reviewsRes.data?.items) {
         setReviews(reviewsRes.data.items);
+        if (reviewsRes.pagination) {
+          setPagination(reviewsRes.pagination as PaginationMeta);
+        }
       }
       if (statsRes.status === "success" && statsRes.data) {
         setStats(statsRes.data);
@@ -426,42 +431,45 @@ export default function TenantReviewsAdminPage() {
         </Table>
 
         {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="p-3 border-t border-stone-200 flex items-center justify-between">
-            <span className="text-xs text-stone-500">
-              Page {safeCurrentPage} of {totalPages}
-            </span>
-            <Pagination className="justify-end">
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    className="cursor-pointer text-xs"
-                  />
-                </PaginationItem>
-                {Array.from({ length: totalPages }).map((_, idx) => (
-                  <PaginationItem key={idx}>
-                    <PaginationLink
-                      isActive={safeCurrentPage === idx + 1}
-                      onClick={() => setCurrentPage(idx + 1)}
+        {(pagination?.total !== undefined
+          ? pagination.total >= 10
+          : filteredReviews.length >= 10) &&
+          totalPages > 1 && (
+            <div className="p-3 border-t border-stone-200 flex items-center justify-between">
+              <span className="text-xs text-stone-500">
+                Page {safeCurrentPage} of {totalPages}
+              </span>
+              <Pagination className="justify-end">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                       className="cursor-pointer text-xs"
-                    >
-                      {idx + 1}
-                    </PaginationLink>
+                    />
                   </PaginationItem>
-                ))}
-                <PaginationItem>
-                  <PaginationNext
-                    onClick={() =>
-                      setCurrentPage((p) => Math.min(totalPages, p + 1))
-                    }
-                    className="cursor-pointer text-xs"
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-          </div>
-        )}
+                  {Array.from({ length: totalPages }).map((_, idx) => (
+                    <PaginationItem key={idx}>
+                      <PaginationLink
+                        isActive={safeCurrentPage === idx + 1}
+                        onClick={() => setCurrentPage(idx + 1)}
+                        className="cursor-pointer text-xs"
+                      >
+                        {idx + 1}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() =>
+                        setCurrentPage((p) => Math.min(totalPages, p + 1))
+                      }
+                      className="cursor-pointer text-xs"
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
       </div>
     </div>
   );

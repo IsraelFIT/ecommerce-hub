@@ -25,6 +25,7 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { PaymentGatewayLogo } from "@/components/shared/payment-gateway-logo";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -243,11 +244,24 @@ export default function TenantAdminOrderDetailPage({
   const isCancelled =
     order.status.toLowerCase() === "cancelled" ||
     order.status.toLowerCase() === "failed";
-  const itemsSubtotal = (order.items || []).reduce(
-    (acc, it) => acc + (it.unit_price || 0) * (it.quantity || 1),
-    0,
+  const itemsSubtotal = Number(
+    order.subtotal ??
+      order.metadata_json?.subtotal ??
+      (order.items || []).reduce(
+        (acc, it) => acc + (Number(it.unit_price) || 0) * (it.quantity || 1),
+        0,
+      ),
   );
-  const deliveryFee = order.metadata_json?.delivery_fee || 0;
+  const deliveryFee = Number(
+    order.delivery_fee ?? order.metadata_json?.delivery_fee ?? 0,
+  );
+  const taxAmount = Number(
+    order.tax_amount ?? order.metadata_json?.tax_amount ?? 0,
+  );
+  const taxTitle =
+    order.tax_title ||
+    (order.metadata_json?.tax_title as string) ||
+    "VAT (7.5%)";
   const address = order.metadata_json?.delivery_address;
   const fulfillmentType = order.metadata_json?.fulfillment_type || "delivery";
 
@@ -527,9 +541,7 @@ export default function TenantAdminOrderDetailPage({
                   Financial & Payout Breakdown
                 </h6>
               </div>
-              <Badge className="bg-muted border border-border px-2 py-1.5 text-xs font-medium text-foreground capitalize">
-                {order.payment_gateway}
-              </Badge>
+              <PaymentGatewayLogo gateway={order.payment_gateway} />
             </div>
 
             <div className="space-y-2.5 text-sm">
@@ -545,6 +557,15 @@ export default function TenantAdminOrderDetailPage({
                   <span>Delivery Fee</span>
                   <span className="font-medium text-foreground">
                     {formatCurrency(deliveryFee, order.currency)}
+                  </span>
+                </div>
+              )}
+
+              {taxAmount > 0 && (
+                <div className="flex justify-between text-muted-foreground">
+                  <span>{taxTitle}</span>
+                  <span className="font-medium text-foreground">
+                    {formatCurrency(taxAmount, order.currency)}
                   </span>
                 </div>
               )}
@@ -566,11 +587,11 @@ export default function TenantAdminOrderDetailPage({
               </div>
 
               <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 mt-3 flex justify-between items-center">
-                <div>
-                  <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 block">
+                <div className="flex flex-col">
+                  <span className="font-semibold text-emerald-800 dark:text-emerald-300 block">
                     Merchant Net Payout (97.5%)
                   </span>
-                  <span className="text-[11px] text-emerald-700/80 dark:text-emerald-400/80">
+                  <span className="text-xs text-emerald-700/80 dark:text-emerald-400/80">
                     Direct split to your connected payout account
                   </span>
                 </div>

@@ -37,6 +37,7 @@ import { useTenantTheme } from "@/components/providers/tenant-theme-provider";
 import { formatCurrency } from "@/utils/helper";
 import { UserAvatar } from "@/components/shared/user-avatar";
 import { CopyableId } from "@/components/shared/copyable-id";
+import { PaginationMeta } from "@/types";
 
 export default function TenantUsersAdminPage() {
   const params = useParams();
@@ -52,6 +53,7 @@ export default function TenantUsersAdminPage() {
   const tenantCurrency = tenant?.currency || user?.tenant_currency || "NGN";
 
   const [users, setUsers] = useState<TenantUserItem[]>([]);
+  const [pagination, setPagination] = useState<PaginationMeta | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -66,6 +68,9 @@ export default function TenantUsersAdminPage() {
       const res = await getTenantUsers(activeTenantSlug);
       if (res.status === "success" && res.data?.items) {
         setUsers(res.data.items);
+        if (res.pagination) {
+          setPagination(res.pagination as PaginationMeta);
+        }
       } else {
         setUsers([]);
       }
@@ -344,7 +349,9 @@ export default function TenantUsersAdminPage() {
                             <span className="text-[11px] text-muted-foreground block truncate">
                               {item.email}
                             </span>
-                            <span className="text-muted-foreground/40 text-[10px]">•</span>
+                            <span className="text-muted-foreground/40 text-[10px]">
+                              •
+                            </span>
                             <CopyableId
                               id={item.id}
                               length={7}
@@ -396,42 +403,45 @@ export default function TenantUsersAdminPage() {
         </Table>
 
         {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="p-3 border-t border-stone-200 flex items-center justify-between">
-            <span className="text-xs text-stone-500">
-              Page {safeCurrentPage} of {totalPages}
-            </span>
-            <Pagination className="justify-end">
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    className="cursor-pointer text-xs"
-                  />
-                </PaginationItem>
-                {Array.from({ length: totalPages }).map((_, idx) => (
-                  <PaginationItem key={idx}>
-                    <PaginationLink
-                      isActive={safeCurrentPage === idx + 1}
-                      onClick={() => setCurrentPage(idx + 1)}
+        {(pagination?.total !== undefined
+          ? pagination.total >= 10
+          : filteredUsers.length >= 10) &&
+          totalPages > 1 && (
+            <div className="p-3 border-t border-stone-200 flex items-center justify-between">
+              <span className="text-xs text-stone-500">
+                Page {safeCurrentPage} of {totalPages}
+              </span>
+              <Pagination className="justify-end">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                       className="cursor-pointer text-xs"
-                    >
-                      {idx + 1}
-                    </PaginationLink>
+                    />
                   </PaginationItem>
-                ))}
-                <PaginationItem>
-                  <PaginationNext
-                    onClick={() =>
-                      setCurrentPage((p) => Math.min(totalPages, p + 1))
-                    }
-                    className="cursor-pointer text-xs"
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-          </div>
-        )}
+                  {Array.from({ length: totalPages }).map((_, idx) => (
+                    <PaginationItem key={idx}>
+                      <PaginationLink
+                        isActive={safeCurrentPage === idx + 1}
+                        onClick={() => setCurrentPage(idx + 1)}
+                        className="cursor-pointer text-xs"
+                      >
+                        {idx + 1}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() =>
+                        setCurrentPage((p) => Math.min(totalPages, p + 1))
+                      }
+                      className="cursor-pointer text-xs"
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
       </div>
     </div>
   );

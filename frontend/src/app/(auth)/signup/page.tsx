@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PaymentGatewayLogo } from "@/components/shared/payment-gateway-logo";
 import {
   Select,
   SelectContent,
@@ -727,13 +728,21 @@ export default function SignupPage() {
                           <span className="font-bold text-primary  text-sm">
                             {selectedCountry.currency}
                           </span>
-                          <span className="text-muted-foreground font-medium">
-                            {["NGN", "GHS", "KES", "ZAR"].includes(
-                              selectedCountry.currency,
-                            )
-                              ? "Paystack Automated Split"
-                              : "Stripe Connect"}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <PaymentGatewayLogo
+                              gateway={
+                                ["NGN", "GHS", "KES", "ZAR"].includes(
+                                  selectedCountry.currency,
+                                )
+                                  ? "paystack"
+                                  : "stripe"
+                              }
+                              imgClassName="h-3.5 w-auto"
+                            />
+                            <span className="text-muted-foreground text-[11px] font-medium">
+                              Split
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { UserProfileSettingsCard } from "@/components/shared/user-profile-settings-card";
 import { toast } from "sonner";
+import { PaymentGatewayLogo } from "@/components/shared/payment-gateway-logo";
 
 export default function CoreSettingsPage() {
   const params = useParams();
@@ -42,7 +43,7 @@ export default function CoreSettingsPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="platform" className="space-y-6 w-full">
+      <Tabs defaultValue="platform" className="w-full flex flex-col gap-6">
         <TabsList className="bg-muted/60 p-1 border border-border h-10 w-full sm:w-auto grid grid-cols-2 sm:inline-flex">
           <TabsTrigger
             value="platform"
@@ -60,18 +61,6 @@ export default function CoreSettingsPage() {
 
         {/* Tab 1: Platform & Policy Configuration */}
         <TabsContent value="platform" className="space-y-6 mt-0">
-          <div className="flex justify-end">
-            <Button
-              size="md"
-              onClick={handleSave}
-              disabled={isSaving}
-              className="gap-1.5 h-8 text-xs cursor-pointer"
-            >
-              <Save className="size-3.5" />
-              <span>{isSaving ? "Saving..." : "Save Configuration"}</span>
-            </Button>
-          </div>
-
           <form
             onSubmit={handleSave}
             className="grid grid-cols-1 md:grid-cols-2 gap-5 text-xs"
@@ -159,9 +148,30 @@ export default function CoreSettingsPage() {
                     Stripe Connect (Express & Custom Splits)
                   </option>
                 </select>
+                <div className="mt-2.5 flex items-center gap-2 p-2 bg-card border border-border rounded-lg">
+                  <span className="text-[11px] text-muted-foreground font-medium">
+                    Active Gateway:
+                  </span>
+                  <PaymentGatewayLogo
+                    gateway={defaultGateway}
+                    imgClassName="h-9"
+                  />
+                </div>
               </div>
             </div>
           </form>
+
+          <div className="flex justify-end">
+            <Button
+              size="md"
+              onClick={handleSave}
+              disabled={isSaving}
+              className="gap-1.5 h-8 text-xs cursor-pointer"
+            >
+              <Save className="size-3.5" />
+              <span>{isSaving ? "Saving..." : "Save Configuration"}</span>
+            </Button>
+          </div>
         </TabsContent>
 
         {/* Tab 2: Super Admin Profile */}

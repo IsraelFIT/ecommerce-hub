@@ -1,7 +1,7 @@
 import uuid
 import re
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Dict, Any
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 
@@ -198,6 +198,11 @@ class UserResponse(BaseModel):
     role: str
     is_active: bool
     tenant_id: Optional[uuid.UUID] = None
+    tenant_slug: Optional[str] = None
+    tenant_name: Optional[str] = None
+    paystack_subaccount_code: Optional[str] = None
+    stripe_account_id: Optional[str] = None
+    tenant_branding: Optional[Dict[str, Any]] = None
     created_at: datetime
 
 

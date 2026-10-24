@@ -202,7 +202,7 @@ async def list_products(
             if user:
                 if user.role in ("super_admin", "admin"):
                     is_authorized_admin = True
-                elif user.role == "tenant_admin" and adapter_tenant_id and user.tenant_id == adapter_tenant_id:
+                elif user.role in ("tenant_admin", "hub_admin") and adapter_tenant_id and user.tenant_id == adapter_tenant_id:
                     is_authorized_admin = True
         if not is_authorized_admin:
             effective_published_only = True

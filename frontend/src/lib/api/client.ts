@@ -210,33 +210,53 @@ export const apiRequest = async <T = unknown>(
         ? localStorage.getItem("ecommerce_guest_session_id")
         : null;
 
-    // Detect tenant slug in browser if available
-    let autoTenantSlug: string | null = null;
-    if (typeof window !== "undefined") {
+    // 1. Primary Source of Truth: Decode tenant slug from access token claims
+    let tokenTenantSlug: string | null = session?.tenantSlug || null;
+    let tokenRole: string | null = (session?.role as string) || null;
+
+    if (accessToken && (!tokenTenantSlug || !tokenRole)) {
+      try {
+        const parts = accessToken.split(".");
+        if (parts.length >= 2) {
+          const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+          const jsonStr = decodeURIComponent(
+            atob(base64)
+              .split("")
+              .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+              .join(""),
+          );
+          const payload = JSON.parse(jsonStr);
+          tokenTenantSlug = payload.tenant_slug || payload.tenantSlug || null;
+          tokenRole = payload.role || null;
+        }
+      } catch {
+        // ignore decode failure
+      }
+    }
+
+    let effectiveTenantSlug: string | null = tokenTenantSlug;
+
+    // 2. If user is super_admin or hub_admin, allow them to explicitly target a tenant via headers
+    if (tokenRole === "super_admin" || tokenRole === "hub_admin") {
+      const explicitHeaderSlug = options.headers
+        ? (options.headers as Record<string, string>)["X-Tenant-Slug"] ||
+          (options.headers as Record<string, string>)["x-tenant-slug"]
+        : null;
+      if (explicitHeaderSlug) {
+        effectiveTenantSlug = explicitHeaderSlug;
+      }
+    }
+
+    // 3. Fallback ONLY for unauthenticated public storefront visitors (shoppers on subdomains)
+    if (!effectiveTenantSlug && typeof window !== "undefined") {
       const hostname = window.location.hostname.toLowerCase();
       if (
         hostname.includes(".localhost") &&
-        !hostname.startsWith("localhost")
+        !hostname.startsWith("localhost") &&
+        !hostname.startsWith("core.")
       ) {
-        autoTenantSlug = hostname.split(".localhost")[0];
-      } else {
-        const segs = window.location.pathname.split("/").filter(Boolean);
-        const reserved = [
-          "api",
-          "core",
-          "login",
-          "signup",
-          "dashboard",
-          "_next",
-          "static",
-        ];
-        if (segs.length > 0 && !reserved.includes(segs[0])) {
-          autoTenantSlug = segs[0];
-        }
+        effectiveTenantSlug = hostname.split(".localhost")[0];
       }
-    }
-    if (!autoTenantSlug && session?.tenantSlug) {
-      autoTenantSlug = session.tenantSlug;
     }
 
     // Prepare headers with JSON default (unless FormData) and Bearer authorization
@@ -244,8 +264,8 @@ export const apiRequest = async <T = unknown>(
       ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       ...(guestId ? { "X-Session-ID": guestId } : {}),
-      ...(autoTenantSlug ? { "X-Tenant-Slug": autoTenantSlug } : {}),
       ...options.headers,
+      ...(effectiveTenantSlug ? { "X-Tenant-Slug": effectiveTenantSlug } : {}),
     };
 
     const path = normalizeEndpoint(endpoint);

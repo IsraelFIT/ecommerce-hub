@@ -40,6 +40,10 @@ class BrandingConfig(BaseModel):
     deliveryFee: Optional[float] = Field(default=45.0, description="Standard delivery fee amount")
     deliveryInstruction: Optional[str] = Field(default=None, description="Custom delivery instructions/terms")
     pickupInstruction: Optional[str] = Field(default=None, description="Custom pickup instructions/terms")
+    settlementBank: Optional[str] = Field(default=None, description="Bank settlement code")
+    settlementBankName: Optional[str] = Field(default=None, description="Bank settlement name")
+    settlementAccount: Optional[str] = Field(default=None, description="NUBAN settlement account number")
+    settlementAccountName: Optional[str] = Field(default=None, description="Verified account holder name")
 
 
 class TenantBase(BaseModel):
@@ -66,6 +70,8 @@ class TenantBase(BaseModel):
     delivery_fee: Optional[float] = Field(default=45.0, description="Standard delivery fee amount")
     delivery_instruction: Optional[str] = Field(default=None, description="Custom delivery terms/instructions")
     pickup_instruction: Optional[str] = Field(default=None, description="Custom pickup terms/instructions")
+    paystack_subaccount_code: Optional[str] = Field(default=None, description="Paystack automated subaccount code (ACCT_xxxx)")
+    stripe_account_id: Optional[str] = Field(default=None, description="Stripe connected express account ID (acct_xxxx)")
 
     branding_config: BrandingConfig = Field(default_factory=BrandingConfig)
 
@@ -95,9 +101,6 @@ class TenantCreate(TenantBase):
             }
         }
     )
-
-    paystack_subaccount_code: Optional[str] = None
-    stripe_account_id: Optional[str] = None
 
 
 class TenantUpdate(BaseModel):

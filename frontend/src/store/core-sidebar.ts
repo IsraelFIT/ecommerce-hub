@@ -8,6 +8,7 @@ import {
   Code2,
   ShieldCheck,
   Palette,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 
@@ -46,6 +47,19 @@ export const CORE_NAV_ITEMS: CoreNavItem[] = [
     detailTitle: "Tenant Details",
     detailSubtitle:
       "Manage store configuration, domain bindings, and adapter status",
+  },
+  {
+    id: "users",
+    label: "Users & Tenant Admins",
+    shortLabel: "Users",
+    icon: Users,
+    href: "/users",
+    title: "Users & Tenant Admins",
+    subtitle:
+      "Directory of store owners, platform administrators, and customer bases",
+    detailTitle: "Tenant Admin & Customers",
+    detailSubtitle:
+      "Customer accounts, order statistics, and administrative privileges",
   },
   {
     id: "customizations",
@@ -128,6 +142,16 @@ export const EXTRA_CORE_PAGE_INFO: Record<string, PageInfo> = {
     title: "Platform Settings",
     subtitle:
       "Global platform fee %, default payment routing, and master configuration",
+  },
+  "/users": {
+    title: "Users & Tenant Admins",
+    subtitle:
+      "Directory of store owners, platform administrators, and customer bases",
+  },
+  "/core/users": {
+    title: "Users & Tenant Admins",
+    subtitle:
+      "Directory of store owners, platform administrators, and customer bases",
   },
 };
 

@@ -24,15 +24,8 @@ import {
   TableRow,
   TableCell,
 } from "@/components/ui/table";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PaymentGatewayLogo } from "@/components/shared/payment-gateway-logo";
 import { useUserStore } from "@/store/user";
 import { useTenantTheme } from "@/components/providers/tenant-theme-provider";
 import {
@@ -76,10 +69,6 @@ export default function TenantOverviewPage({ params }: AdminPageProps) {
   const [orders, setOrders] = useState<ApiOrder[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-
-  // Pagination for Orders Table
-  const [orderPage, setOrderPage] = useState(1);
-  const pageSize = 5;
 
   useEffect(() => {
     let isMounted = true;
@@ -156,22 +145,49 @@ export default function TenantOverviewPage({ params }: AdminPageProps) {
 
   const activeProducts = products.filter((p) => p.is_published !== false);
   const lowStockProducts = products.filter((p) => {
+    // Products of class 'service' or 'digital' have unlimited inventory and are never low on stock
+    if (p.product_class === "service" || p.product_class === "digital") {
+      return false;
+    }
+
     const variantsList = p.variants || [];
-    const totalStock =
-      variantsList.length > 0
-        ? variantsList.reduce(
-            (acc, v) => acc + (v.track_inventory ? v.stock_quantity : 0),
-            0,
-          )
-        : (p.inventory_count ?? 0);
-    return totalStock <= 5;
+    if (variantsList.length > 0) {
+      // If ANY variant is unlimited (does not track inventory), the product is not low on stock
+      if (variantsList.some((v) => !v.track_inventory)) {
+        return false;
+      }
+      const trackedVariants = variantsList.filter((v) => v.track_inventory);
+      if (trackedVariants.length === 0) {
+        return false;
+      }
+      const totalStock = trackedVariants.reduce(
+        (acc, v) => acc + (v.stock_quantity ?? 0),
+        0,
+      );
+      return totalStock <= 5;
+    }
+
+    // Flat products without variants: only evaluate if track_inventory is not false and inventory_count exists
+    const productTracksInventory =
+      p.track_inventory !== false &&
+      p.inventory_count !== undefined &&
+      p.inventory_count !== null;
+
+    if (!productTracksInventory) {
+      return false;
+    }
+
+    return (p.inventory_count ?? 0) <= 5;
   });
 
-  const totalOrderPages = Math.max(1, Math.ceil(orders.length / pageSize));
-  const paginatedOrders = orders.slice(
-    (orderPage - 1) * pageSize,
-    orderPage * pageSize,
-  );
+  // Display strictly the latest five orders on the admin overview
+  const latestOrders = [...orders]
+    .sort(
+      (a, b) =>
+        new Date(b.created_at || 0).getTime() -
+        new Date(a.created_at || 0).getTime(),
+    )
+    .slice(0, 5);
 
   return (
     <div className="space-y-6 w-full text-foreground">
@@ -412,7 +428,7 @@ export default function TenantOverviewPage({ params }: AdminPageProps) {
                     </TableCell>
                   </TableRow>
                 ))
-              ) : paginatedOrders.length === 0 ? (
+              ) : latestOrders.length === 0 ? (
                 <TableRow>
                   <TableCell
                     colSpan={6}
@@ -423,17 +439,10 @@ export default function TenantOverviewPage({ params }: AdminPageProps) {
                   </TableCell>
                 </TableRow>
               ) : (
-                paginatedOrders.map((ord) => {
+                latestOrders.map((ord) => {
                   const customerName = ord.customer_name || "Customer";
                   const customerEmail = ord.customer_email || "—";
                   const customerAvatar = ord.customer_avatar_url || undefined;
-                  const gatewayName = ord.payment_gateway
-                    ? ord.payment_gateway.toLowerCase().includes("stripe")
-                      ? "Stripe Connect"
-                      : ord.payment_gateway.toLowerCase().includes("paystack")
-                        ? "Paystack Split"
-                        : ord.payment_gateway.toUpperCase()
-                    : "Direct Split";
                   const grossVal = Number(ord.total_amount) || 0;
                   const netVal =
                     Number(ord.tenant_payout_amount) || grossVal * 0.975;
@@ -477,9 +486,7 @@ export default function TenantOverviewPage({ params }: AdminPageProps) {
                         </div>
                       </TableCell>
                       <TableCell className="p-3.5">
-                        <Badge className="bg-muted border border-border px-2 py-0.5 text-[11px] font-medium text-foreground">
-                          {gatewayName}
-                        </Badge>
+                        <PaymentGatewayLogo gateway={ord.payment_gateway} />
                       </TableCell>
                       <TableCell className="p-3.5 font-semibold text-foreground text-xs">
                         {formatCurrency(grossVal, ordCurrency)}
@@ -511,64 +518,19 @@ export default function TenantOverviewPage({ params }: AdminPageProps) {
             </TableBody>
           </Table>
 
-          {/* Pagination */}
+          {/* Footer */}
           <div className="p-3.5 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
             <span className="text-[11px]">
-              Showing{" "}
-              {orders.length === 0
-                ? 0
-                : Math.min((orderPage - 1) * pageSize + 1, orders.length)}{" "}
-              to {Math.min(orderPage * pageSize, orders.length)} of{" "}
-              {orders.length} orders
+              Showing {orders.length === 0 ? 0 : latestOrders.length} of{" "}
+              {orders.length} orders (latest 5)
             </span>
-            <Pagination className="mx-0 w-auto">
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (orderPage > 1) setOrderPage(orderPage - 1);
-                    }}
-                    className={
-                      orderPage === 1
-                        ? "pointer-events-none opacity-50"
-                        : "cursor-pointer"
-                    }
-                  />
-                </PaginationItem>
-                {Array.from({ length: totalOrderPages }, (_, idx) => (
-                  <PaginationItem key={idx + 1}>
-                    <PaginationLink
-                      href="#"
-                      isActive={orderPage === idx + 1}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setOrderPage(idx + 1);
-                      }}
-                      className="cursor-pointer text-xs"
-                    >
-                      {idx + 1}
-                    </PaginationLink>
-                  </PaginationItem>
-                ))}
-                <PaginationItem>
-                  <PaginationNext
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (orderPage < totalOrderPages)
-                        setOrderPage(orderPage + 1);
-                    }}
-                    className={
-                      orderPage === totalOrderPages
-                        ? "pointer-events-none opacity-50"
-                        : "cursor-pointer"
-                    }
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
+            <Link
+              href={getTenantRoute(tenantSlug, "/orders")}
+              className="text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1"
+            >
+              <span>View all orders</span>
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Link>
           </div>
         </div>
 

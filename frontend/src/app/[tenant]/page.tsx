@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import CoreDashboardLayout from "./(core)/layout";
-import CoreDashboardPage from "./(core)/core/page";
+import { redirect } from "next/navigation";
 import { DefaultStorefront } from "@/components/storefronts/default/default-storefront";
 import {
   BESPOKE_STOREFRONTS,
@@ -39,11 +38,7 @@ export default async function TenantStorefrontPage({
   const { tenant } = await params;
 
   if (tenant === "core") {
-    return (
-      <CoreDashboardLayout>
-        <CoreDashboardPage />
-      </CoreDashboardLayout>
-    );
+    redirect("/core");
   }
 
   // 1. Fetch server-side tenant configuration

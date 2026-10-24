@@ -61,3 +61,45 @@ class CheckoutSessionResponse(BaseModel):
     reference: str
     gateway: str
     split_details: Optional[SplitDetails] = None
+
+
+class PaystackBank(BaseModel):
+    name: str
+    code: str
+    slug: Optional[str] = None
+    id: Optional[int] = None
+
+
+class ResolveAccountRequest(BaseModel):
+    account_number: str
+    bank_code: str
+
+
+class ResolveAccountResponse(BaseModel):
+    account_number: str
+    account_name: str
+    bank_id: Optional[int] = None
+
+
+class CreateSubaccountRequest(BaseModel):
+    bank_code: str
+    account_number: str
+    business_name: Optional[str] = None
+
+
+class CreateSubaccountResponse(BaseModel):
+    subaccount_code: str
+    business_name: str
+    settlement_bank: str
+    account_number: str
+    percentage_charge: float = 2.5
+
+
+class StripeOnboardRequest(BaseModel):
+    return_url: Optional[str] = None
+    refresh_url: Optional[str] = None
+
+
+class StripeOnboardResponse(BaseModel):
+    account_id: str
+    onboarding_url: str

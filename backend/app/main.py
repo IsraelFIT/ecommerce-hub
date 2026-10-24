@@ -21,6 +21,7 @@ from app.routes import (
     reviews_router,
     likes_router,
     cart_router,
+    users_router,
 )
 
 
@@ -90,6 +91,7 @@ app.include_router(customizations_router, prefix="/api")
 app.include_router(reviews_router, prefix="/api")
 app.include_router(likes_router, prefix="/api")
 app.include_router(cart_router, prefix="/api")
+app.include_router(users_router, prefix="/api")
 
 
 from app.schemas.response import success_response, ApiResponse

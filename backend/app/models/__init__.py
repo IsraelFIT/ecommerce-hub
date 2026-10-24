@@ -10,6 +10,7 @@ from app.models.customization_request import CustomizationRequest
 from app.models.review import Review
 from app.models.like import ProductLike
 from app.models.cart import UserCart
+from app.models.bank import Bank
 
 __all__ = [
     "Base",
@@ -33,4 +34,5 @@ __all__ = [
     "Review",
     "ProductLike",
     "UserCart",
+    "Bank",
 ]

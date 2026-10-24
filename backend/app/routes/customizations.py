@@ -63,7 +63,7 @@ async def submit_landing_page_request(
         )
 
     if current_user.role != "super_admin":
-        if current_user.role not in ["admin", "tenant_admin"] or current_user.tenant_id != tenant.id:
+        if current_user.role not in ["admin", "tenant_admin", "hub_admin"] or current_user.tenant_id != tenant.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have administrative access to this tenant store.",
@@ -166,7 +166,7 @@ async def set_landing_page_type(
         )
 
     if current_user.role != "super_admin":
-        if current_user.role not in ["admin", "tenant_admin"] or current_user.tenant_id != tenant.id:
+        if current_user.role not in ["admin", "tenant_admin", "hub_admin"] or current_user.tenant_id != tenant.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have administrative access to this tenant store.",
@@ -335,17 +335,18 @@ async def list_tenant_brandings(
     t_results = await db.execute(query)
     tenants = t_results.scalars().all()
 
-    # 2. Check Customization Requests for these tenants
+    # 2. Check Customization Requests for these tenants (most recent first)
     tenant_ids = [t.id for t in tenants]
-    reqs_res = await db.execute(
-        select(CustomizationRequest).where(
-            CustomizationRequest.tenant_id.in_(tenant_ids)
-        )
-    )
-    all_reqs = reqs_res.scalars().all()
     reqs_by_tenant = {}
-    for r in all_reqs:
-        reqs_by_tenant[r.tenant_id] = r
+    if tenant_ids:
+        reqs_res = await db.execute(
+            select(CustomizationRequest)
+            .where(CustomizationRequest.tenant_id.in_(tenant_ids))
+            .order_by(desc(CustomizationRequest.created_at))
+        )
+        for r in reqs_res.scalars().all():
+            if r.tenant_id not in reqs_by_tenant:
+                reqs_by_tenant[r.tenant_id] = r
 
     items = []
     for t in tenants:
@@ -355,6 +356,9 @@ async def list_tenant_brandings(
         l_type = cfg.get("landingPageType", "default")
         if landing_type and landing_type.lower() != "all" and l_type != landing_type.lower():
             continue
+
+        has_custom = req is not None or (cfg.get("customLandingPageStatus") not in (None, "none", ""))
+        cust_status = req.status if req else cfg.get("customLandingPageStatus", "none")
 
         items.append(
             TenantBrandingSummary(
@@ -370,8 +374,8 @@ async def list_tenant_brandings(
                     "secondaryColor", cfg.get("accentColor", "#ec4899")
                 ),
                 landing_page_type=l_type,
-                has_custom_request=req is not None,
-                custom_request_status=req.status if req else cfg.get("customLandingPageStatus", "none"),
+                has_custom_request=has_custom,
+                custom_request_status=cust_status,
                 logo_url=cfg.get("logoUrl"),
                 store_headline=cfg.get("storeHeadline"),
                 announcement_text=cfg.get("announcementText"),
@@ -413,7 +417,7 @@ async def get_tenant_customization_status(
         )
 
     if current_user.role != "super_admin":
-        if current_user.role not in ["admin", "tenant_admin"] or current_user.tenant_id != tenant.id:
+        if current_user.role not in ["admin", "tenant_admin", "hub_admin"] or current_user.tenant_id != tenant.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have administrative access to this tenant store.",

@@ -14,6 +14,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import { PaginationMeta } from "@/types";
 import { CopyableId } from "@/components/shared/copyable-id";
 import { useTenantTheme } from "@/components/providers/tenant-theme-provider";
 import { useUserStore } from "@/store/user";
@@ -32,6 +42,38 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
+function getVisiblePages(
+  currentPage: number,
+  totalPages: number,
+): (number | string)[] {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+  if (currentPage <= 4) {
+    return [1, 2, 3, 4, 5, "...", totalPages];
+  }
+  if (currentPage >= totalPages - 3) {
+    return [
+      1,
+      "...",
+      totalPages - 4,
+      totalPages - 3,
+      totalPages - 2,
+      totalPages - 1,
+      totalPages,
+    ];
+  }
+  return [
+    1,
+    "...",
+    currentPage - 1,
+    currentPage,
+    currentPage + 1,
+    "...",
+    totalPages,
+  ];
+}
+
 export default function ProfileOrdersPage() {
   const params = useParams();
   const tenant = (params?.tenant as string) || "store";
@@ -44,6 +86,9 @@ export default function ProfileOrdersPage() {
   const [orders, setOrders] = useState<OrderDisplay[]>([]);
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
   const [orderFilter, setOrderFilter] = useState("All");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState<PaginationMeta | null>(null);
+  const pageSize = 10;
 
   useEffect(() => {
     let isMounted = true;
@@ -53,13 +98,17 @@ export default function ProfileOrdersPage() {
       try {
         const res = await fetchOrders({
           tenantSlug: tenant,
-          page: 1,
-          per_page: 50,
+          page: currentPage,
+          per_page: pageSize,
           customer_email: user?.email,
           user_id: user?.id,
         });
 
         if (!isMounted) return;
+
+        if (res.pagination) {
+          setPagination(res.pagination as PaginationMeta);
+        }
 
         if (res.data?.items && Array.isArray(res.data.items)) {
           const userEmail = (user?.email || "").trim().toLowerCase();
@@ -101,7 +150,7 @@ export default function ProfileOrdersPage() {
     return () => {
       isMounted = false;
     };
-  }, [tenant, user?.email, user?.id]);
+  }, [tenant, user?.email, user?.id, currentPage]);
 
   const [downloadingOrderId, setDownloadingOrderId] = useState<string | null>(
     null,
@@ -202,20 +251,32 @@ export default function ProfileOrdersPage() {
     }
   };
 
+  const totalOrders = pagination?.total ?? orders.length;
+  const totalPages =
+    pagination?.last_page ?? Math.max(1, Math.ceil(totalOrders / pageSize));
+  const showPagination = totalOrders > 10;
+
   return (
     <div>
       {/* Title & Filter Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 mb-6 border-b border-border">
         <h4 className="font-bold text-foreground">
-          Order History ({filteredOrders.length})
+          Order History (
+          {orderFilter === "All" ? totalOrders : filteredOrders.length})
         </h4>
 
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">
             Filter Status:
           </span>
-          <Select value={orderFilter} onValueChange={setOrderFilter}>
-            <SelectTrigger className="w-36 h-9 text-xs">
+          <Select
+            value={orderFilter}
+            onValueChange={(val) => {
+              setOrderFilter(val);
+              setCurrentPage(1);
+            }}
+          >
+            <SelectTrigger className="w-36 h-9">
               <SelectValue placeholder="All" />
             </SelectTrigger>
             <SelectContent>
@@ -419,6 +480,84 @@ export default function ProfileOrdersPage() {
               </div>
             </div>
           ))}
+
+          {showPagination && (
+            <div className="pt-6 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4">
+              <span className="text-xs text-muted-foreground">
+                Showing{" "}
+                <strong className="text-foreground">
+                  {(currentPage - 1) * pageSize + 1}
+                </strong>{" "}
+                to{" "}
+                <strong className="text-foreground">
+                  {Math.min(currentPage * pageSize, totalOrders)}
+                </strong>{" "}
+                of <strong className="text-foreground">{totalOrders}</strong>{" "}
+                orders
+              </span>
+
+              <Pagination className="mx-0 w-auto">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (currentPage > 1) setCurrentPage((prev) => prev - 1);
+                      }}
+                      className={
+                        currentPage <= 1
+                          ? "pointer-events-none opacity-50"
+                          : "cursor-pointer"
+                      }
+                    />
+                  </PaginationItem>
+
+                  {getVisiblePages(currentPage, totalPages).map((p, idx) => {
+                    if (p === "...") {
+                      return (
+                        <PaginationItem key={`ellipsis-${idx}`}>
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                      );
+                    }
+                    const pageNum = Number(p);
+                    return (
+                      <PaginationItem key={pageNum}>
+                        <PaginationLink
+                          href="#"
+                          isActive={currentPage === pageNum}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setCurrentPage(pageNum);
+                          }}
+                          className="cursor-pointer text-xs"
+                        >
+                          {pageNum}
+                        </PaginationLink>
+                      </PaginationItem>
+                    );
+                  })}
+
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (currentPage < totalPages)
+                          setCurrentPage((prev) => prev + 1);
+                      }}
+                      className={
+                        currentPage >= totalPages
+                          ? "pointer-events-none opacity-50"
+                          : "cursor-pointer"
+                      }
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
         </div>
       )}
     </div>

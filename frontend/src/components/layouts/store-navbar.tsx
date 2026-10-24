@@ -1,14 +1,7 @@
 "use client";
 
 import { useParams, usePathname } from "next/navigation";
-import {
-  Menu,
-  PanelLeft,
-  Search,
-  Bell,
-  ArrowUpRight,
-  Sparkles,
-} from "lucide-react";
+import { Menu, PanelLeft, Search, Bell, ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import useSidebarStore, { getStoreAdminPageInfo } from "@/store/sidebar";
 import useUserStore from "@/store/user";
@@ -98,7 +91,6 @@ export function StoreNavbar() {
           className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-card border border-border text-xs text-foreground hover:text-primary hover:border-primary/50 transition-all shadow-2xs group"
           title="Open live public storefront in a new tab"
         >
-          <Sparkles className="size-3.5 text-primary group-hover:rotate-12 transition-transform" />
           <span className="text-[11px] font-semibold">Live Store</span>
           <ArrowUpRight className="size-3 text-muted-foreground group-hover:text-primary transition-colors" />
         </a>

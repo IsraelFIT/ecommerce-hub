@@ -4,10 +4,23 @@ export * from "./order";
 export * from "./payment";
 
 export interface ApiResponse<T = unknown> {
-  success: boolean;
+  status?: "success" | "error";
+  success?: boolean;
   data?: T;
   message?: string;
+  pagination?: PaginationMeta;
+  filters?: Record<string, unknown>;
   error?: string;
+  errors?: Record<string, string[] | string>;
+}
+
+export interface PaginationMeta {
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+  next_page_url?: string | null;
+  prev_page_url?: string | null;
 }
 
 export interface TenantBranding {
@@ -19,4 +32,3 @@ export interface TenantBranding {
   accentColor?: string;
   customDomain?: string;
 }
-

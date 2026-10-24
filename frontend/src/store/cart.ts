@@ -16,6 +16,9 @@ export interface CartItem {
   description: string;
   quantity: number;
   options?: Record<string, unknown>;
+  stock_quantity?: number;
+  track_inventory?: boolean;
+  product_id?: string;
 }
 
 function matchOptions(
@@ -263,7 +266,11 @@ export const useCartStore = create<CartStore>()(
           image: cleanProps.image || "",
           description: cleanProps.description || "",
           quantity,
-          ...(options && Object.keys(options).length > 0 ? { options } : {}),
+          options:
+            options && Object.keys(options).length > 0 ? options : undefined,
+          stock_quantity: cleanProps.stock_quantity,
+          track_inventory: cleanProps.track_inventory,
+          product_id: cleanProps.product_id,
         };
 
         set((state) => {
@@ -275,7 +282,20 @@ export const useCartStore = create<CartStore>()(
 
           if (existingItemIndex > -1) {
             updatedItems = [...state.items];
-            updatedItems[existingItemIndex].quantity += quantity;
+            const existing = updatedItems[existingItemIndex];
+            updatedItems[existingItemIndex] = {
+              ...existing,
+              quantity: existing.quantity + quantity,
+              stock_quantity:
+                normalizedItem.stock_quantity !== undefined
+                  ? normalizedItem.stock_quantity
+                  : existing.stock_quantity,
+              track_inventory:
+                normalizedItem.track_inventory !== undefined
+                  ? normalizedItem.track_inventory
+                  : existing.track_inventory,
+              product_id: normalizedItem.product_id || existing.product_id,
+            };
           } else {
             updatedItems = [...state.items, normalizedItem];
           }

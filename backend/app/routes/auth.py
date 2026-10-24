@@ -504,9 +504,19 @@ async def reset_password(
 )
 async def get_me(
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     user_data = UserResponse.model_validate(current_user).model_dump(mode="json")
     user_data["full_name"] = f"{current_user.first_name} {current_user.last_name}"
+    if current_user.tenant_id:
+        t_res = await db.execute(select(Tenant).where(Tenant.id == current_user.tenant_id))
+        tenant = t_res.scalar_one_or_none()
+        if tenant:
+            user_data["tenant_slug"] = tenant.slug
+            user_data["tenant_name"] = tenant.name
+            user_data["paystack_subaccount_code"] = tenant.paystack_subaccount_code
+            user_data["stripe_account_id"] = tenant.stripe_account_id
+            user_data["tenant_branding"] = tenant.branding_config
     return success_response(
         data=user_data,
         message="User details retrieved successfully",

@@ -26,31 +26,34 @@ async def get_tenant_context(
     db: AsyncSession = Depends(get_db),
 ) -> Tenant:
     """
-    Extracts tenant identity from request headers (X-Tenant-ID / X-Tenant-Slug),
-    falls back to Bearer access token claims, query parameters, referer URL,
-    or customer email profile resolution.
+    Extracts tenant identity prioritizing the signed JWT Bearer access token as the
+    immutable, tamper-proof source of truth. Even if client URL or headers are tampered with,
+    the tenant encoded in the verified JWT token governs.
+    Falls back to X-Tenant-ID/X-Tenant-Slug, subdomain, or query parameters only for
+    unauthenticated requests or super_admin/hub_admin users.
     """
     tenant: Optional[Tenant] = None
 
-    if x_tenant_id:
-        try:
-            t_uuid = uuid.UUID(x_tenant_id)
-            result = await db.execute(select(Tenant).where(Tenant.id == t_uuid))
-            tenant = result.scalar_one_or_none()
-        except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid X-Tenant-ID UUID format",
-            )
-    elif x_tenant_slug:
-        result = await db.execute(select(Tenant).where(Tenant.slug == x_tenant_slug.lower()))
-        tenant = result.scalar_one_or_none()
-    elif authorization and authorization.startswith("Bearer "):
+    # 1. Primary Source of Truth: Decode authenticated JWT Access Token
+    token: Optional[str] = None
+    if authorization and authorization.startswith("Bearer "):
         token = authorization.split("Bearer ")[1].strip()
+    elif request:
+        auth_header = request.headers.get("authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split("Bearer ")[1].strip()
+        else:
+            token = request.cookies.get("auth_session") or request.cookies.get("auth_token")
+
+    token_role: Optional[str] = None
+    if token:
         payload = decode_access_token(token)
         if payload:
+            token_role = payload.get("role")
             token_tenant_id = payload.get("tenant_id")
             token_tenant_slug = payload.get("tenant_slug")
+
+            # A. Tenant bound user (tenant_admin, customer, etc.)
             if token_tenant_id:
                 try:
                     t_uuid = uuid.UUID(str(token_tenant_id))
@@ -58,18 +61,65 @@ async def get_tenant_context(
                     tenant = result.scalar_one_or_none()
                 except ValueError:
                     pass
+
             if not tenant and token_tenant_slug:
                 result = await db.execute(select(Tenant).where(Tenant.slug == str(token_tenant_slug).lower()))
                 tenant = result.scalar_one_or_none()
 
-    # Fallback 1: Query parameters (tenant_slug or tenant)
+            # B. Super Admin / Hub Admin: allowed to target any tenant via explicit header/param
+            if not tenant and token_role in ("super_admin", "hub_admin"):
+                if x_tenant_id:
+                    try:
+                        t_uuid = uuid.UUID(x_tenant_id)
+                        result = await db.execute(select(Tenant).where(Tenant.id == t_uuid))
+                        tenant = result.scalar_one_or_none()
+                    except ValueError:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Invalid X-Tenant-ID UUID format",
+                        )
+                elif x_tenant_slug:
+                    result = await db.execute(select(Tenant).where(Tenant.slug == x_tenant_slug.lower()))
+                    tenant = result.scalar_one_or_none()
+                elif request.query_params.get("tenant_slug") or request.query_params.get("tenant"):
+                    query_slug = request.query_params.get("tenant_slug") or request.query_params.get("tenant")
+                    if query_slug:
+                        result = await db.execute(select(Tenant).where(Tenant.slug == query_slug.strip().lower()))
+                        tenant = result.scalar_one_or_none()
+
+    # 2. Fallback for unauthenticated requests (public shoppers, storefront browsing)
+    if not tenant:
+        if x_tenant_id:
+            try:
+                t_uuid = uuid.UUID(x_tenant_id)
+                result = await db.execute(select(Tenant).where(Tenant.id == t_uuid))
+                tenant = result.scalar_one_or_none()
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid X-Tenant-ID UUID format",
+                )
+        elif x_tenant_slug:
+            result = await db.execute(select(Tenant).where(Tenant.slug == x_tenant_slug.lower()))
+            tenant = result.scalar_one_or_none()
+
+    # Fallback 3: Query parameters (tenant_slug or tenant)
     if not tenant:
         query_slug = request.query_params.get("tenant_slug") or request.query_params.get("tenant")
         if query_slug:
             result = await db.execute(select(Tenant).where(Tenant.slug == query_slug.strip().lower()))
             tenant = result.scalar_one_or_none()
 
-    # Fallback 2: Referer header (when proxied from frontend browser)
+    # Fallback 4: Host header subdomain
+    if not tenant and request.headers.get("host"):
+        host = request.headers.get("host", "").split(":")[0].lower()
+        if host.endswith(".localhost") and host != "localhost":
+            sub_slug = host.split(".localhost")[0]
+            if sub_slug and sub_slug not in ("api", "core", "www", "app"):
+                result = await db.execute(select(Tenant).where(Tenant.slug == sub_slug))
+                tenant = result.scalar_one_or_none()
+
+    # Fallback 5: Referer header (when proxied from frontend browser)
     if not tenant:
         referer = request.headers.get("referer")
         if referer:
@@ -77,22 +127,14 @@ async def get_tenant_context(
                 parsed_ref = urlparse(referer)
                 if parsed_ref.hostname:
                     host_parts = parsed_ref.hostname.split(".")
-                    if len(host_parts) > 1 and host_parts[0] not in ("localhost", "127", "www", "app"):
+                    if len(host_parts) > 1 and host_parts[0] not in ("localhost", "127", "www", "app", "core"):
                         subdomain = host_parts[0].lower()
                         result = await db.execute(select(Tenant).where(Tenant.slug == subdomain))
-                        tenant = result.scalar_one_or_none()
-
-                if not tenant and parsed_ref.path:
-                    path_segs = [s for s in parsed_ref.path.split("/") if s]
-                    reserved = {"api", "core", "login", "signup", "dashboard", "_next", "static", "favicon.ico"}
-                    if path_segs and path_segs[0].lower() not in reserved:
-                        slug_cand = path_segs[0].lower()
-                        result = await db.execute(select(Tenant).where(Tenant.slug == slug_cand))
                         tenant = result.scalar_one_or_none()
             except Exception:
                 pass
 
-    # Fallback 3: Customer email resolution if querying customer orders
+    # Fallback 6: Customer email resolution if querying customer orders
     if not tenant:
         customer_email = request.query_params.get("customer_email")
         if customer_email:
@@ -269,9 +311,9 @@ async def get_current_admin_user(
     user: User = Depends(get_current_user),
 ) -> User:
     """
-    Ensures that the authenticated user possesses admin / tenant_admin privileges.
+    Ensures that the authenticated user possesses admin / tenant_admin / hub_admin privileges.
     """
-    if user.role not in ["admin", "super_admin", "tenant_admin"]:
+    if user.role not in ["admin", "super_admin", "tenant_admin", "hub_admin"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Insufficient administrative privileges",

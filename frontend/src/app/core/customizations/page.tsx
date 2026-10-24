@@ -127,12 +127,12 @@ export default function CoreCustomizationsPage() {
 
   // Filter Brandings
   const filteredBrandings = brandings.filter((b) => {
+    const term = searchTerm.toLowerCase();
     const matchesSearch =
-      b.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      b.slug.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      b.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (b.store_headline &&
-        b.store_headline.toLowerCase().includes(searchTerm.toLowerCase()));
+      (b.name || "").toLowerCase().includes(term) ||
+      (b.slug || "").toLowerCase().includes(term) ||
+      (b.category || "").toLowerCase().includes(term) ||
+      (b.store_headline && b.store_headline.toLowerCase().includes(term));
 
     const matchesType =
       landingTypeFilter === "all" || b.landing_page_type === landingTypeFilter;
@@ -142,14 +142,13 @@ export default function CoreCustomizationsPage() {
 
   // Filter Requests
   const filteredRequests = requests.filter((r) => {
+    const term = searchTerm.toLowerCase();
     const matchesSearch =
-      r.tenant_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.tenant_slug.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (r.tenant_name || "").toLowerCase().includes(term) ||
+      (r.tenant_slug || "").toLowerCase().includes(term) ||
       (r.requested_by_email &&
-        r.requested_by_email
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase())) ||
-      (r.details && r.details.toLowerCase().includes(searchTerm.toLowerCase()));
+        r.requested_by_email.toLowerCase().includes(term)) ||
+      (r.details && r.details.toLowerCase().includes(term));
 
     const matchesStatus = statusFilter === "all" || r.status === statusFilter;
 
@@ -454,7 +453,7 @@ export default function CoreCustomizationsPage() {
                               {tenant.name}
                             </div>
                             <div className="text-[11px]  text-muted-foreground truncate">
-                              {tenant.slug}.localhost:3000
+                              {subUrl.replace(/^https?:\/\//, "")}
                             </div>
                           </div>
                         </div>

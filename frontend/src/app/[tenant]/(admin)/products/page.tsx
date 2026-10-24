@@ -71,7 +71,8 @@ import {
   CreateProductInput,
   ProductCategory,
   ProductFilter,
-} from "@/types/products";
+  PaginationMeta,
+} from "@/types";
 import { formatCurrency, getTenantRoute } from "@/utils/helper";
 
 interface ProductsPageProps {
@@ -151,7 +152,8 @@ export default function TenantProductsPage({ params }: ProductsPageProps) {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [classFilter, setClassFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 5;
+  const [pagination, setPagination] = useState<PaginationMeta | null>(null);
+  const pageSize = 10;
 
   // Currency State
   const [tenantCurrency, setTenantCurrency] = useState<string>(
@@ -364,6 +366,9 @@ export default function TenantProductsPage({ params }: ProductsPageProps) {
       if (res.status === "success" && res.data) {
         const items = res.data.items || [];
         setProducts(items);
+        if (res.pagination) {
+          setPagination(res.pagination as PaginationMeta);
+        }
         if (items.length > 0 && items[0].currency) {
           setTenantCurrency(items[0].currency);
         }
@@ -1958,42 +1963,45 @@ export default function TenantProductsPage({ params }: ProductsPageProps) {
         </Table>
 
         {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="p-3 border-t border-stone-200 flex items-center justify-between">
-            <span className="text-xs text-stone-500">
-              Page {currentPage} of {totalPages}
-            </span>
-            <Pagination className="justify-end">
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    className="cursor-pointer text-xs"
-                  />
-                </PaginationItem>
-                {Array.from({ length: totalPages }).map((_, idx) => (
-                  <PaginationItem key={idx}>
-                    <PaginationLink
-                      isActive={currentPage === idx + 1}
-                      onClick={() => setCurrentPage(idx + 1)}
+        {(pagination?.total !== undefined
+          ? pagination.total >= 10
+          : filteredProducts.length >= 10) &&
+          totalPages > 1 && (
+            <div className="p-3 border-t border-stone-200 flex items-center justify-between">
+              <span className="text-xs text-stone-500">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Pagination className="justify-end">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                       className="cursor-pointer text-xs"
-                    >
-                      {idx + 1}
-                    </PaginationLink>
+                    />
                   </PaginationItem>
-                ))}
-                <PaginationItem>
-                  <PaginationNext
-                    onClick={() =>
-                      setCurrentPage((p) => Math.min(totalPages, p + 1))
-                    }
-                    className="cursor-pointer text-xs"
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-          </div>
-        )}
+                  {Array.from({ length: totalPages }).map((_, idx) => (
+                    <PaginationItem key={idx}>
+                      <PaginationLink
+                        isActive={currentPage === idx + 1}
+                        onClick={() => setCurrentPage(idx + 1)}
+                        className="cursor-pointer text-xs"
+                      >
+                        {idx + 1}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() =>
+                        setCurrentPage((p) => Math.min(totalPages, p + 1))
+                      }
+                      className="cursor-pointer text-xs"
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
       </div>
     </div>
   );

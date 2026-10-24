@@ -23,11 +23,12 @@ export async function proxy(request: NextRequest) {
   const hostname = request.headers.get("host") || "";
   const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || "ecommerce-hub.com";
 
-  // 1. Skip static assets and internal paths
+  // 1. Skip static assets, public files with extensions, and internal paths
   if (
     excludedPaths.some(
       (path) => pathname === path || pathname.startsWith(`${path}/`),
-    )
+    ) ||
+    /\.(?:png|jpg|jpeg|gif|svg|webp|ico|css|js|woff2?|ttf|eot)$/i.test(pathname)
   ) {
     return NextResponse.next();
   }
@@ -58,46 +59,68 @@ export async function proxy(request: NextRequest) {
     );
     const requestHeaders = new Headers(request.headers);
 
-    let effectiveTenant = tenantSlug || requestHeaders.get("x-tenant-slug");
-    if (!effectiveTenant) {
-      effectiveTenant =
-        searchParams.get("tenant_slug") || searchParams.get("tenant") || null;
+    // 1. Resolve access token from Authorization header or auth cookies
+    const rawAuth = requestHeaders.get("authorization");
+    const token =
+      (rawAuth && rawAuth.startsWith("Bearer ")
+        ? rawAuth.split("Bearer ")[1]?.trim() || rawAuth.slice(7).trim()
+        : null) ||
+      request.cookies.get("auth_session")?.value ||
+      request.cookies.get("auth_token")?.value;
+
+    if (token && !requestHeaders.has("authorization")) {
+      requestHeaders.set("authorization", `Bearer ${token}`);
     }
-    if (!effectiveTenant) {
-      const referer = request.headers.get("referer");
-      if (referer) {
-        try {
-          const refererUrl = new URL(referer);
-          const segs = refererUrl.pathname.split("/").filter(Boolean);
-          const reserved = [
-            "api",
-            "core",
-            "login",
-            "signup",
-            "dashboard",
-            "_next",
-            "static",
-          ];
-          if (segs.length > 0 && !reserved.includes(segs[0])) {
-            effectiveTenant = segs[0];
-          }
-        } catch {
-          // ignore invalid referer
+
+    // 2. Primary Source of Truth: Decode verified JWT claims from access token
+    let tokenTenantSlug: string | null = null;
+    let tokenRole: string | null = null;
+    if (token) {
+      try {
+        const parts = token.split(".");
+        if (parts.length >= 2) {
+          const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+          const jsonStr = decodeURIComponent(
+            atob(base64)
+              .split("")
+              .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+              .join(""),
+          );
+          const payload = JSON.parse(jsonStr);
+          tokenTenantSlug = payload.tenant_slug || payload.tenantSlug || null;
+          tokenRole = payload.role || null;
         }
+      } catch {
+        // ignore decode failure
       }
     }
 
-    if (effectiveTenant && !requestHeaders.has("x-tenant-slug")) {
+    // 3. Determine effective tenant slug
+    let effectiveTenant: string | null = tokenTenantSlug;
+
+    // Super admin or Hub admin: allow explicit target via header or query params
+    if (tokenRole === "super_admin" || tokenRole === "hub_admin") {
+      effectiveTenant =
+        requestHeaders.get("x-tenant-slug") ||
+        searchParams.get("tenant_slug") ||
+        searchParams.get("tenant") ||
+        null;
+    }
+
+    // Unauthenticated public visitors: fallback to subdomain host or query params
+    if (!effectiveTenant) {
+      effectiveTenant =
+        tenantSlug ||
+        requestHeaders.get("x-tenant-slug") ||
+        searchParams.get("tenant_slug") ||
+        searchParams.get("tenant") ||
+        null;
+    }
+
+    if (effectiveTenant) {
       requestHeaders.set("x-tenant-slug", effectiveTenant);
     }
-    if (!requestHeaders.has("authorization")) {
-      const token =
-        request.cookies.get("auth_session")?.value ||
-        request.cookies.get("auth_token")?.value;
-      if (token) {
-        requestHeaders.set("authorization", `Bearer ${token}`);
-      }
-    }
+
     return NextResponse.rewrite(targetUrl, {
       request: {
         headers: requestHeaders,
@@ -193,7 +216,8 @@ export async function proxy(request: NextRequest) {
   if (
     !effectiveTenantSlug &&
     pathSegments.length > 0 &&
-    !reservedRootSlugs.includes(pathSegments[0])
+    !reservedRootSlugs.includes(pathSegments[0]) &&
+    !pathSegments[0].includes(".")
   ) {
     effectiveTenantSlug = pathSegments[0];
   }
@@ -211,9 +235,91 @@ export async function proxy(request: NextRequest) {
 
   // 4. Auth and Protected Route checking
   const isValid = validateSessionFromRequest(request);
+
+  // Extract authentic JWT token and decode verified claims
+  const rawAuth = request.headers.get("authorization");
+  const token =
+    (rawAuth && rawAuth.startsWith("Bearer ")
+      ? rawAuth.split("Bearer ")[1]?.trim() || rawAuth.slice(7).trim()
+      : null) ||
+    request.cookies.get("auth_session")?.value ||
+    request.cookies.get("auth_token")?.value;
+
+  let tokenRole: string | null = null;
+  let tokenTenantSlug: string | null = null;
+  if (token) {
+    try {
+      const parts = token.split(".");
+      if (parts.length >= 2) {
+        const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+        const jsonStr = decodeURIComponent(
+          atob(base64)
+            .split("")
+            .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+            .join(""),
+        );
+        const payload = JSON.parse(jsonStr);
+        tokenRole = payload.role || null;
+        tokenTenantSlug = payload.tenant_slug || payload.tenantSlug || null;
+      }
+    } catch {
+      // ignore decode failure
+    }
+  }
+
   const roleCookie = request.cookies.get("userRole")?.value;
-  const userRoles: string[] = roleCookie ? [roleCookie] : [];
-  const primaryRole = userRoles[0];
+  const primaryRole = tokenRole || roleCookie || null;
+  const userRoles: string[] = primaryRole ? [primaryRole] : [];
+
+  const isCorePlatform =
+    tenantSlug === "core" ||
+    pathname === "/core" ||
+    pathname.startsWith("/core/");
+
+  const isCoreAdmin =
+    primaryRole === "super_admin" ||
+    primaryRole === "hub_admin" ||
+    userRoles.includes("super_admin") ||
+    userRoles.includes("hub_admin");
+
+  // Core Platform Security Enforcement: ONLY super_admin and hub_admin can access http://core.localhost:3000/ and its pages
+  if (isCorePlatform && normalizedPath !== "/login") {
+    if (!isValid) {
+      const redirectUrl = new URL("/login", request.url);
+      redirectUrl.searchParams.set(
+        "redirect",
+        pathname +
+          (request.nextUrl.search &&
+          !request.nextUrl.search.includes("redirect")
+            ? request.nextUrl.search
+            : ""),
+      );
+      return NextResponse.redirect(redirectUrl);
+    }
+
+    if (!isCoreAdmin) {
+      const assignedTenant =
+        tokenTenantSlug ||
+        (effectiveTenantSlug && effectiveTenantSlug !== "core"
+          ? effectiveTenantSlug
+          : null);
+      const isLocal =
+        currentHost.includes("localhost") || currentHost.includes("127.0.0.1");
+      const port = request.nextUrl.port ? `:${request.nextUrl.port}` : "";
+
+      if (assignedTenant && assignedTenant !== "core") {
+        const targetUrl = isLocal
+          ? `http://${assignedTenant}.localhost${port}/admin`
+          : `https://${assignedTenant}.${rootDomain}/admin`;
+        return NextResponse.redirect(new URL(targetUrl));
+      }
+
+      const targetUrl = isLocal
+        ? `http://localhost${port}/dashboard`
+        : `https://${rootDomain}/dashboard`;
+      return NextResponse.redirect(new URL(targetUrl));
+    }
+  }
 
   const protectedRoutePrefixes = [
     "/dashboard",
@@ -276,17 +382,29 @@ export async function proxy(request: NextRequest) {
       }
       return NextResponse.redirect(new URL(targetRedirect, request.url));
     }
-    const fallbackPath =
-      primaryRole === "super_admin"
-        ? tenantSlug === "core"
-          ? "/"
-          : "/core"
-        : primaryRole === "tenant_admin" || primaryRole === "admin"
-          ? effectiveTenantSlug
-            ? `/${effectiveTenantSlug}/admin`
-            : "/dashboard"
-          : "/";
-    return NextResponse.redirect(new URL(fallbackPath, request.url));
+
+    if (isCoreAdmin) {
+      const fallbackPath = tenantSlug === "core" ? "/" : "/core";
+      return NextResponse.redirect(new URL(fallbackPath, request.url));
+    }
+
+    const assignedTenant =
+      tokenTenantSlug ||
+      (effectiveTenantSlug && effectiveTenantSlug !== "core"
+        ? effectiveTenantSlug
+        : null);
+    const isLocal =
+      currentHost.includes("localhost") || currentHost.includes("127.0.0.1");
+    const port = request.nextUrl.port ? `:${request.nextUrl.port}` : "";
+
+    if (assignedTenant && assignedTenant !== "core") {
+      const targetUrl = isLocal
+        ? `http://${assignedTenant}.localhost${port}/admin`
+        : `https://${assignedTenant}.${rootDomain}/admin`;
+      return NextResponse.redirect(new URL(targetUrl));
+    }
+
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   // Case 3: RBAC check
@@ -295,11 +413,27 @@ export async function proxy(request: NextRequest) {
     isProtectedPath &&
     !checkPathAllowed(normalizedPath, userRoles)
   ) {
-    const fallbackPath = effectiveTenantSlug
-      ? `/${effectiveTenantSlug}/admin`
-      : tenantSlug
+    const assignedTenant =
+      tokenTenantSlug ||
+      (effectiveTenantSlug && effectiveTenantSlug !== "core"
+        ? effectiveTenantSlug
+        : null);
+    const isLocal =
+      currentHost.includes("localhost") || currentHost.includes("127.0.0.1");
+    const port = request.nextUrl.port ? `:${request.nextUrl.port}` : "";
+
+    if (assignedTenant && assignedTenant !== "core") {
+      const targetUrl = isLocal
+        ? `http://${assignedTenant}.localhost${port}/admin`
+        : `https://${assignedTenant}.${rootDomain}/admin`;
+      return NextResponse.redirect(new URL(targetUrl));
+    }
+
+    const fallbackPath = isCoreAdmin
+      ? tenantSlug === "core"
         ? "/"
-        : "/dashboard";
+        : "/core"
+      : "/dashboard";
     return NextResponse.redirect(new URL(fallbackPath, request.url));
   }
 
@@ -321,14 +455,14 @@ export async function proxy(request: NextRequest) {
         coreSubPath === "/dashboard" ||
         coreSubPath === "/overview"
       ) {
-        rewrittenPath = "/core/core";
+        rewrittenPath = "/core";
       } else if (coreSubPath === "/login") {
-        rewrittenPath = "/core/login";
+        rewrittenPath = "/login";
       } else {
         const cleanSub = coreSubPath.startsWith("/")
           ? coreSubPath
           : `/${coreSubPath}`;
-        rewrittenPath = `/core/core${cleanSub}`;
+        rewrittenPath = `/core${cleanSub}`;
       }
     } else {
       rewrittenPath = `/${tenantSlug}${normalizedPath === "/" ? "" : normalizedPath}`;
@@ -362,8 +496,8 @@ export async function proxy(request: NextRequest) {
     if (currentHost.endsWith(".vercel.app")) {
       const targetPath =
         subPath === "/login"
-          ? "/core/login"
-          : `/core/core${subPath === "/" || subPath === "" ? "" : subPath}`;
+          ? "/login"
+          : `/core${subPath === "/" || subPath === "" ? "" : subPath}`;
       return NextResponse.rewrite(new URL(targetPath, request.url));
     }
 

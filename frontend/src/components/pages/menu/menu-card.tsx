@@ -216,6 +216,17 @@ export function MenuCard({
         price: price,
         description: description,
         image: imageUrl,
+        stock_quantity:
+          primaryVariant?.stock_quantity ??
+          (product as unknown as { stock_quantity?: number }).stock_quantity ??
+          (product as unknown as { inventory_count?: number }).inventory_count,
+        track_inventory:
+          primaryVariant?.track_inventory ??
+          ((product as unknown as { product_class?: string }).product_class !==
+            "service" &&
+            (product as unknown as { product_class?: string }).product_class !==
+              "digital"),
+        product_id: product.id,
       },
       1,
     );

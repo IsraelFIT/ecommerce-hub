@@ -226,6 +226,34 @@ async def init_db():
                     await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_user_carts_user_id ON user_carts (user_id);"))
                     await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_user_carts_tenant_id ON user_carts (tenant_id);"))
 
+                    # Banks cached table for Paystack supported settlement banks
+                    await conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS banks (
+                            id UUID PRIMARY KEY,
+                            paystack_id INTEGER,
+                            name VARCHAR(255) NOT NULL,
+                            slug VARCHAR(255),
+                            code VARCHAR(50) NOT NULL,
+                            longcode VARCHAR(50),
+                            gateway VARCHAR(50),
+                            pay_with_bank BOOLEAN DEFAULT FALSE NOT NULL,
+                            supports_transfer BOOLEAN DEFAULT TRUE NOT NULL,
+                            active BOOLEAN DEFAULT TRUE NOT NULL,
+                            is_deleted BOOLEAN DEFAULT FALSE NOT NULL,
+                            country VARCHAR(50) DEFAULT 'nigeria' NOT NULL,
+                            currency VARCHAR(10) DEFAULT 'NGN' NOT NULL,
+                            bank_type VARCHAR(50) DEFAULT 'nuban',
+                            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                        );
+                    """))
+                    await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_banks_name ON banks (name);"))
+                    await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_banks_code ON banks (code);"))
+                    await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_banks_country ON banks (country);"))
+                    await conn.execute(text("DROP INDEX IF EXISTS ix_banks_country_code;"))
+                    await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_banks_paystack_id ON banks (paystack_id);"))
+                    await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_banks_country_code ON banks (country, code);"))
+
                     try:
                         await conn.execute(text("ALTER TABLE products DROP CONSTRAINT IF EXISTS check_products_max_images;"))
                         await conn.execute(text("ALTER TABLE products ADD CONSTRAINT check_products_max_images CHECK (images IS NULL OR json_array_length(images) <= 5);"))

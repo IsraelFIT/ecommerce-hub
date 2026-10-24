@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
+import { PaymentGatewayLogo } from "@/components/shared/payment-gateway-logo";
 import {
   CreditCard,
   Calendar as CalendarIcon,
@@ -42,17 +43,18 @@ import { useCartStore } from "@/store/cart";
 import { useUserStore } from "@/store/user";
 import { formatCurrency, getTenantRoute } from "@/utils/helper";
 import { getTenantBySlug } from "@/lib/api/tenants";
-import { createOrder } from "@/lib/api/order";
+import { createOrder, calculateOrderPricing } from "@/lib/api/order";
 import { createCheckoutSession, verifyPayment } from "@/lib/api/payments";
 import { getUserAddresses, addUserAddress } from "@/lib/api/auth";
 import { Tenant, UserAddress } from "@/types/users";
-import { Order, CheckoutSessionResponse } from "@/types";
+import { Order, CheckoutSessionResponse, OrderCalculateResult } from "@/types";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 export default function CheckoutPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const tenantSlug = (params?.tenant as string) || "store";
   const { user } = useUserStore();
   const { items, getCartTotal, clearCart } = useCartStore();
@@ -97,8 +99,21 @@ export default function CheckoutPage() {
   }, [user]);
 
   const [fulfillmentType, setFulfillmentType] = useState<"pickup" | "delivery">(
-    "pickup",
+    () => {
+      const mode = searchParams?.get("fulfillment") || searchParams?.get("tab");
+      return mode === "delivery" ? "delivery" : "pickup";
+    },
   );
+
+  useEffect(() => {
+    const mode = searchParams?.get("fulfillment") || searchParams?.get("tab");
+    if (mode === "delivery") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFulfillmentType("delivery");
+    } else if (mode === "pickup") {
+      setFulfillmentType("pickup");
+    }
+  }, [searchParams]);
   const [date, setDate] = useState("");
   const [timeSlot, setTimeSlot] = useState("");
 
@@ -216,15 +231,64 @@ export default function CheckoutPage() {
     }
   }, [tenantData]);
 
+  // Server Pricing & Nigerian VAT calculation state
+  const [serverPricing, setServerPricing] =
+    useState<OrderCalculateResult | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (items.length === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setServerPricing(null);
+      return;
+    }
+    async function fetchPricingQuote() {
+      try {
+        const res = await calculateOrderPricing(
+          {
+            fulfillment_type: fulfillmentType,
+            items: items.map((it) => ({
+              product_id: it.id,
+              quantity: it.quantity,
+              options: it.options,
+            })),
+          },
+          tenantSlug,
+        );
+        if (isMounted && res.data) {
+          setServerPricing(res.data);
+        }
+      } catch (err) {
+        console.warn("Server pricing calculation error, using fallback:", err);
+      }
+    }
+    fetchPricingQuote();
+    return () => {
+      isMounted = false;
+    };
+  }, [items, fulfillmentType, tenantSlug]);
+
   const storeCurrency = tenantData?.currency || "NGN";
-  const subtotal = getCartTotal();
+  const isNigeria =
+    (tenantData?.country || "").toLowerCase().includes("nigeria") ||
+    storeCurrency.toUpperCase() === "NGN";
+
   const configuredDeliveryFee = Number(
     tenantData?.delivery_fee ?? tenantData?.branding_config?.deliveryFee ?? 45,
   );
+
+  const subtotal = serverPricing?.subtotal ?? getCartTotal();
   const deliveryFee =
-    fulfillmentType === "delivery" ? configuredDeliveryFee : 0;
-  const estTax = subtotal * 0.0825;
-  const total = subtotal + deliveryFee + estTax;
+    serverPricing?.delivery_fee ??
+    (fulfillmentType === "delivery" ? configuredDeliveryFee : 0);
+  const taxRate = serverPricing?.tax_rate ?? 0.075;
+  const taxTitle =
+    serverPricing?.tax_title ?? (isNigeria ? "VAT (7.5%)" : "VAT (7.5%)");
+  const taxAmount =
+    serverPricing?.tax_amount ?? Number((subtotal * taxRate).toFixed(2));
+  const total =
+    serverPricing?.total_amount ??
+    Number((subtotal + deliveryFee + taxAmount).toFixed(2));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -487,8 +551,12 @@ export default function CheckoutPage() {
                 <CreditCard className="h-7 w-7" />
               </div>
 
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider mb-2 bg-stone-100 text-stone-700">
-                <span>{paymentGateway} Payment Sandbox</span>
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider mb-2 bg-stone-100 text-stone-700">
+                <PaymentGatewayLogo
+                  gateway={paymentGateway}
+                  imgClassName="h-6"
+                />
+                <span>Payment Sandbox</span>
               </div>
 
               <h3 className="text-xl font-bold text-foreground text-center mb-1">
@@ -579,10 +647,7 @@ export default function CheckoutPage() {
                       Verifying Transaction with Provider...
                     </>
                   ) : (
-                    <>
-                      <ShieldCheck className="h-4 w-4 mr-2" />
-                      Simulate Successful Payment & Confirm Order
-                    </>
+                    <>Simulate Successful Payment & Confirm Order</>
                   )}
                 </Button>
 
@@ -1017,48 +1082,33 @@ export default function CheckoutPage() {
                     }
                   }}
                   className={cn(
-                    "relative p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between gap-3 text-left outline-none",
+                    "relative p-4 rounded-xl border-2 transition-all cursor-pointer flex items-center justify-between gap-4 outline-none min-h-18.5",
                     paymentGateway === "paystack"
-                      ? "border-emerald-600 bg-emerald-50/20 ring-1 ring-emerald-600/30 shadow-xs"
+                      ? "border-blue-400 bg-blue-50/20 ring-1 ring-blue-400/30 shadow-xs"
                       : "border-stone-200 hover:border-stone-300 bg-card text-foreground",
                   )}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-9 h-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
-                        P
-                      </div>
-                      <div>
-                        <div className="font-bold text-sm text-foreground flex items-center gap-1.5">
-                          Paystack
-                          <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full font-semibold">
-                            Direct / Subaccount
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-muted-foreground">
-                          Cards, Bank Transfer, Apple Pay, USSD
-                        </p>
-                      </div>
-                    </div>
-                    <div
-                      className={cn(
-                        "w-5 h-5 rounded-full border flex items-center justify-center transition-colors shrink-0 mt-0.5",
-                        paymentGateway === "paystack"
-                          ? "border-emerald-600 bg-emerald-600 text-white"
-                          : "border-stone-300 bg-white",
-                      )}
-                    >
-                      {paymentGateway === "paystack" && (
-                        <Check className="h-3 w-3 stroke-3" />
-                      )}
-                    </div>
+                  <div className="relative h-12 w-36">
+                    <Image
+                      src="/logos/paystack.png"
+                      alt="Paystack"
+                      fill
+                      unoptimized
+                      className="object-contain object-left"
+                      priority
+                    />
                   </div>
-
-                  <div className="pt-2 border-t border-stone-100 flex items-center justify-between text-[11px] text-muted-foreground">
-                    <span>Currency: NGN, GHS, ZAR, USD</span>
-                    <span className="font-semibold text-emerald-700">
-                      97.5% merchant payout
-                    </span>
+                  <div
+                    className={cn(
+                      "w-5 h-5 rounded-full border flex items-center justify-center transition-colors shrink-0",
+                      paymentGateway === "paystack"
+                        ? "border-blue-400 bg-blue-400 text-white"
+                        : "border-stone-300 bg-white",
+                    )}
+                  >
+                    {paymentGateway === "paystack" && (
+                      <Check className="h-3 w-3 stroke-3" />
+                    )}
                   </div>
                 </div>
 
@@ -1073,61 +1123,44 @@ export default function CheckoutPage() {
                     }
                   }}
                   className={cn(
-                    "relative p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between gap-3 text-left outline-none",
+                    "relative p-4 rounded-xl border-2 transition-all cursor-pointer flex items-center justify-between gap-4 outline-none min-h-18.5",
                     paymentGateway === "stripe"
                       ? "border-indigo-600 bg-indigo-50/20 ring-1 ring-indigo-600/30 shadow-xs"
                       : "border-stone-200 hover:border-stone-300 bg-card text-foreground",
                   )}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-9 h-9 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
-                        S
-                      </div>
-                      <div>
-                        <div className="font-bold text-sm text-foreground flex items-center gap-1.5">
-                          Stripe
-                          <span className="text-[10px] bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded-full font-semibold">
-                            Connect / Split
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-muted-foreground">
-                          Visa, Mastercard, Amex, Apple/Google Pay
-                        </p>
-                      </div>
-                    </div>
-                    <div
-                      className={cn(
-                        "w-5 h-5 rounded-full border flex items-center justify-center transition-colors shrink-0 mt-0.5",
-                        paymentGateway === "stripe"
-                          ? "border-indigo-600 bg-indigo-600 text-white"
-                          : "border-stone-300 bg-white",
-                      )}
-                    >
-                      {paymentGateway === "stripe" && (
-                        <Check className="h-3 w-3 stroke-3" />
-                      )}
-                    </div>
+                  <div className="relative h-7 w-32">
+                    <Image
+                      src="/logos/stripe.png"
+                      alt="Stripe"
+                      fill
+                      unoptimized
+                      className="object-contain object-left"
+                      priority
+                    />
                   </div>
-
-                  <div className="pt-2 border-t border-stone-100 flex items-center justify-between text-[11px] text-muted-foreground">
-                    <span>Global: 135+ Currencies</span>
-                    <span className="font-semibold text-indigo-700">
-                      Automated Connect payout
-                    </span>
+                  <div
+                    className={cn(
+                      "w-5 h-5 rounded-full border flex items-center justify-center transition-colors shrink-0",
+                      paymentGateway === "stripe"
+                        ? "border-indigo-600 bg-indigo-600 text-white"
+                        : "border-stone-300 bg-white",
+                    )}
+                  >
+                    {paymentGateway === "stripe" && (
+                      <Check className="h-3 w-3 stroke-3" />
+                    )}
                   </div>
                 </div>
               </div>
 
               <div className="mt-4 p-3 bg-stone-50 border border-stone-200/80 rounded-md text-xs text-muted-foreground flex items-center gap-2">
                 <Lock className="h-3.5 w-3.5 text-stone-500 shrink-0" />
-                <span>
-                  Payments are processed securely via{" "}
-                  <strong className="text-stone-800 capitalize font-medium">
-                    {paymentGateway}
-                  </strong>
-                  . Platform fees (2.5%) are retained and net proceeds route
-                  straight to the merchant.
+                <span className="flex items-center flex-wrap gap-1.5">
+                  Payments are processed securely via
+                  <PaymentGatewayLogo gateway={paymentGateway} />. Platform fees
+                  (2.5%) are retained and net proceeds route straight to the
+                  merchant.
                 </span>
               </div>
             </div>
@@ -1221,9 +1254,9 @@ export default function CheckoutPage() {
               </div>
 
               <div className="flex justify-between text-xs text-foreground font-medium">
-                <span>Sales Tax (8.25%)</span>
+                <span>{taxTitle}</span>
                 <span className="font-semibold text-sm text-foreground">
-                  {formatCurrency(estTax.toFixed(2), storeCurrency)}
+                  {formatCurrency(taxAmount.toFixed(2), storeCurrency)}
                 </span>
               </div>
 
@@ -1240,20 +1273,11 @@ export default function CheckoutPage() {
             </div>
 
             {/* Place Order CTA button */}
-            <Button
-              type="submit"
-              disabled={isProcessingPayment}
-              className={cn(
-                "w-full h-12 gap-2 flex items-center justify-center font-bold text-sm cursor-pointer shadow-md transition-all",
-                paymentGateway === "stripe"
-                  ? "bg-indigo-600 hover:bg-indigo-700 text-white"
-                  : "bg-emerald-600 hover:bg-emerald-700 text-white",
-              )}
-            >
+            <Button type="submit" disabled={isProcessingPayment}>
               {isProcessingPayment ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin" />
-                  Securing Order & Initializing Payment...
+                  Initializing Payment...
                 </>
               ) : (
                 <>
@@ -1267,11 +1291,12 @@ export default function CheckoutPage() {
             </Button>
             <div className="flex items-center justify-center gap-1.5 mt-3 text-[11px] text-muted-foreground font-medium">
               <Lock className="h-3 w-3 text-stone-400" />
-              <span>
+              <span className="flex items-center gap-1">
                 Encrypted via{" "}
-                {paymentGateway === "stripe"
-                  ? "Stripe Connect"
-                  : "Paystack Split"}
+                <PaymentGatewayLogo
+                  gateway={paymentGateway}
+                  imgClassName="h-4"
+                />
               </span>
             </div>
           </div>

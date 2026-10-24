@@ -101,7 +101,7 @@ async def update_tenant_by_slug(
         )
 
     if current_user.role != "super_admin":
-        if current_user.role not in ["admin", "tenant_admin"] or current_user.tenant_id != tenant.id:
+        if current_user.role not in ["admin", "tenant_admin", "hub_admin"] or current_user.tenant_id != tenant.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have administrative access to this tenant store.",
@@ -170,7 +170,7 @@ async def update_tenant(
         )
 
     if current_user.role != "super_admin":
-        if current_user.role not in ["admin", "tenant_admin"] or current_user.tenant_id != tenant.id:
+        if current_user.role not in ["admin", "tenant_admin", "hub_admin"] or current_user.tenant_id != tenant.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have administrative access to this tenant store.",
@@ -310,7 +310,7 @@ async def list_tenant_users(
         )
 
     if current_user.role != "super_admin":
-        if current_user.role not in ["admin", "tenant_admin"] or current_user.tenant_id != tenant.id:
+        if current_user.role not in ["admin", "tenant_admin", "hub_admin"] or current_user.tenant_id != tenant.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have administrative access to this tenant store.",

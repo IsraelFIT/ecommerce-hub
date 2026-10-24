@@ -5,11 +5,13 @@ import Link from "next/link";
 import Image from "next/image";
 import { useParams } from "next/navigation";
 import { Trash2, Plus, Minus, CreditCard, ChevronRight } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { useCartStore } from "@/store/cart";
+import { useCartStore, type CartItem } from "@/store/cart";
 import { formatCurrency, getTenantRoute } from "@/utils/helper";
 import { useTenantTheme } from "@/components/providers/tenant-theme-provider";
 import { getTenantBySlug } from "@/lib/api/tenants";
+import { getProducts } from "@/lib/api/products";
 import { Tenant } from "@/types/users";
 
 export function CartView() {
@@ -53,6 +55,81 @@ export function CartView() {
     };
   }, [tenantSlug]);
 
+  // Live stock tracker for accurate inventory limit checks
+  const [liveStockMap, setLiveStockMap] = useState<
+    Record<string, { stock: number; tracksInventory: boolean }>
+  >({});
+
+  useEffect(() => {
+    if (!tenantSlug || items.length === 0) return;
+    let isMounted = true;
+    getProducts({ tenantSlug, per_page: 100 })
+      .then((res) => {
+        if (!isMounted || !res.data?.items) return;
+        const products = res.data.items;
+        const map: Record<string, { stock: number; tracksInventory: boolean }> =
+          {};
+        for (const prod of products) {
+          const prodStock =
+            prod.inventory_count ??
+            (prod as unknown as { stock_quantity?: number }).stock_quantity ??
+            0;
+          const prodTracks =
+            prod.product_class !== "service" &&
+            prod.product_class !== "digital";
+          map[prod.id] = { stock: prodStock, tracksInventory: prodTracks };
+          if (prod.variants && prod.variants.length > 0) {
+            for (const v of prod.variants) {
+              map[v.id] = {
+                stock: v.stock_quantity ?? prodStock,
+                tracksInventory: v.track_inventory ?? prodTracks,
+              };
+            }
+          }
+        }
+        setLiveStockMap(map);
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, [tenantSlug, items.length]);
+
+  const handleIncreaseQuantity = (item: CartItem) => {
+    const liveInfo =
+      liveStockMap[item.id] ||
+      (item.product_id ? liveStockMap[item.product_id] : undefined);
+    const availableStock =
+      liveInfo !== undefined ? liveInfo.stock : item.stock_quantity;
+    const tracksInventory =
+      liveInfo !== undefined
+        ? liveInfo.tracksInventory
+        : item.track_inventory !== false && availableStock !== undefined;
+
+    if (tracksInventory && availableStock !== undefined) {
+      if (availableStock <= 0) {
+        toast.error(`The item '${item.name}' is out of stock.`);
+        return;
+      }
+      if (item.quantity >= availableStock) {
+        toast.error(
+          availableStock === 1
+            ? "Only 1 order left."
+            : `Only ${availableStock} orders left.`,
+        );
+        return;
+      }
+    }
+
+    updateQuantity(
+      item.id,
+      item.quantity + 1,
+      item.options,
+      undefined,
+      tenantSlug,
+    );
+  };
+
   const activeTenant = tenantData || contextTenant;
   const currency = activeTenant?.currency || "NGN";
   const configuredDeliveryFee = Number(
@@ -63,18 +140,21 @@ export function CartView() {
 
   const subtotal = getCartTotal();
   const deliveryFee = shippingMethod === "delivery" ? configuredDeliveryFee : 0;
-  const estTax = subtotal * 0.0825; // 8.25% tax
-  const total = subtotal + deliveryFee + estTax;
+  const isNigeria =
+    (activeTenant?.country || "").toLowerCase().includes("nigeria") ||
+    currency.toUpperCase() === "NGN";
+  const taxRate = isNigeria ? 0.075 : 0.075;
+  const taxTitle = isNigeria ? "VAT (7.5%)" : "VAT (7.5%)";
+  const taxAmount = Number((subtotal * taxRate).toFixed(2));
+  const total = subtotal + deliveryFee + taxAmount;
 
   const pickupInstruction =
     activeTenant?.pickup_instruction ||
-    activeTenant?.branding_config?.pickupInstruction ||
-    "Pickup available Tuesday–Saturday at our studio. Select your time slot on the checkout page.";
+    activeTenant?.branding_config?.pickupInstruction;
 
   const deliveryInstruction =
     activeTenant?.delivery_instruction ||
-    activeTenant?.branding_config?.deliveryInstruction ||
-    "White-Glove climate-controlled delivery is locked for the Tri-State area. Assembly included.";
+    activeTenant?.branding_config?.deliveryInstruction;
 
   if (!mounted) {
     return (
@@ -196,41 +276,60 @@ export function CartView() {
                     {/* Controls Row */}
                     <div className="flex items-center justify-between">
                       {/* Quantity selector */}
-                      <div className="flex items-center justify-between border border-border bg-white rounded-md w-24 h-8.5 px-0.5 select-none">
-                        <button
-                          onClick={() =>
-                            updateQuantity(
-                              item.id,
-                              item.quantity - 1,
-                              item.options,
-                              undefined,
-                              tenantSlug,
-                            )
-                          }
-                          className="text-stone-500 hover:text-stone-900 hover:bg-secondary rounded-md transition-colors p-2 cursor-pointer"
-                          aria-label="Decrease quantity"
-                        >
-                          <Minus className="h-3 w-3" />
-                        </button>
-                        <span className="text-xs font-bold text-stone-900">
-                          {item.quantity}
-                        </span>
-                        <button
-                          onClick={() =>
-                            updateQuantity(
-                              item.id,
-                              item.quantity + 1,
-                              item.options,
-                              undefined,
-                              tenantSlug,
-                            )
-                          }
-                          className="text-stone-500 hover:text-stone-900 hover:bg-secondary rounded-md transition-colors p-2 cursor-pointer"
-                          aria-label="Increase quantity"
-                        >
-                          <Plus className="h-3 w-3" />
-                        </button>
-                      </div>
+                      {(() => {
+                        const liveInfo =
+                          liveStockMap[item.id] ||
+                          (item.product_id
+                            ? liveStockMap[item.product_id]
+                            : undefined);
+                        const availableStock =
+                          liveInfo !== undefined
+                            ? liveInfo.stock
+                            : item.stock_quantity;
+                        const tracksInventory =
+                          liveInfo !== undefined
+                            ? liveInfo.tracksInventory
+                            : item.track_inventory !== false &&
+                              availableStock !== undefined;
+                        const isAtMaxStock =
+                          tracksInventory &&
+                          availableStock !== undefined &&
+                          item.quantity >= availableStock;
+
+                        return (
+                          <div className="flex items-center justify-between border border-border bg-white rounded-md w-24 h-8.5 px-0.5 select-none">
+                            <button
+                              onClick={() =>
+                                updateQuantity(
+                                  item.id,
+                                  item.quantity - 1,
+                                  item.options,
+                                  undefined,
+                                  tenantSlug,
+                                )
+                              }
+                              className="text-stone-500 hover:text-stone-900 hover:bg-secondary rounded-md transition-colors p-2 cursor-pointer"
+                              aria-label="Decrease quantity"
+                            >
+                              <Minus className="h-3 w-3" />
+                            </button>
+                            <span className="text-xs font-bold text-stone-900">
+                              {item.quantity}
+                            </span>
+                            <button
+                              onClick={() => handleIncreaseQuantity(item)}
+                              className={`text-stone-500 hover:text-stone-900 hover:bg-secondary rounded-md transition-colors p-2 cursor-pointer ${
+                                isAtMaxStock
+                                  ? "opacity-35 cursor-not-allowed hover:bg-transparent text-stone-300"
+                                  : ""
+                              }`}
+                              aria-label="Increase quantity"
+                            >
+                              <Plus className="h-3 w-3" />
+                            </button>
+                          </div>
+                        );
+                      })()}
 
                       {/* Remove Button */}
                       <button
@@ -252,20 +351,6 @@ export function CartView() {
                 </div>
               ))}
             </div>
-
-            {/* Gift option helper banner */}
-            {/* <div className="flex items-start gap-4 p-5 bg-stone-100/50 border border-stone-200/50">
-              <Gift className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-              <div>
-                <h4 className="text-xs font-bold tracking-wider uppercase text-stone-900 mb-1">
-                  Ordering as a Gift?
-                </h4>
-                <p className="text-xs text-stone-500 leading-relaxed font-light">
-                  Include a complimentary handwritten card. You will be prompted
-                  to enter your message during the checkout process.
-                </p>
-              </div>
-            </div> */}
           </div>
 
           {/* Right Column: Checkout Summary Box */}
@@ -331,9 +416,9 @@ export function CartView() {
               </div>
 
               <div className="flex justify-between text-xs text-stone-500 font-medium">
-                <span>Estimated Sales Tax</span>
+                <span>{taxTitle}</span>
                 <span className="font-semibold text-sm text-foreground">
-                  {formatCurrency(estTax.toFixed(2), currency)}
+                  {formatCurrency(taxAmount.toFixed(2), currency)}
                 </span>
               </div>
 
@@ -351,7 +436,10 @@ export function CartView() {
 
             {/* Checkout Link button */}
             <Link
-              href={getTenantRoute(tenantSlug, "/checkout")}
+              href={getTenantRoute(
+                tenantSlug,
+                `/checkout?fulfillment=${shippingMethod}`,
+              )}
               className="w-full"
             >
               <Button className="w-full">

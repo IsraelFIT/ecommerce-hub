@@ -30,8 +30,34 @@ export function checkPathAllowed(
     subRoute = `/${segments.slice(1).join("/")}`;
   }
 
-  // Admin and tenant admins have access to tenant administrative routes
+  // Hub admin has full platform administration access alongside super_admin
+  if (userRoles.includes("hub_admin")) {
+    return true;
+  }
+
+  // Admin and tenant_admin have access ONLY to tenant-level administrative routes
   if (userRoles.includes("admin") || userRoles.includes("tenant_admin")) {
+    // Explicitly forbid core platform routes to tenant_admin
+    const isCorePlatformRoute =
+      pathname.startsWith("/core") ||
+      subRoute.startsWith("/core") ||
+      pathname.startsWith("/tenants") ||
+      subRoute.startsWith("/tenants") ||
+      pathname.startsWith("/revenue") ||
+      subRoute.startsWith("/revenue") ||
+      pathname.startsWith("/subscriptions") ||
+      subRoute.startsWith("/subscriptions") ||
+      pathname.startsWith("/customizations") ||
+      subRoute.startsWith("/customizations") ||
+      pathname.startsWith("/developers") ||
+      subRoute.startsWith("/developers") ||
+      pathname.startsWith("/security") ||
+      subRoute.startsWith("/security");
+
+    if (isCorePlatformRoute) {
+      return false;
+    }
+
     if (
       pathname.includes("/admin") ||
       subRoute.includes("/admin") ||
@@ -51,12 +77,8 @@ export function checkPathAllowed(
       subRoute.startsWith("/branding") ||
       pathname.startsWith("/adapters") ||
       subRoute.startsWith("/adapters") ||
-      pathname.startsWith("/tenants") ||
-      subRoute.startsWith("/tenants") ||
       pathname.startsWith("/category-filters") ||
-      subRoute.startsWith("/category-filters") ||
-      pathname.startsWith("/core") ||
-      subRoute.startsWith("/core")
+      subRoute.startsWith("/category-filters")
     ) {
       return true;
     }

@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PaymentGatewayLogo } from "@/components/shared/payment-gateway-logo";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -34,7 +35,7 @@ import {
 } from "@/components/ui/select";
 import { UserAvatar } from "@/components/shared/user-avatar";
 import { CopyableId } from "@/components/shared/copyable-id";
-import { ApiOrder } from "@/types/order";
+import { ApiOrder, PaginationMeta } from "@/types";
 import { fetchOrders, updateOrderStatus } from "@/lib/api/order";
 import { formatCurrency, formatDate, getTenantRoute } from "@/utils/helper";
 
@@ -52,6 +53,7 @@ export default function TenantOrdersPage({ params }: OrdersPageProps) {
     unwrappedParams?.tenant || (routeParams?.tenant as string) || "store";
 
   const [orders, setOrders] = useState<ApiOrder[]>([]);
+  const [pagination, setPagination] = useState<PaginationMeta | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
@@ -68,10 +70,13 @@ export default function TenantOrdersPage({ params }: OrdersPageProps) {
       try {
         const res = await fetchOrders({
           tenantSlug,
-          per_page: 100,
+          per_page: 10,
         });
         if (isMounted) {
           setOrders(res.data?.items || []);
+          if (res.pagination) {
+            setPagination(res.pagination as PaginationMeta);
+          }
         }
       } catch (err: unknown) {
         if (isMounted) {
@@ -181,7 +186,7 @@ export default function TenantOrdersPage({ params }: OrdersPageProps) {
               placeholder="Search order ID, reference, customer or gateway..."
               value={orderSearch}
               onChange={(e) => handleSearchChange(e.target.value)}
-              className="pl-8 h-9 bg-background border-border text-foreground text-xs"
+              className="pl-8"
             />
           </div>
 
@@ -189,7 +194,7 @@ export default function TenantOrdersPage({ params }: OrdersPageProps) {
             value={statusFilter}
             onValueChange={(val) => handleStatusChange(val)}
           >
-            <SelectTrigger className="h-9 w-40 bg-background border-border text-foreground text-xs">
+            <SelectTrigger className="w-40">
               <SelectValue placeholder="All Statuses" />
             </SelectTrigger>
             <SelectContent className="bg-card border-border text-foreground">
@@ -205,7 +210,7 @@ export default function TenantOrdersPage({ params }: OrdersPageProps) {
         </div>
 
         <div className="flex items-center gap-2">
-          <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-xs font-semibold px-3 py-1">
+          <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-xs font-semibold px-2 py-3">
             Auto-Payout: Active
           </Badge>
         </div>
@@ -335,9 +340,7 @@ export default function TenantOrdersPage({ params }: OrdersPageProps) {
                       </TableCell>
 
                       <TableCell className="p-4">
-                        <Badge className="bg-muted border border-border px-2 py-1 text-xs font-medium text-foreground capitalize">
-                          {ord.payment_gateway}
-                        </Badge>
+                        <PaymentGatewayLogo gateway={ord.payment_gateway} />
                       </TableCell>
 
                       <TableCell className="p-4 font-bold text-foreground text-xs">
@@ -434,62 +437,67 @@ export default function TenantOrdersPage({ params }: OrdersPageProps) {
               to {Math.min(currentPage * pageSize, filteredOrders.length)} of{" "}
               {filteredOrders.length} orders
             </span>
-            <Pagination className="mx-0 w-auto">
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (currentPage > 1) setCurrentPage(currentPage - 1);
-                    }}
-                    className={
-                      currentPage === 1
-                        ? "pointer-events-none opacity-50"
-                        : "cursor-pointer"
-                    }
-                  />
-                </PaginationItem>
-                {Array.from(
-                  {
-                    length: Math.ceil(filteredOrders.length / pageSize) || 1,
-                  },
-                  (_, idx) => (
-                    <PaginationItem key={idx + 1}>
-                      <PaginationLink
-                        href="#"
-                        isActive={currentPage === idx + 1}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setCurrentPage(idx + 1);
-                        }}
-                        className="cursor-pointer text-xs"
-                      >
-                        {idx + 1}
-                      </PaginationLink>
-                    </PaginationItem>
-                  ),
-                )}
-                <PaginationItem>
-                  <PaginationNext
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (
-                        currentPage <
+            {(pagination?.total !== undefined
+              ? pagination.total >= 10
+              : filteredOrders.length >= 10) && (
+              <Pagination className="mx-0 w-auto">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (currentPage > 1) setCurrentPage(currentPage - 1);
+                      }}
+                      className={
+                        currentPage === 1
+                          ? "pointer-events-none opacity-50"
+                          : "cursor-pointer"
+                      }
+                    />
+                  </PaginationItem>
+                  {Array.from(
+                    {
+                      length: Math.ceil(filteredOrders.length / pageSize) || 1,
+                    },
+                    (_, idx) => (
+                      <PaginationItem key={idx + 1}>
+                        <PaginationLink
+                          href="#"
+                          isActive={currentPage === idx + 1}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setCurrentPage(idx + 1);
+                          }}
+                          className="cursor-pointer text-xs"
+                        >
+                          {idx + 1}
+                        </PaginationLink>
+                      </PaginationItem>
+                    ),
+                  )}
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (
+                          currentPage <
+                          Math.ceil(filteredOrders.length / pageSize)
+                        )
+                          setCurrentPage(currentPage + 1);
+                      }}
+                      className={
+                        currentPage >=
                         Math.ceil(filteredOrders.length / pageSize)
-                      )
-                        setCurrentPage(currentPage + 1);
-                    }}
-                    className={
-                      currentPage >= Math.ceil(filteredOrders.length / pageSize)
-                        ? "pointer-events-none opacity-50"
-                        : "cursor-pointer"
-                    }
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
+                          ? "pointer-events-none opacity-50"
+                          : "cursor-pointer"
+                      }
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            )}
           </div>
         )}
       </div>

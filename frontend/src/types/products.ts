@@ -107,6 +107,7 @@ export interface Product {
   price?: number;
   currency?: string;
   inventory_count?: number;
+  track_inventory?: boolean;
   sales?: number;
   created_at?: string;
   updated_at?: string;

@@ -243,53 +243,55 @@ export default function DashboardPage() {
             to {Math.min(page * pageSize, recentOrders.length)} of{" "}
             {recentOrders.length} orders
           </span>
-          <Pagination className="mx-0 w-auto">
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    if (page > 1) setPage(page - 1);
-                  }}
-                  className={
-                    page === 1
-                      ? "pointer-events-none opacity-50"
-                      : "cursor-pointer"
-                  }
-                />
-              </PaginationItem>
-              {Array.from({ length: totalPages }, (_, idx) => (
-                <PaginationItem key={idx + 1}>
-                  <PaginationLink
+          {recentOrders.length >= 10 && (
+            <Pagination className="mx-0 w-auto">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
                     href="#"
-                    isActive={page === idx + 1}
                     onClick={(e) => {
                       e.preventDefault();
-                      setPage(idx + 1);
+                      if (page > 1) setPage(page - 1);
                     }}
-                    className="cursor-pointer text-xs"
-                  >
-                    {idx + 1}
-                  </PaginationLink>
+                    className={
+                      page === 1
+                        ? "pointer-events-none opacity-50"
+                        : "cursor-pointer"
+                    }
+                  />
                 </PaginationItem>
-              ))}
-              <PaginationItem>
-                <PaginationNext
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    if (page < totalPages) setPage(page + 1);
-                  }}
-                  className={
-                    page >= totalPages
-                      ? "pointer-events-none opacity-50"
-                      : "cursor-pointer"
-                  }
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
+                {Array.from({ length: totalPages }, (_, idx) => (
+                  <PaginationItem key={idx + 1}>
+                    <PaginationLink
+                      href="#"
+                      isActive={page === idx + 1}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setPage(idx + 1);
+                      }}
+                      className="cursor-pointer text-xs"
+                    >
+                      {idx + 1}
+                    </PaginationLink>
+                  </PaginationItem>
+                ))}
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (page < totalPages) setPage(page + 1);
+                    }}
+                    className={
+                      page >= totalPages
+                        ? "pointer-events-none opacity-50"
+                        : "cursor-pointer"
+                    }
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          )}
         </div>
       </div>
     </div>

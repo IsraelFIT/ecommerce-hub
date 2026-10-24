@@ -18,9 +18,9 @@ class OrderItem(BaseModel):
     )
 
     product_id: Union[uuid.UUID, str]
-    title: str
+    title: Optional[str] = None
     quantity: int = Field(..., gt=0)
-    unit_price: float = Field(..., gt=0)
+    unit_price: Optional[float] = None
     image: Optional[str] = None
     options: Optional[Dict[str, Any]] = None
 
@@ -109,8 +109,30 @@ class OrderResponse(BaseModel):
     gateway_reference: str
     items: List[Dict[str, Any]]
     metadata_json: Dict[str, Any]
+    subtotal: Optional[float] = None
+    delivery_fee: Optional[float] = None
+    tax_rate: Optional[float] = None
+    tax_title: Optional[str] = None
+    tax_amount: Optional[float] = None
     created_at: datetime
     updated_at: datetime
+
+
+class OrderCalculateRequest(BaseModel):
+    items: List[OrderItem] = Field(..., min_length=1)
+    fulfillment_type: Optional[str] = "pickup"
+    currency: Optional[str] = None
+
+
+class OrderCalculateResponse(BaseModel):
+    items: List[Dict[str, Any]]
+    subtotal: float
+    delivery_fee: float
+    tax_rate: float
+    tax_title: str
+    tax_amount: float
+    total_amount: float
+    currency: str
 
 
 class OrderStatusUpdate(BaseModel):

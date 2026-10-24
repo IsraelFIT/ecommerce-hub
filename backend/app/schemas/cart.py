@@ -12,6 +12,11 @@ class CartItemSchema(BaseModel):
     description: Optional[str] = Field(default=None, description="Product Description")
     quantity: int = Field(default=1, ge=1, description="Quantity")
     options: Optional[Dict[str, Any]] = Field(default=None, description="Dynamic variant options / subfields")
+    stock_quantity: Optional[int] = Field(default=None, description="Available stock quantity")
+    track_inventory: Optional[bool] = Field(default=None, description="Whether stock inventory is tracked")
+    product_id: Optional[str] = Field(default=None, description="Parent Product ID if variant")
+
+    model_config = {"extra": "allow"}
 
 
 class CartSyncRequest(BaseModel):

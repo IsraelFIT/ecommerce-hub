@@ -19,6 +19,7 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { CopyableId } from "@/components/shared/copyable-id";
+import { PaymentGatewayLogo } from "@/components/shared/payment-gateway-logo";
 import { getTenantBySlug } from "@/lib/api/tenants";
 import { verifyPayment } from "@/lib/api/payments";
 import { fetchOrderById } from "@/lib/api/order";
@@ -86,7 +87,8 @@ export default function OrderConfirmationPage({
         }
 
         // 3. If sessionId provided or order still pending, verify with payment provider
-        if (sessionId || (!fetchedOrder && reference)) {
+        const isPending = !fetchedOrder || fetchedOrder.status === "pending";
+        if (reference && (sessionId || isPending)) {
           try {
             const verifyRes = await verifyPayment(
               reference,
@@ -95,7 +97,6 @@ export default function OrderConfirmationPage({
             );
 
             if (verifyRes.data) {
-              clearCart(tenantSlug, true);
               const reloadedOrder = await fetchOrderById(reference);
               if (reloadedOrder.data && isMounted) {
                 setOrder(reloadedOrder.data as unknown as Order);
@@ -105,6 +106,11 @@ export default function OrderConfirmationPage({
           } catch (verifyErr) {
             console.warn("Payment verification note:", verifyErr);
           }
+        }
+
+        // 4. Always clear cart once order confirmation is verified and loaded
+        if (fetchedOrder) {
+          clearCart(tenantSlug, true);
         }
 
         if (!fetchedOrder) {
@@ -147,7 +153,25 @@ export default function OrderConfirmationPage({
   const currency = order?.currency || tenant?.currency || "NGN";
 
   // Calculate delivery fee
-  const shippingFee = Number(order?.metadata_json?.delivery_fee || 0);
+  const shippingFee = Number(
+    order?.delivery_fee ?? order?.metadata_json?.delivery_fee ?? 0,
+  );
+  const subtotal = Number(
+    order?.subtotal ??
+      order?.metadata_json?.subtotal ??
+      (order?.items || []).reduce(
+        (sum, item) =>
+          sum + (Number(item.unit_price) || 0) * (item.quantity || 1),
+        0,
+      ),
+  );
+  const taxAmount = Number(
+    order?.tax_amount ?? order?.metadata_json?.tax_amount ?? 0,
+  );
+  const taxTitle =
+    order?.tax_title ||
+    (order?.metadata_json?.tax_title as string) ||
+    "VAT (7.5%)";
 
   // Format delivery date nicely
   const getFormattedDeliveryDate = () => {
@@ -282,14 +306,6 @@ export default function OrderConfirmationPage({
 
   const transactionIdDisplay = reference || order?.gateway_reference || "N/A";
 
-  const paymentMethodDisplay = order?.payment_gateway
-    ? order.payment_gateway.toUpperCase() === "PAYSTACK"
-      ? "Paystack"
-      : order.payment_gateway.toUpperCase() === "STRIPE"
-        ? "Stripe"
-        : order.payment_gateway
-    : "Online Payment";
-
   return (
     <>
       <style jsx global>{`
@@ -371,14 +387,19 @@ export default function OrderConfirmationPage({
                   Order ID
                 </span>
                 <div className="print:text-right">
-                  <CopyableId
-                    id={order?.gateway_reference || order?.id || reference}
-                    length={7}
-                    prefix="#"
-                    uppercase
-                    textClassName="text-primary-foreground font-bold text-sm md:text-base font-mono"
-                    iconClassName="text-primary-foreground/80 hover:text-primary-foreground hover:bg-primary-foreground/20"
-                  />
+                  <div className="print:hidden">
+                    <CopyableId
+                      id={order?.gateway_reference || reference || order?.id}
+                      length={7}
+                      prefix="#"
+                      uppercase
+                      textClassName="text-primary-foreground font-bold text-sm md:text-base font-mono"
+                      iconClassName="text-primary-foreground/80 hover:text-primary-foreground"
+                    />
+                  </div>
+                  <div className="hidden print:block font-mono font-bold text-xs select-all text-primary-foreground break-all">
+                    #{order?.gateway_reference || reference || order?.id}
+                  </div>
                 </div>
               </div>
 
@@ -386,9 +407,14 @@ export default function OrderConfirmationPage({
                 <span className="text-primary-foreground/75 text-xs uppercase font-bold tracking-wider block shrink-0">
                   Payment Method
                 </span>
-                <p className="font-bold text-primary-foreground select-all print:text-right">
-                  {paymentMethodDisplay}
-                </p>
+                <div className="print:text-right flex items-center">
+                  <div className="bg-white/95 px-2.5 py-1 rounded-md shadow-2xs inline-flex items-center">
+                    <PaymentGatewayLogo
+                      gateway={order?.payment_gateway}
+                      className="text-stone-900"
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="flex flex-col gap-1 print:flex-row print:justify-between print:items-center print:border-b print:border-primary-foreground/20 print:pb-2">
@@ -397,13 +423,20 @@ export default function OrderConfirmationPage({
                 </span>
                 <div className="print:text-right">
                   {transactionIdDisplay !== "N/A" ? (
-                    <CopyableId
-                      id={transactionIdDisplay}
-                      length={7}
-                      uppercase
-                      textClassName="text-primary-foreground font-bold text-sm md:text-base font-mono"
-                      iconClassName="text-primary-foreground/80 hover:text-primary-foreground hover:bg-primary-foreground/20"
-                    />
+                    <>
+                      <div className="print:hidden">
+                        <CopyableId
+                          id={transactionIdDisplay}
+                          length={7}
+                          uppercase
+                          textClassName="text-primary-foreground font-bold text-sm md:text-base font-mono"
+                          iconClassName="text-primary-foreground/80 hover:text-primary-foreground"
+                        />
+                      </div>
+                      <div className="hidden print:block font-mono font-bold text-xs select-all text-primary-foreground break-all">
+                        {transactionIdDisplay}
+                      </div>
+                    </>
                   ) : (
                     <p className="font-bold text-primary-foreground">N/A</p>
                   )}
@@ -509,7 +542,14 @@ export default function OrderConfirmationPage({
             {/* Financial Breakdown */}
             <div className="pt-4 border-t border-stone-100 space-y-3 text-stone-600">
               <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Shipping</span>
+                <span className="text-muted-foreground">Subtotal</span>
+                <span className="font-medium text-foreground">
+                  {formatCurrency(subtotal, currency)}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Fulfillment</span>
                 <span className="font-medium text-foreground">
                   {shippingFee > 0
                     ? formatCurrency(shippingFee, currency)
@@ -518,9 +558,9 @@ export default function OrderConfirmationPage({
               </div>
 
               <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Taxes</span>
+                <span className="text-muted-foreground">{taxTitle}</span>
                 <span className="font-medium text-foreground">
-                  {formatCurrency(0, currency)}
+                  {formatCurrency(taxAmount, currency)}
                 </span>
               </div>
 

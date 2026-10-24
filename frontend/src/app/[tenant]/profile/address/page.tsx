@@ -125,7 +125,7 @@ export default function ProfileAddressPage() {
               >
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-semibold text-xs text-foreground">
+                    <span className="font-semibold text-foreground">
                       {addr.street}
                     </span>
                     {addr.is_default && (
@@ -134,14 +134,12 @@ export default function ProfileAddressPage() {
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-muted-foreground">
                     {addr.city}, {addr.state} {addr.zip_code}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {addr.country}
-                  </p>
+                  <p className="text-muted-foreground mt-0.5">{addr.country}</p>
                   {addr.phone && (
-                    <p className="text-xs text-muted-foreground mt-1 font-mono">
+                    <p className="text-xs text-muted-foreground mt-1">
                       {addr.phone}
                     </p>
                   )}
@@ -151,7 +149,7 @@ export default function ProfileAddressPage() {
                   <button
                     type="button"
                     onClick={() => handleDeleteAddress(addr.id)}
-                    className="text-xs text-destructive hover:underline cursor-pointer"
+                    className="text-destructive hover:underline cursor-pointer"
                   >
                     Delete
                   </button>
@@ -176,7 +174,7 @@ export default function ProfileAddressPage() {
                 setAddressForm({ ...addressForm, country: val })
               }
             >
-              <SelectTrigger className="h-10">
+              <SelectTrigger className="h-10 w-full">
                 <SelectValue placeholder="Select Country" />
               </SelectTrigger>
               <SelectContent>

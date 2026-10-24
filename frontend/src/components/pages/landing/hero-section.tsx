@@ -23,6 +23,7 @@ import {
   TableRow,
   TableCell,
 } from "@/components/ui/table";
+import { PaymentGatewayLogo } from "@/components/shared/payment-gateway-logo";
 
 export function HeroSection() {
   return (
@@ -422,7 +423,7 @@ export function HeroSection() {
                       Emma Rose
                     </TableCell>
                     <TableCell className="py-2.5 px-2 text-muted-foreground text-xs">
-                      Stripe
+                      <PaymentGatewayLogo gateway="stripe" />
                     </TableCell>
                     <TableCell className="py-2.5 px-2 font-bold text-foreground text-xs">
                       $350.00

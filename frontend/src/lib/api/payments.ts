@@ -4,6 +4,13 @@ import {
   CheckoutSessionResponse,
   CreateCheckoutSessionInput,
   PaymentVerificationResponse,
+  PaystackBank,
+  ResolveAccountInput,
+  ResolveAccountResult,
+  CreateSubaccountInput,
+  CreateSubaccountResult,
+  StripeOnboardInput,
+  StripeOnboardResult,
 } from "@/types/payment";
 
 export * from "@/types/payment";
@@ -54,5 +61,117 @@ export async function verifyPayment(
   return apiRequest<PaymentVerificationResponse>(endpoint, {
     method: "GET",
     headers,
+  });
+}
+
+/**
+ * Fetch supported settlement banks for automated Paystack subaccount setup.
+ * Supported by local database caching with periodic/on-demand sync from Paystack API.
+ */
+export async function fetchPaystackBanks(
+  tenantSlug?: string,
+  options?: { country?: string; refresh?: boolean },
+): Promise<ApiResponse<PaystackBank[]>> {
+  const headers: Record<string, string> = {};
+  if (tenantSlug) {
+    headers["X-Tenant-Slug"] = tenantSlug;
+  }
+  const queryParams = new URLSearchParams();
+  if (options?.country) {
+    queryParams.set("country", options.country);
+  }
+  if (options?.refresh) {
+    queryParams.set("refresh", "true");
+  }
+  const queryStr = queryParams.toString();
+  const endpoint = `/payments/paystack/banks${queryStr ? `?${queryStr}` : ""}`;
+  return apiRequest<PaystackBank[]>(endpoint, {
+    method: "GET",
+    headers,
+  });
+}
+
+/**
+ * Real-time verification of a Nigerian NUBAN bank account number.
+ */
+export async function resolvePaystackAccount(
+  payload: ResolveAccountInput,
+  tenantSlug?: string,
+): Promise<ApiResponse<ResolveAccountResult>> {
+  const headers: Record<string, string> = {};
+  if (tenantSlug) {
+    headers["X-Tenant-Slug"] = tenantSlug;
+  }
+  return apiRequest<ResolveAccountResult>(
+    "/payments/paystack/resolve-account",
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+/**
+ * Automatically create and link a Paystack subaccount using bank details.
+ */
+export async function createPaystackSubaccount(
+  payload: CreateSubaccountInput,
+  tenantSlug?: string,
+): Promise<ApiResponse<CreateSubaccountResult>> {
+  const headers: Record<string, string> = {};
+  if (tenantSlug) {
+    headers["X-Tenant-Slug"] = tenantSlug;
+  }
+  return apiRequest<CreateSubaccountResult>(
+    "/payments/paystack/create-subaccount",
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+/**
+ * Generate a Stripe Express hosted onboarding link for instant merchant onboarding.
+ */
+export async function createStripeOnboarding(
+  payload: StripeOnboardInput,
+  tenantSlug?: string,
+): Promise<ApiResponse<StripeOnboardResult>> {
+  const headers: Record<string, string> = {};
+  if (tenantSlug) {
+    headers["X-Tenant-Slug"] = tenantSlug;
+  }
+  return apiRequest<StripeOnboardResult>("/payments/stripe/onboard", {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+  });
+}
+
+/**
+ * Fetch platform-wide revenue, escrow balances, and split transactions (Super Admin).
+ */
+export async function getCoreRevenueAnalytics(): Promise<
+  ApiResponse<import("@/types/users").CoreRevenueData>
+> {
+  return apiRequest<import("@/types/users").CoreRevenueData>(
+    "/payments/core/revenue",
+    {
+      method: "GET",
+    },
+  );
+}
+
+/**
+ * Trigger platform-wide escrow settlement for all merchant subaccounts (Super Admin).
+ */
+export async function settleAllEscrowBalances(): Promise<
+  ApiResponse<{ settled_count: number }>
+> {
+  return apiRequest<{ settled_count: number }>("/payments/core/settle", {
+    method: "POST",
   });
 }

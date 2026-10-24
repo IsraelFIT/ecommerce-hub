@@ -1,6 +1,9 @@
+import { PaginationMeta } from ".";
+
 export type UserRole =
   | "super_admin"
   | "admin"
+  | "hub_admin"
   | "tenant_admin"
   | "customer"
   | "user";
@@ -36,6 +39,10 @@ export interface BrandingConfig {
   deliveryFee?: number | null;
   deliveryInstruction?: string | null;
   pickupInstruction?: string | null;
+  settlementBank?: string | null;
+  settlementBankName?: string | null;
+  settlementAccount?: string | null;
+  settlementAccountName?: string | null;
 }
 
 export interface CustomizationRequest {
@@ -165,6 +172,8 @@ export interface User {
   tenant_country?: string | null;
   tenant_branding?: BrandingConfig | null;
   branding_config?: BrandingConfig | null;
+  paystack_subaccount_code?: string | null;
+  stripe_account_id?: string | null;
   tenantId?: string;
   avatarUrl?: string;
   createdAt?: string;
@@ -177,15 +186,6 @@ export interface AuthSession {
   expiresAt: string;
 }
 
-export interface PaginationMeta {
-  current_page: number;
-  last_page: number;
-  per_page: number;
-  total: number;
-  next_page_url?: string | null;
-  prev_page_url?: string | null;
-}
-
 export interface ApiResponse<T = unknown> {
   status: "success" | "error";
   message: string;
@@ -193,4 +193,116 @@ export interface ApiResponse<T = unknown> {
   pagination?: PaginationMeta | Record<string, unknown>;
   filters?: Record<string, unknown>;
   errors?: Record<string, string[] | string>;
+}
+
+export interface CoreUserSummary {
+  id: string;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  email: string;
+  phone_number?: string | null;
+  avatar_url?: string | null;
+  gender?: string | null;
+  role: UserRole;
+  is_active: boolean;
+  is_verified: boolean;
+  tenant_id?: string | null;
+  tenant_name?: string | null;
+  tenant_slug?: string | null;
+  created_at?: string | null;
+  orders_count: number;
+  total_spent: number;
+}
+
+export interface TenantCustomerSummary {
+  id: string;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  email: string;
+  phone_number?: string | null;
+  avatar_url?: string | null;
+  orders_count: number;
+  total_spent: number;
+  last_order_at?: string | null;
+  is_registered: boolean;
+  is_active: boolean;
+  created_at?: string | null;
+}
+
+export interface CoreUserDetailResponse {
+  id: string;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  email: string;
+  phone_number?: string | null;
+  avatar_url?: string | null;
+  gender?: string | null;
+  role: UserRole;
+  is_active: boolean;
+  is_verified: boolean;
+  created_at?: string | null;
+  tenant?: {
+    id?: string | null;
+    name?: string | null;
+    slug?: string | null;
+    currency?: string;
+    country?: string;
+    custom_domain?: string | null;
+    branding_config?: BrandingConfig;
+  } | null;
+  stats: {
+    total_customers: number;
+    total_orders: number;
+    total_revenue: number;
+    avg_order_value: number;
+    currency: string;
+  };
+  customers: TenantCustomerSummary[];
+}
+
+export interface UpdateUserRoleInput {
+  role: UserRole | string;
+}
+
+export interface UpdateUserStatusInput {
+  is_active: boolean;
+}
+
+export interface CoreRevenueMetric {
+  id: string;
+  title: string;
+  rawAmount: number;
+  value: string;
+  change: string;
+  subtitle: string;
+  color: string;
+  bg: string;
+}
+
+export interface CoreSplitTransaction {
+  id: string;
+  orderId: string;
+  orderUuid: string;
+  tenant: string;
+  tenantSlug: string;
+  customer: string;
+  customerEmail: string;
+  gross: number;
+  feePercent: string;
+  platformFee: number;
+  tenantPayout: number;
+  gateway: string;
+  status: string;
+  date: string;
+  currency: string;
+}
+
+export interface CoreRevenueData {
+  metrics: CoreRevenueMetric[];
+  transactions: CoreSplitTransaction[];
+  total_orders: number;
+  primary_currency: string;
 }

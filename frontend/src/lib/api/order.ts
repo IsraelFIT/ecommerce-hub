@@ -9,6 +9,8 @@ import {
   CancelOrderInput,
   GetOrdersOptions,
   PaginatedOrdersResponse,
+  OrderCalculateInput,
+  OrderCalculateResult,
 } from "@/types/order";
 import { ApiResponse } from "@/types/users";
 
@@ -116,6 +118,25 @@ export async function createOrder(
     method: "POST",
     headers,
     body: JSON.stringify(orderData),
+  });
+}
+
+/**
+ * Calculate verified server-side order pricing including delivery fee and statutory Nigerian VAT (7.5%).
+ */
+export async function calculateOrderPricing(
+  payload: OrderCalculateInput,
+  tenantSlug?: string,
+): Promise<ApiResponse<OrderCalculateResult>> {
+  const headers: Record<string, string> = {};
+  if (tenantSlug) {
+    headers["X-Tenant-Slug"] = tenantSlug;
+  }
+
+  return apiRequest<OrderCalculateResult>("/orders/calculate", {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
   });
 }
 

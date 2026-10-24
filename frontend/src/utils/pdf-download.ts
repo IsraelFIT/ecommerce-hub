@@ -38,6 +38,8 @@ export interface InvoiceData {
 
   subtotal: number;
   deliveryFee: number;
+  taxAmount?: number;
+  taxTitle?: string;
   totalAmount: number;
   currency: string;
 }
@@ -336,7 +338,8 @@ export async function downloadInvoicePdf(invoice: InvoiceData): Promise<void> {
         logoW = maxLogoH * aspect;
       }
 
-      const logoY = 17 - logoH / 2;
+      const textCenterY = 20.5;
+      const logoY = textCenterY - logoH / 2;
       doc.addImage(logoBase64.dataUrl, "PNG", margin, logoY, logoW, logoH);
       headerTextX = margin + logoW + 3;
     } catch (e) {
@@ -373,10 +376,11 @@ export async function downloadInvoicePdf(invoice: InvoiceData): Promise<void> {
 
   let currentY = 43;
 
-  // 3. Two-Column Metadata (30% Billed To, 70% Invoice Summary)
-  // Left Column: Customer & Coordinates (30% width = 54mm)
+  // 3. Two-Column Metadata (40% Billed To, 60% Invoice Summary)
+  // Usable width = 180mm. 40% = 72mm, 60% = 108mm.
+  // Left Column: Customer & Coordinates (40% width = 72mm)
   const leftColX = margin;
-  const leftColWidth = 50;
+  const leftColWidth = 66;
 
   doc.setFontSize(8);
   doc.setFont(primaryFont, "bold");
@@ -427,8 +431,8 @@ export async function downloadInvoicePdf(invoice: InvoiceData): Promise<void> {
     leftY += addressLines.length * 4.2;
   }
 
-  // Right Column: Invoice Details (70% width = 126mm, starts at margin + 54 = 69mm)
-  const rightColX = margin + 54;
+  // Right Column: Invoice Details (60% width = 108mm, starts at margin + 72 = 87mm)
+  const rightColX = margin + 72;
   const rightColRightEdge = pageWidth - margin;
 
   doc.setFontSize(8);
@@ -445,9 +449,9 @@ export async function downloadInvoicePdf(invoice: InvoiceData): Promise<void> {
   doc.text("Invoice Number:", rightColX, rightY);
 
   doc.setFont(primaryFont, "bold");
-  doc.setFontSize(8.5);
-  doc.setTextColor(15, 23, 42);
   const displayInvoiceNum = `#${invoice.orderNumber || invoice.orderReference || "ORDER"}`;
+  doc.setFontSize(displayInvoiceNum.length > 25 ? 7 : 8.5);
+  doc.setTextColor(15, 23, 42);
   doc.text(displayInvoiceNum, rightColRightEdge, rightY, {
     align: "right",
   });
@@ -671,8 +675,17 @@ export async function downloadInvoicePdf(invoice: InvoiceData): Promise<void> {
   const totalLines: [string, number, boolean][] = [
     ["Subtotal:", invoice.subtotal, false],
     ["Shipping / Delivery:", invoice.deliveryFee, false],
-    ["Total Paid:", invoice.totalAmount, true],
   ];
+
+  if (invoice.taxAmount && invoice.taxAmount > 0) {
+    totalLines.push([
+      invoice.taxTitle || "VAT (7.5%):",
+      invoice.taxAmount,
+      false,
+    ]);
+  }
+
+  totalLines.push(["Total Paid:", invoice.totalAmount, true]);
 
   totalLines.forEach(([label, val, isGrandTotal]) => {
     if (isGrandTotal) {
@@ -821,8 +834,8 @@ export function printInvoice(invoice?: InvoiceData): void {
           h2, .store-title, .invoice-title { font-family: 'Bricolage Grotesque', sans-serif; }
           .header { background: #ffffff; border-bottom: 1px solid #e2e8f0; padding-bottom: 16px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
           .logo-box { display: flex; align-items: center; gap: 12px; }
-          .logo-img { max-height: 24px; width: auto; max-width: 48px; object-fit: contain; }
-          .grid { display: grid; grid-template-columns: 3fr 7fr; gap: 24px; margin-bottom: 24px; }
+          .logo-img { max-height: 38px; width: auto; max-width: 48px; object-fit: contain; display: block; }
+          .grid { display: grid; grid-template-columns: 4fr 6fr; gap: 24px; margin-bottom: 24px; }
           .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; font-size: 13px; }
           .card h4 { margin: 0 0 8px 0; font-size: 11px; text-transform: uppercase; color: #64748b; letter-spacing: 0.05em; font-weight: 700; }
           table { width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 13px; }
@@ -902,6 +915,14 @@ export function printInvoice(invoice?: InvoiceData): void {
             <span>Shipping / Delivery:</span>
             <span>${formatAmount(invoice.deliveryFee, invoice.currency)}</span>
           </div>
+          ${
+            invoice.taxAmount && invoice.taxAmount > 0
+              ? `<div class="totals-row">
+            <span>${invoice.taxTitle || "VAT (7.5%):"}</span>
+            <span>${formatAmount(invoice.taxAmount, invoice.currency)}</span>
+          </div>`
+              : ""
+          }
           <div class="totals-row totals-grand">
             <span>Total Paid:</span>
             <span>${formatAmount(invoice.totalAmount, invoice.currency)}</span>
@@ -998,10 +1019,7 @@ export function buildInvoiceFromOrder(
     deliveryAddressStr = String(rawAddr);
   }
 
-  const orderNum =
-    order.gateway_reference?.slice(0, 14).toUpperCase() ||
-    order.id?.slice(0, 8).toUpperCase() ||
-    "ORDER";
+  const orderNum = order.gateway_reference || order.id || "ORDER";
 
   return {
     storeName,
@@ -1040,6 +1058,11 @@ export function buildInvoiceFromOrder(
     items,
     subtotal,
     deliveryFee,
+    taxAmount: Number(order.tax_amount ?? order.metadata_json?.tax_amount ?? 0),
+    taxTitle:
+      order.tax_title ||
+      (order.metadata_json?.tax_title as string) ||
+      "VAT (7.5%)",
     totalAmount,
     currency,
   };
@@ -1077,7 +1100,8 @@ export function buildInvoiceFromOrderDisplay(
     storeLogoUrl: logoUrl,
     tenantSlug,
     primaryColor,
-    orderNumber: order.orderNumber || order.id.slice(0, 8).toUpperCase(),
+    orderNumber:
+      order.gatewayReference || order.orderNumber || order.id || "ORDER",
     orderReference: order.gatewayReference || order.id,
     orderDate: order.dateValue || new Date().toLocaleDateString(),
     paymentMethod: order.paymentMethod || "Online Payment",

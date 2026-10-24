@@ -503,7 +503,7 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
                     />
                     Primary Brand Color
                   </Label>
-                  <span className="text-[10px]  text-muted-foreground">
+                  <span className="text-sm  text-muted-foreground">
                     Core Accent
                   </span>
                 </div>
@@ -512,17 +512,17 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
                     type="color"
                     value={brandColor}
                     onChange={(e) => handleColorChange(e.target.value)}
-                    className="size-9 rounded-lg border border-border cursor-pointer p-0.5 bg-card shrink-0"
+                    className="size-9 rounded-lg cursor-pointer p-0.5 bg-card shrink-0"
                     title="Pick custom primary brand color"
                   />
                   <Input
                     value={brandColor}
                     onChange={(e) => handleColorChange(e.target.value)}
-                    className="h-9 text-xs uppercase "
+                    className="h-9 uppercase"
                     placeholder="#059669"
                   />
                 </div>
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   Applied to admin sidebar, main CTA buttons, badges, and active
                   tabs.
                 </p>
@@ -538,7 +538,7 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
                     />
                     Secondary / Accent Color
                   </Label>
-                  <span className="text-[10px]  text-muted-foreground">
+                  <span className="text-sm  text-muted-foreground">
                     Highlight
                   </span>
                 </div>
@@ -549,7 +549,7 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
                     onChange={(e) =>
                       handleColorChange(brandColor, e.target.value)
                     }
-                    className="size-9 rounded-lg border border-border cursor-pointer p-0.5 bg-card shrink-0"
+                    className="size-9 rounded-lg cursor-pointer p-0.5 bg-card shrink-0"
                     title="Pick custom secondary accent color"
                   />
                   <Input
@@ -557,11 +557,11 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
                     onChange={(e) =>
                       handleColorChange(brandColor, e.target.value)
                     }
-                    className="h-9 text-xs uppercase "
+                    className="h-9 uppercase"
                     placeholder="#EC4899"
                   />
                 </div>
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   Applied to promotional tags, highlight rings, and secondary
                   contrasts.
                 </p>
@@ -599,22 +599,22 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
               >
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-xs text-foreground flex items-center gap-1.5">
-                      <Store className="size-3.5 text-primary" />
+                    <span className="font-bold text-foreground flex items-center gap-1.5">
+                      <Store className="size-4 text-primary" />
                       Standard Storefront
                     </span>
                     {landingPageType === "default" && (
-                      <Badge className="bg-primary text-primary-foreground text-[10px] h-5">
+                      <Badge className="bg-primary text-primary-foreground text-sm h-5">
                         Active
                       </Badge>
                     )}
                   </div>
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-muted-foreground">
                     Automated real-time catalog showcase, category filters, and
                     checkout integration.
                   </p>
                 </div>
-                <div className="pt-3 mt-2 border-t border-border/50 text-[10px] text-muted-foreground font-medium">
+                <div className="pt-3 mt-2 border-t border-border/50 text-sm text-muted-foreground font-medium">
                   Instant deployment • Fully responsive
                 </div>
               </div>
@@ -630,22 +630,22 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
               >
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-xs text-foreground flex items-center gap-1.5">
-                      <Paintbrush className="size-3.5 text-pink-500" />
+                    <span className="font-bold text-foreground flex items-center gap-1.5">
+                      <Paintbrush className="size-4 text-pink-500" />
                       Bespoke Custom Design
                     </span>
                     {landingPageType === "custom" && (
-                      <Badge className="bg-pink-600 text-white text-[10px] h-5">
+                      <Badge className="bg-pink-600 text-white text-sm h-5">
                         Selected
                       </Badge>
                     )}
                   </div>
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-muted-foreground">
                     Custom-engineered hero animations, editorial lookbooks, and
                     bespoke interactive layouts.
                   </p>
                 </div>
-                <div className="pt-3 mt-2 border-t border-border/50 text-[10px] text-muted-foreground font-medium flex items-center justify-between">
+                <div className="pt-3 mt-2 border-t border-border/50 text-sm text-muted-foreground font-medium flex items-center justify-between">
                   <span>Tailored by platform engineers</span>
                   {activeCustomRequest &&
                     getStatusBadge(activeCustomRequest.status)}
@@ -939,7 +939,7 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
                 </div>
                 <p className="text-[11px] text-muted-foreground">
                   Point your DNS CNAME record to{" "}
-                  <code className="bg-muted px-1.5 py-0.5 rounded text-foreground  text-[10px]">
+                  <code className="bg-muted px-1.5 py-0.5 rounded text-foreground text-xs">
                     cname.ecommerce-hub.com
                   </code>
                 </p>
@@ -974,7 +974,7 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
               {/* Simulated Announcement Banner */}
               {announcementText && (
                 <div
-                  className="p-2 text-center text-[10px] font-semibold text-white transition-colors tracking-wide"
+                  className="p-2 text-center text-sm font-semibold text-white transition-colors tracking-wide"
                   style={{ backgroundColor: brandColor }}
                 >
                   {announcementText}
@@ -1010,7 +1010,7 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
                     className="size-2 rounded-full"
                     style={{ backgroundColor: accentColor }}
                   />
-                  <span className="text-[10px] text-muted-foreground  truncate max-w-28">
+                  <span className="text-sm text-muted-foreground  truncate max-w-28">
                     {landingPageType === "custom" ? "Bespoke" : "Standard"}
                   </span>
                 </div>
@@ -1024,13 +1024,13 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
                 />
                 <div className="flex items-center justify-center gap-2 relative z-10">
                   <span
-                    className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold text-white shadow-xs"
+                    className="inline-block px-2.5 py-0.5 rounded-full text-sm font-semibold text-white shadow-xs"
                     style={{ backgroundColor: brandColor }}
                   >
                     Primary Accent
                   </span>
                   <span
-                    className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold text-white shadow-xs"
+                    className="inline-block px-2.5 py-0.5 rounded-full text-sm font-semibold text-white shadow-xs"
                     style={{ backgroundColor: accentColor }}
                   >
                     Secondary Accent
@@ -1090,8 +1090,8 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
                   variant="outline"
                   className={
                     landingPageType === "custom"
-                      ? "bg-pink-500/10 text-pink-600 border-pink-200 text-[10px]"
-                      : "bg-primary/10 text-primary border-primary/20 text-[10px]"
+                      ? "bg-pink-500/10 text-pink-600 border-pink-200 text-sm"
+                      : "bg-primary/10 text-primary border-primary/20 text-sm"
                   }
                 >
                   {landingPageType === "custom"

@@ -12,7 +12,14 @@ from app.models.tenant import Tenant
 from app.models.order import Order, OrderStatus
 from app.models.user import User
 from app.models.product import Product, ProductVariant
-from app.schemas.order import OrderCreate, OrderResponse, OrderStatusUpdate, OrderCancelRequest
+from app.schemas.order import (
+    OrderCreate,
+    OrderResponse,
+    OrderStatusUpdate,
+    OrderCancelRequest,
+    OrderCalculateRequest,
+    OrderCalculateResponse,
+)
 from app.schemas.response import success_response, PaginationMeta, ApiResponse, PaginatedData, ErrorResponse
 
 router = APIRouter(
@@ -167,47 +174,25 @@ async def enrich_order_items_from_products(
 enrich_order_items_images = enrich_order_items_from_products
 
 
-@router.post(
-    "",
-    status_code=status.HTTP_201_CREATED,
-    response_model=ApiResponse[OrderResponse],
-    summary="Create order and calculate subaccount split fees",
-    description="Creates an order for the tenant and automatically calculates 2.5% platform fee and tenant payout.",
-)
-@router.post(
-    "/",
-    status_code=status.HTTP_201_CREATED,
-    response_model=ApiResponse[OrderResponse],
-    include_in_schema=False,
-)
-async def create_order(
-    order_in: OrderCreate,
-    tenant: Tenant = Depends(get_tenant_context),
-    db: AsyncSession = Depends(get_rls_db_session),
+async def compute_server_pricing(
+    items_in: List[Any],
+    tenant: Tenant,
+    fulfillment_type: str,
+    db: AsyncSession,
+    lock_rows: bool = False,
 ) -> Dict[str, Any]:
-    subtotal = sum(item.unit_price * item.quantity for item in order_in.items)
-    delivery_fee = (
-        float(order_in.delivery_fee or 0.0)
-        if order_in.fulfillment_type == "delivery"
-        else 0.0
-    )
-    total_amount = round(subtotal + delivery_fee, 2)
-    platform_fee = round(total_amount * (settings.PLATFORM_FEE_PERCENTAGE / 100.0), 2)
-    tenant_payout = round(total_amount - platform_fee, 2)
-
-    resolved_currency = (order_in.currency or tenant.currency or "NGN").upper()
-    gateway_ref = f"ECH-{tenant.slug.upper()}-{secrets.token_hex(6).upper()}"
-
-    # Auto-resolve user_id if customer_email matches an existing user
-    user_id = order_in.user_id
-    if not user_id and order_in.customer_email:
-        user_res = await db.execute(
-            select(User.id).where(User.email == order_in.customer_email.strip().lower())
-        )
-        user_id = user_res.scalar_one_or_none()
-
-    # Resolve items and first images directly from the Product table in the DB
-    raw_item_dicts = [item.model_dump(mode="json", exclude_none=True) for item in order_in.items]
+    """
+    Authoritative server-side pricing engine:
+    1. NEVER trusts client-submitted unit_price or delivery_fee.
+    2. Queries live database Product and ProductVariant tables for authentic prices.
+    3. Resolves tenant-configured delivery fee server-side.
+    4. Calculates statutory Nigerian 7.5% VAT when tenant currency is NGN or country is Nigeria.
+    5. Optionally acquires explicit row-level locks on products & variants to prevent overselling race conditions.
+    """
+    raw_item_dicts = [
+        it.model_dump(mode="json", exclude_none=True) if hasattr(it, "model_dump") else dict(it)
+        for it in items_in
+    ]
     raw_ids = set()
     raw_titles = set()
     for it in raw_item_dicts:
@@ -272,158 +257,313 @@ async def create_order(
                 prod_by_title[tp.name.strip().lower()] = tp
             prod_by_id[str(tp.id)] = tp
 
-    target_p_ids = set()
-    for p in prod_by_id.values():
-        target_p_ids.add(p.id)
+    target_p_ids = {p.id for p in prod_by_id.values()}
 
-    # Acquire explicit row-level locks on target products and variants to prevent overselling race conditions
     locked_products: Dict[uuid.UUID, Product] = {}
     locked_variants: Dict[uuid.UUID, ProductVariant] = {}
 
     if target_p_ids:
         sorted_p_ids = sorted(list(target_p_ids), key=lambda x: str(x))
-        p_lock_res = await db.execute(
-            select(Product)
-            .where(Product.id.in_(sorted_p_ids))
-            .options(selectinload(Product.variants))
-            .with_for_update()
-        )
-        locked_products = {p.id: p for p in p_lock_res.scalars().all()}
+        if lock_rows:
+            p_lock_res = await db.execute(
+                select(Product)
+                .where(Product.id.in_(sorted_p_ids))
+                .options(selectinload(Product.variants))
+                .with_for_update()
+            )
+            locked_products = {p.id: p for p in p_lock_res.scalars().all()}
 
-        v_lock_res = await db.execute(
-            select(ProductVariant)
-            .where(ProductVariant.product_id.in_(sorted_p_ids))
-            .with_for_update()
-        )
-        for v in v_lock_res.scalars().all():
-            locked_variants[v.id] = v
+            v_lock_res = await db.execute(
+                select(ProductVariant)
+                .where(ProductVariant.product_id.in_(sorted_p_ids))
+                .with_for_update()
+            )
+            for v in v_lock_res.scalars().all():
+                locked_variants[v.id] = v
+        else:
+            p_res = await db.execute(
+                select(Product)
+                .where(Product.id.in_(sorted_p_ids))
+                .options(selectinload(Product.variants))
+            )
+            locked_products = {p.id: p for p in p_res.scalars().all()}
+
+            v_res = await db.execute(
+                select(ProductVariant)
+                .where(ProductVariant.product_id.in_(sorted_p_ids))
+            )
+            for v in v_res.scalars().all():
+                locked_variants[v.id] = v
 
     inventory_deductions = []
-
     resolved_items = []
+
     for it in raw_item_dicts:
         p_id = str(it.get("product_id") or "")
         title = str(it.get("title") or it.get("product_title") or "").strip().lower()
-        req_qty = int(it.get("quantity") or 1)
+        req_qty = max(1, int(it.get("quantity") or 1))
 
         matched_p = (
             prod_by_id.get(p_id)
             or variant_to_prod.get(p_id)
             or prod_by_title.get(title)
         )
-        if matched_p:
-            it["image"] = (
-                matched_p.images[0]
-                if matched_p.images and len(matched_p.images) > 0
-                else None
+        if not matched_p:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Product with ID '{p_id}' or title '{title}' not found in store catalog.",
             )
-            if not it.get("title") and (matched_p.name or matched_p.title):
-                it["title"] = matched_p.name or matched_p.title
 
-            if matched_p.id in locked_products:
-                p_record = locked_products[matched_p.id]
-                p_name = p_record.name or p_record.title or "Product"
+        p_record = locked_products.get(matched_p.id) if matched_p else None
+        p_name = (p_record.name or p_record.title) if p_record else (it.get("title") or "Item")
 
-                # If product was already unlisted / draft due to 0 stock, reject with clear error message
-                if not p_record.is_published or p_record.availability in ("unavailable", "out_of_stock"):
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"The item '{p_name}' is out of stock and is not available.",
-                    )
+        # In transactional order creation, enforce availability
+        if lock_rows and p_record:
+            if not p_record.is_published or p_record.availability in ("unavailable", "out_of_stock"):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"The item '{p_name}' is out of stock and is not available.",
+                )
 
-                # Resolve specific variant
-                matched_v: Optional[ProductVariant] = None
-                try:
-                    p_uuid = uuid.UUID(p_id)
-                    if p_uuid in locked_variants:
-                        matched_v = locked_variants[p_uuid]
-                except Exception:
-                    pass
+        # Resolve specific variant
+        matched_v: Optional[ProductVariant] = None
+        try:
+            p_uuid = uuid.UUID(p_id)
+            if p_uuid in locked_variants:
+                matched_v = locked_variants[p_uuid]
+        except Exception:
+            pass
 
-                if not matched_v:
-                    p_vars = [v for v in locked_variants.values() if v.product_id == p_record.id]
-                    it_options = it.get("options")
-                    if it_options and isinstance(it_options, dict):
-                        for v in p_vars:
-                            if v.options == it_options:
-                                matched_v = v
-                                break
-                    if not matched_v and p_vars:
-                        matched_v = p_vars[0]
+        if not matched_v and p_record:
+            p_vars = [v for v in locked_variants.values() if v.product_id == p_record.id]
+            it_options = it.get("options")
+            if it_options and isinstance(it_options, dict):
+                for v in p_vars:
+                    if v.options == it_options:
+                        matched_v = v
+                        break
+            if not matched_v and p_vars:
+                matched_v = p_vars[0]
 
-                if matched_v and matched_v.track_inventory:
-                    if matched_v.stock_quantity <= 0:
-                        p_record.is_published = False
-                        p_record.availability = "out_of_stock"
-                        raise HTTPException(
-                            status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=f"The item '{p_name}' is out of stock and is not available.",
-                        )
-                    if matched_v.stock_quantity < req_qty:
-                        raise HTTPException(
-                            status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=f"The item '{p_name}' is not available in requested quantity (only {matched_v.stock_quantity} left).",
-                        )
+        # Enforce inventory deductions if lock_rows is True
+        if lock_rows and matched_v and matched_v.track_inventory:
+            if matched_v.stock_quantity <= 0:
+                p_record.is_published = False
+                p_record.availability = "out_of_stock"
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"The item '{p_name}' is out of stock and is not available.",
+                )
+            if matched_v.stock_quantity < req_qty:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"The item '{p_name}' is not available in requested quantity (only {matched_v.stock_quantity} left).",
+                )
+            matched_v.stock_quantity -= req_qty
+            inventory_deductions.append({
+                "variant_id": str(matched_v.id),
+                "product_id": str(p_record.id),
+                "quantity": req_qty,
+            })
 
-                    # Deduct stock quantity atomically under the row lock
-                    matched_v.stock_quantity -= req_qty
-                    inventory_deductions.append({
-                        "variant_id": str(matched_v.id),
-                        "product_id": str(p_record.id),
-                        "quantity": req_qty,
-                    })
+        # Resolve verified unit price server-side (NEVER TRUST CLIENT unit_price)
+        verified_unit_price: float = 0.0
+        if matched_v and matched_v.price is not None:
+            verified_unit_price = round(float(matched_v.price), 2)
+        elif matched_p and hasattr(matched_p, "price") and matched_p.price is not None:
+            verified_unit_price = round(float(matched_p.price), 2)
 
+        it["unit_price"] = verified_unit_price
+        it["quantity"] = req_qty
+        it["line_total"] = round(verified_unit_price * req_qty, 2)
+        it["title"] = p_name
+        it["image"] = (
+            matched_p.images[0]
+            if matched_p and matched_p.images and len(matched_p.images) > 0
+            else None
+        )
         resolved_items.append(it)
 
-    # Recalculate remaining total stock per locked product and apply draft/low_stock states
-    for p_record in locked_products.values():
-        tracked = [v for v in locked_variants.values() if v.product_id == p_record.id and v.track_inventory]
-        if tracked:
-            total_stock = sum(v.stock_quantity for v in tracked)
-            if total_stock <= 0:
-                p_record.is_published = False  # Set to draft status so customers don't see
-                p_record.availability = "out_of_stock"
-            elif total_stock < 5:
-                p_record.availability = "low_stock"  # Rate as low quantity when less than 5 left
-            else:
-                p_record.availability = "available"
+    # Post-deduction stock check for locked products
+    if lock_rows:
+        for p_record in locked_products.values():
+            tracked = [v for v in locked_variants.values() if v.product_id == p_record.id and v.track_inventory]
+            if tracked:
+                total_stock = sum(v.stock_quantity for v in tracked)
+                if total_stock <= 0:
+                    p_record.is_published = False
+                    p_record.availability = "out_of_stock"
+                elif total_stock < 5:
+                    p_record.availability = "low_stock"
+                else:
+                    p_record.availability = "available"
 
-    # Sort items alphabetically by product title
+    # Sort items alphabetically by title
     resolved_items.sort(key=lambda item: str(item.get("title") or "").lower())
+
+    # 1. Server-side Subtotal
+    subtotal = round(sum(it["unit_price"] * it["quantity"] for it in resolved_items), 2)
+
+    # 2. Server-side Delivery Fee
+    if (fulfillment_type or "").strip().lower() == "delivery":
+        configured_fee = tenant.delivery_fee
+        if configured_fee is None:
+            configured_fee = (tenant.branding_config or {}).get("deliveryFee", 45.0)
+        delivery_fee = round(float(configured_fee or 0.0), 2)
+    else:
+        delivery_fee = 0.0
+
+    # 3. Server-side Tax (VAT) Calculation for Nigeria (7.5%)
+    is_nigeria = (
+        (tenant.country or "").strip().lower() == "nigeria"
+        or (tenant.currency or "").strip().upper() == "NGN"
+    )
+    if is_nigeria:
+        tax_rate = 0.075  # 7.5% Nigerian statutory VAT
+        tax_title = "VAT (7.5%)"
+    else:
+        tax_rate = 0.0
+        tax_title = "Taxes"
+
+    tax_amount = round(subtotal * tax_rate, 2)
+
+    # 4. Total Amount & Platform Split
+    total_amount = round(subtotal + delivery_fee + tax_amount, 2)
+    platform_fee = round(total_amount * (settings.PLATFORM_FEE_PERCENTAGE / 100.0), 2)
+    tenant_payout = round(total_amount - platform_fee, 2)
+
+    return {
+        "resolved_items": resolved_items,
+        "subtotal": subtotal,
+        "delivery_fee": delivery_fee,
+        "tax_rate": tax_rate,
+        "tax_title": tax_title,
+        "tax_amount": tax_amount,
+        "total_amount": total_amount,
+        "platform_fee": platform_fee,
+        "tenant_payout": tenant_payout,
+        "inventory_deductions": inventory_deductions,
+    }
+
+
+@router.post(
+    "/calculate",
+    response_model=ApiResponse[OrderCalculateResponse],
+    summary="Calculate order pricing, delivery fee, and Nigerian VAT server-side",
+    description="Authoritative backend calculation for items, delivery fee, subtotal, 7.5% Nigerian VAT, and grand total.",
+)
+async def calculate_order(
+    payload: OrderCalculateRequest,
+    tenant: Tenant = Depends(get_tenant_context),
+    db: AsyncSession = Depends(get_rls_db_session),
+) -> Dict[str, Any]:
+    pricing = await compute_server_pricing(
+        items_in=payload.items,
+        tenant=tenant,
+        fulfillment_type=payload.fulfillment_type or "pickup",
+        db=db,
+        lock_rows=False,
+    )
+    resolved_currency = (payload.currency or tenant.currency or "NGN").upper()
+    return success_response(
+        data={
+            "items": pricing["resolved_items"],
+            "subtotal": pricing["subtotal"],
+            "delivery_fee": pricing["delivery_fee"],
+            "tax_rate": pricing["tax_rate"],
+            "tax_title": pricing["tax_title"],
+            "tax_amount": pricing["tax_amount"],
+            "total_amount": pricing["total_amount"],
+            "currency": resolved_currency,
+        },
+        message="Order pricing and VAT calculated successfully",
+    )
+
+
+@router.post(
+    "",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ApiResponse[OrderResponse],
+    summary="Create order and calculate subaccount split fees",
+    description="Creates an order for the tenant with 100% server-side verified pricing, 7.5% Nigerian VAT, delivery fee, and automated split settlement.",
+)
+@router.post(
+    "/",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ApiResponse[OrderResponse],
+    include_in_schema=False,
+)
+async def create_order(
+    order_in: OrderCreate,
+    tenant: Tenant = Depends(get_tenant_context),
+    db: AsyncSession = Depends(get_rls_db_session),
+) -> Dict[str, Any]:
+    # Calculate all pricing, delivery fees, and Nigerian VAT strictly server-side under row-level locks
+    pricing = await compute_server_pricing(
+        items_in=order_in.items,
+        tenant=tenant,
+        fulfillment_type=order_in.fulfillment_type or "pickup",
+        db=db,
+        lock_rows=True,
+    )
+
+    resolved_currency = (order_in.currency or tenant.currency or "NGN").upper()
+    gateway_ref = f"ECH-{tenant.slug.upper()}-{secrets.token_hex(6).upper()}"
+
+    # Auto-resolve user_id if customer_email matches an existing user
+    user_id = order_in.user_id
+    if not user_id and order_in.customer_email:
+        user_res = await db.execute(
+            select(User.id).where(User.email == order_in.customer_email.strip().lower())
+        )
+        user_id = user_res.scalar_one_or_none()
 
     order = Order(
         tenant_id=tenant.id,
         user_id=user_id,
         customer_email=order_in.customer_email.strip().lower(),
         customer_name=order_in.customer_name,
-        total_amount=total_amount,
-        platform_fee=platform_fee,
-        tenant_payout_amount=tenant_payout,
+        total_amount=pricing["total_amount"],
+        platform_fee=pricing["platform_fee"],
+        tenant_payout_amount=pricing["tenant_payout"],
         currency=resolved_currency,
         status=OrderStatus.PENDING,
         payment_gateway=order_in.payment_gateway,
         gateway_reference=gateway_ref,
-        items=resolved_items,
+        items=pricing["resolved_items"],
         metadata_json={
             "tenant_slug": tenant.slug,
             "subaccount_used": tenant.paystack_subaccount_code or tenant.stripe_account_id,
             "fulfillment_type": order_in.fulfillment_type,
-            "delivery_fee": delivery_fee,
+            "subtotal": pricing["subtotal"],
+            "delivery_fee": pricing["delivery_fee"],
+            "tax_rate": pricing["tax_rate"],
+            "tax_title": pricing["tax_title"],
+            "tax_amount": pricing["tax_amount"],
+            "total_amount": pricing["total_amount"],
             "delivery_address": order_in.delivery_address,
             "fulfillment_date": order_in.fulfillment_date,
             "fulfillment_time": order_in.fulfillment_time,
             "gift_message": order_in.gift_message,
-            "inventory_deducted": len(inventory_deductions) > 0,
-            "deductions": inventory_deductions,
+            "inventory_deducted": len(pricing["inventory_deductions"]) > 0,
+            "deductions": pricing["inventory_deductions"],
         },
     )
 
     db.add(order)
     await db.commit()
     await db.refresh(order)
+
+    resp = OrderResponse.model_validate(order)
+    resp.subtotal = pricing["subtotal"]
+    resp.delivery_fee = pricing["delivery_fee"]
+    resp.tax_rate = pricing["tax_rate"]
+    resp.tax_title = pricing["tax_title"]
+    resp.tax_amount = pricing["tax_amount"]
+
     return success_response(
-        data=OrderResponse.model_validate(order).model_dump(mode="json"),
-        message="Order created successfully",
+        data=resp.model_dump(mode="json"),
+        message="Order created successfully with server-verified pricing and VAT",
     )
 
 
@@ -465,7 +605,7 @@ async def list_orders(
 
     is_admin = (
         current_user.role == "super_admin"
-        or (current_user.role in ("admin", "tenant_admin") and current_user.tenant_id == tenant.id)
+        or (current_user.role in ("admin", "tenant_admin", "hub_admin") and current_user.tenant_id == tenant.id)
     )
 
     if is_admin:
@@ -548,6 +688,13 @@ async def list_orders(
     items = []
     for o in orders:
         resp = OrderResponse.model_validate(o)
+        meta = o.metadata_json or {}
+        resp.subtotal = meta.get("subtotal")
+        resp.delivery_fee = meta.get("delivery_fee")
+        resp.tax_rate = meta.get("tax_rate")
+        resp.tax_title = meta.get("tax_title")
+        resp.tax_amount = meta.get("tax_amount")
+
         if o.user and getattr(o.user, "avatar_url", None):
             resp.customer_avatar_url = o.user.avatar_url
         elif o.customer_email and o.customer_email.strip().lower() in email_user_map:
@@ -616,6 +763,13 @@ async def get_order(
                 detail="The billing email does not match this order",
             )
     resp = OrderResponse.model_validate(order)
+    meta = order.metadata_json or {}
+    resp.subtotal = meta.get("subtotal")
+    resp.delivery_fee = meta.get("delivery_fee")
+    resp.tax_rate = meta.get("tax_rate")
+    resp.tax_title = meta.get("tax_title")
+    resp.tax_amount = meta.get("tax_amount")
+
     if order.user and getattr(order.user, "avatar_url", None):
         resp.customer_avatar_url = order.user.avatar_url
     elif order.customer_email:
@@ -805,7 +959,7 @@ async def cancel_order(
 
     if current_user:
         if current_user.role == "super_admin" or (
-            current_user.role in ("admin", "tenant_admin") and current_user.tenant_id == tenant.id
+            current_user.role in ("admin", "tenant_admin", "hub_admin") and current_user.tenant_id == tenant.id
         ):
             is_admin = True
 

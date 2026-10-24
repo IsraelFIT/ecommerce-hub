@@ -67,12 +67,21 @@ export interface ApiOrder {
   gateway_reference: string;
   created_at: string;
   updated_at: string;
+  subtotal?: number;
+  delivery_fee?: number;
+  tax_rate?: number;
+  tax_title?: string;
+  tax_amount?: number;
   items: OrderItem[];
   metadata_json?: {
     tenant_slug?: string;
     subaccount_used?: string | null;
     fulfillment_type?: string;
+    subtotal?: number;
     delivery_fee?: number;
+    tax_rate?: number;
+    tax_title?: string;
+    tax_amount?: number;
     delivery_address?: {
       address?: string;
       street?: string;
@@ -100,9 +109,9 @@ export type Order = ApiOrder;
 
 export interface CreateOrderItemInput {
   product_id: string;
-  title: string;
+  title?: string;
   quantity: number;
-  unit_price: number;
+  unit_price?: number;
   image?: string | null;
   options?: Record<string, unknown>;
 }
@@ -120,6 +129,40 @@ export interface CreateOrderInput {
   fulfillment_date?: string | null;
   fulfillment_time?: string | null;
   gift_message?: string | null;
+}
+
+export interface OrderCalculateItemInput {
+  product_id?: string;
+  variant_id?: string;
+  title?: string;
+  quantity: number;
+  options?: Record<string, unknown>;
+}
+
+export interface OrderCalculateInput {
+  fulfillment_type?: "pickup" | "delivery" | string;
+  items: OrderCalculateItemInput[];
+}
+
+export interface OrderCalculateItemResult {
+  product_id?: string;
+  title?: string;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+  image?: string | null;
+  options?: Record<string, unknown>;
+}
+
+export interface OrderCalculateResult {
+  items: OrderCalculateItemResult[];
+  subtotal: number;
+  delivery_fee: number;
+  tax_rate: number;
+  tax_title: string;
+  tax_amount: number;
+  total_amount: number;
+  currency: string;
 }
 
 export interface UpdateOrderStatusInput {

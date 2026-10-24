@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     STRIPE_WEBHOOK_SECRET: Optional[str] = None
     PAYSTACK_SECRET_KEY: Optional[str] = None
     PAYSTACK_WEBHOOK_SECRET: Optional[str] = None
+    PAYSTACK_API_URL: str = "https://api.paystack.co"
 
     # Sanity CMS Settings
     SANITY_PROJECT_ID: Optional[str] = None

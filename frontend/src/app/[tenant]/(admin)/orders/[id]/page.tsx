@@ -21,6 +21,7 @@ import {
   Loader2,
   FileText,
   ShoppingBag,
+  Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,12 @@ import { OrderDetail } from "@/types/order";
 import { fetchOrderById, updateOrderStatus } from "@/lib/api/order";
 import { formatCurrency, formatDate, getTenantRoute } from "@/utils/helper";
 import { confirmToast } from "@/components/ui/confirm-toast";
+import { useTenantTheme } from "@/components/providers/tenant-theme-provider";
+import {
+  buildInvoiceFromOrder,
+  downloadInvoicePdf,
+  printInvoice,
+} from "@/utils/pdf-download";
 import { cn } from "@/lib/utils";
 
 interface OrderDetailPageProps {
@@ -103,6 +110,43 @@ export default function TenantAdminOrderDetailPage({
   const [selectedStatus, setSelectedStatus] = useState<string>("");
   const [trackingNotes, setTrackingNotes] = useState<string>("");
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+
+  const { tenant, branding } = useTenantTheme();
+
+  const getOrderInvoice = () => {
+    if (!order) return null;
+    return buildInvoiceFromOrder(order, tenant, tenantSlug, branding?.logoUrl);
+  };
+
+  const handlePrintSlip = () => {
+    const invoice = getOrderInvoice();
+    if (!invoice) {
+      toast.error("Order details are not yet loaded");
+      return;
+    }
+    printInvoice(invoice);
+  };
+
+  const handleDownloadPdf = async () => {
+    const invoice = getOrderInvoice();
+    if (!invoice) {
+      toast.error("Order details are not yet loaded");
+      return;
+    }
+    try {
+      setIsDownloadingPdf(true);
+      await downloadInvoicePdf(invoice);
+      toast.success(
+        `Packing slip #${order?.gateway_reference || order?.id} downloaded!`,
+      );
+    } catch (err) {
+      console.error("Failed to download PDF packing slip:", err);
+      toast.error("Failed to download PDF. Please try again.");
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -210,10 +254,6 @@ export default function TenantAdminOrderDetailPage({
       return;
     }
     await executeUpdateStatus(selectedStatus);
-  };
-
-  const handlePrintSlip = () => {
-    window.print();
   };
 
   if (isLoading) {
@@ -327,7 +367,7 @@ export default function TenantAdminOrderDetailPage({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button
             variant="outline"
             size="sm"
@@ -336,6 +376,21 @@ export default function TenantAdminOrderDetailPage({
           >
             <Printer className="w-3.5 h-3.5 text-muted-foreground" />
             Print Packing Slip
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDownloadPdf}
+            disabled={isDownloadingPdf}
+            className="text-xs h-8 gap-1.5"
+          >
+            {isDownloadingPdf ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+            ) : (
+              <Download className="w-3.5 h-3.5 text-muted-foreground" />
+            )}
+            Download PDF
           </Button>
 
           <Button

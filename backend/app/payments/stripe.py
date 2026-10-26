@@ -163,15 +163,25 @@ class StripePaymentProvider(PaymentProvider):
         data_obj = payload.get("data", {}).get("object", {})
 
         reference = data_obj.get("client_reference_id") or data_obj.get("id", "")
-        status = "paid" if event_type in ["checkout.session.completed", "payment_intent.succeeded"] else "pending"
+        if event_type in ["checkout.session.completed", "payment_intent.succeeded"]:
+            status_val = "paid"
+        elif event_type in ["payment_intent.payment_failed", "charge.failed"]:
+            status_val = "declined"
+        elif event_type in ["checkout.session.expired"]:
+            status_val = "abandoned"
+        else:
+            status_val = "pending"
 
         return {
             "event_id": payload.get("id", ""),
             "event_type": event_type,
             "reference": reference,
-            "status": status,
+            "status": status_val,
             "amount": float(data_obj.get("amount_total", data_obj.get("amount", 0))) / 100.0,
-            "metadata": data_obj.get("metadata", {}),
+            "metadata": {
+                **(data_obj.get("metadata", {}) or {}),
+                "last_payment_error": (data_obj.get("last_payment_error", {}) or {}).get("message"),
+            },
         }
 
     async def verify_transaction(self, reference: str, session_id: Optional[str] = None) -> Dict[str, Any]:
@@ -236,3 +246,60 @@ class StripePaymentProvider(PaymentProvider):
             "account_id": mock_id,
             "onboarding_url": f"https://connect.stripe.com/express/onboarding/{mock_id}",
         }
+
+    async def refund_transaction(
+        self,
+        reference: str,
+        amount: Optional[float] = None,
+        currency: str = "USD",
+    ) -> Dict[str, Any]:
+        """
+        Triggers a full or partial refund for a payment on Stripe.
+        """
+        if not self.secret_key or not self.secret_key.startswith("sk_"):
+            return {
+                "status": "success",
+                "refund_id": f"mock-ref-{reference[:8]}",
+                "message": "Simulated offline refund (no live Stripe key configured)",
+                "amount": amount,
+            }
+
+        try:
+            amount_cents = int(round(amount * 100)) if amount is not None and amount > 0 else None
+            refund_kwargs: Dict[str, Any] = {}
+            if reference.startswith("pi_"):
+                refund_kwargs["payment_intent"] = reference
+            elif reference.startswith("ch_"):
+                refund_kwargs["charge"] = reference
+            elif reference.startswith("cs_"):
+                # Retrieve checkout session to get payment_intent
+                sess = stripe.checkout.Session.retrieve(reference)
+                if sess.payment_intent:
+                    refund_kwargs["payment_intent"] = sess.payment_intent
+
+            if amount_cents:
+                refund_kwargs["amount"] = amount_cents
+
+            if not refund_kwargs.get("payment_intent") and not refund_kwargs.get("charge"):
+                # Search by reference in metadata
+                search_res = stripe.PaymentIntent.search(query=f"metadata['reference']:'{reference}'")
+                if search_res.data:
+                    refund_kwargs["payment_intent"] = search_res.data[0].id
+                else:
+                    return {
+                        "status": "recorded",
+                        "message": f"Recorded locally (no Stripe payment intent for {reference})",
+                    }
+
+            refund = stripe.Refund.create(**refund_kwargs)
+            return {
+                "status": "success",
+                "refund_id": refund.id,
+                "amount": float(refund.amount / 100.0) if hasattr(refund, "amount") else amount,
+            }
+        except Exception as e:
+            return {
+                "status": "recorded",
+                "message": f"Refund recorded with note: {str(e)}",
+            }
+

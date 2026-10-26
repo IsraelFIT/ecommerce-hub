@@ -238,7 +238,7 @@ export default function TenantSettingsPage({ params }: SettingsPageProps) {
         if (res.data.account_id) {
           setStripeAccountId(res.data.account_id);
         }
-        window.location.href = res.data.onboarding_url;
+        window.location.assign(res.data.onboarding_url);
       }
     } catch (err: unknown) {
       const msg =
@@ -934,134 +934,138 @@ export default function TenantSettingsPage({ params }: SettingsPageProps) {
                 )}
               </div>
 
-              {/* Stripe Connect Express Automated Onboarding */}
-              <div className="rounded-xl border border-border/80 bg-background/50 p-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="relative h-8 w-12">
-                      <Image
-                        src="/logos/stripe.png"
-                        alt="Stripe"
-                        fill
-                        unoptimized
-                        className="object-contain object-left"
-                      />
+              {/* Stripe Connect Express Automated Onboarding (Temporarily hidden for Nigerian accounts) */}
+              {false && (
+                <div className="rounded-xl border border-border/80 bg-background/50 p-5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="relative h-8 w-12">
+                        <Image
+                          src="/logos/stripe.png"
+                          alt="Stripe"
+                          fill
+                          unoptimized
+                          className="object-contain object-left"
+                        />
+                      </div>
+                      <span className="text-xs font-semibold text-muted-foreground">
+                        Connect Express (USD / EUR / GBP / Global)
+                      </span>
                     </div>
-                    <span className="text-xs font-semibold text-muted-foreground">
-                      Connect Express (USD / EUR / GBP / Global)
+                    <span className="text-muted-foreground font-medium text-xs">
+                      Direct Charge (2.9% + 30¢ billed to merchant)
                     </span>
                   </div>
-                  <span className="text-muted-foreground font-medium text-xs">
-                    Direct Charge (2.9% + 30¢ billed to merchant)
-                  </span>
-                </div>
 
-                {stripeAccountId && !showManualStripe ? (
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Check className="h-4 w-4 text-indigo-600" />
-                        <span className="text-xs font-bold text-indigo-900 dark:text-indigo-300">
-                          Active Stripe Connected Account
-                        </span>
-                        <code className="text-[11px] bg-background/80 px-2 py-0.5 rounded font-bold text-foreground">
-                          {stripeAccountId}
-                        </code>
-                      </div>
-                      <p className="text-[11px] text-indigo-800/80 dark:text-indigo-400">
-                        Direct Charge active: Customer payments settle directly
-                        to your Stripe account.
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handleStartStripeOnboarding}
-                        disabled={isCreatingStripeOnboarding}
-                        className="text-xs h-8 cursor-pointer gap-1"
-                      >
-                        {isCreatingStripeOnboarding ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <ExternalLink className="h-3 w-3" />
-                        )}
-                        Stripe Dashboard
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowManualStripe(true)}
-                        className="text-xs h-8 cursor-pointer"
-                      >
-                        Edit ID
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <p className="text-muted-foreground">
-                      Complete express onboarding with Stripe to accept payments
-                      in USD, EUR, and GBP. Stripe will verify your identity and
-                      bank details securely.
-                    </p>
-
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <Button
-                        type="button"
-                        onClick={handleStartStripeOnboarding}
-                        disabled={isCreatingStripeOnboarding}
-                      >
-                        {isCreatingStripeOnboarding ? (
-                          <>
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            Connecting to Stripe Express...
-                          </>
-                        ) : (
-                          <>Connect with Stripe Express</>
-                        )}
-                      </Button>
-
-                      <button
-                        type="button"
-                        onClick={() => setShowManualStripe(!showManualStripe)}
-                        className="text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors text-left sm:text-right"
-                      >
-                        {showManualStripe
-                          ? "Hide manual entry"
-                          : "Or enter existing Stripe acct_xxxx ID"}
-                      </button>
-                    </div>
-
-                    {showManualStripe && (
-                      <div className="pt-3 border-t border-border/60 space-y-2">
-                        <Label className="text-xs font-semibold text-foreground">
-                          Manual Stripe Connected Account ID
-                        </Label>
-                        <div className="flex gap-2">
-                          <Input
-                            value={stripeAccountId}
-                            onChange={(e) => setStripeAccountId(e.target.value)}
-                            placeholder="acct_xxxxxxxxxxxxxxx"
-                          />
-                          {stripeAccountId && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setShowManualStripe(false)}
-                            >
-                              Done
-                            </Button>
-                          )}
+                  {stripeAccountId && !showManualStripe ? (
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Check className="h-4 w-4 text-indigo-600" />
+                          <span className="text-xs font-bold text-indigo-900 dark:text-indigo-300">
+                            Active Stripe Connected Account
+                          </span>
+                          <code className="text-[11px] bg-background/80 px-2 py-0.5 rounded font-bold text-foreground">
+                            {stripeAccountId}
+                          </code>
                         </div>
+                        <p className="text-[11px] text-indigo-800/80 dark:text-indigo-400">
+                          Direct Charge active: Customer payments settle
+                          directly to your Stripe account.
+                        </p>
                       </div>
-                    )}
-                  </div>
-                )}
-              </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleStartStripeOnboarding}
+                          disabled={isCreatingStripeOnboarding}
+                          className="text-xs h-8 cursor-pointer gap-1"
+                        >
+                          {isCreatingStripeOnboarding ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <ExternalLink className="h-3 w-3" />
+                          )}
+                          Stripe Dashboard
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowManualStripe(true)}
+                          className="text-xs h-8 cursor-pointer"
+                        >
+                          Edit ID
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <p className="text-muted-foreground">
+                        Complete express onboarding with Stripe to accept
+                        payments in USD, EUR, and GBP. Stripe will verify your
+                        identity and bank details securely.
+                      </p>
+
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <Button
+                          type="button"
+                          onClick={handleStartStripeOnboarding}
+                          disabled={isCreatingStripeOnboarding}
+                        >
+                          {isCreatingStripeOnboarding ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              Connecting to Stripe Express...
+                            </>
+                          ) : (
+                            <>Connect with Stripe Express</>
+                          )}
+                        </Button>
+
+                        <button
+                          type="button"
+                          onClick={() => setShowManualStripe(!showManualStripe)}
+                          className="text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors text-left sm:text-right"
+                        >
+                          {showManualStripe
+                            ? "Hide manual entry"
+                            : "Or enter existing Stripe acct_xxxx ID"}
+                        </button>
+                      </div>
+
+                      {showManualStripe && (
+                        <div className="pt-3 border-t border-border/60 space-y-2">
+                          <Label className="text-xs font-semibold text-foreground">
+                            Manual Stripe Connected Account ID
+                          </Label>
+                          <div className="flex gap-2">
+                            <Input
+                              value={stripeAccountId}
+                              onChange={(e) =>
+                                setStripeAccountId(e.target.value)
+                              }
+                              placeholder="acct_xxxxxxxxxxxxxxx"
+                            />
+                            {stripeAccountId && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setShowManualStripe(false)}
+                              >
+                                Done
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Operational Currency */}
               <div className="space-y-1.5 pt-2 border-t border-border/60">

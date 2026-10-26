@@ -152,32 +152,21 @@ async def get_like_status(
     user_id = _extract_user_id(authorization, request)
     active_session_id = session_id or request.headers.get("x-session-id")
 
-    is_liked = False
-    if user_id:
-        check = await db.execute(
-            select(ProductLike.id).where(
-                ProductLike.tenant_id == tenant.id,
-                ProductLike.product_id == product_id,
-                ProductLike.user_id == user_id,
-            )
-        )
-        is_liked = check.scalar_one_or_none() is not None
-    elif active_session_id:
-        check = await db.execute(
-            select(ProductLike.id).where(
-                ProductLike.tenant_id == tenant.id,
-                ProductLike.product_id == product_id,
-                ProductLike.session_id == active_session_id,
-            )
-        )
-        is_liked = check.scalar_one_or_none() is not None
-
-    count_res = await db.execute(
-        select(func.count(ProductLike.id)).where(
-            ProductLike.product_id == product_id
-        )
+    user_cond = (
+        ProductLike.user_id == user_id
+        if user_id
+        else (ProductLike.session_id == active_session_id if active_session_id else False)
     )
-    total_likes = count_res.scalar() or 0
+
+    likes_stmt = select(
+        func.count(ProductLike.id).label("total_likes"),
+        func.bool_or(user_cond).label("is_liked"),
+    ).where(ProductLike.product_id == product_id)
+
+    count_res = await db.execute(likes_stmt)
+    row = count_res.first()
+    total_likes = int(row.total_likes or 0) if row else 0
+    is_liked = bool(row.is_liked) if (row and row.is_liked is not None) else False
 
     return success_response(
         data={

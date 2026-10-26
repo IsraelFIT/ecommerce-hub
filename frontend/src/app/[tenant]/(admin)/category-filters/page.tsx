@@ -50,6 +50,7 @@ import {
   deleteFilter,
 } from "@/lib/api/filters";
 import { ProductCategory, ProductFilter } from "@/types/products";
+import { confirmToast } from "@/components/ui/confirm-toast";
 
 export default function CategoryFiltersAdminPage() {
   const [activeTab, setActiveTab] = useState<string>("categories");
@@ -143,17 +144,25 @@ export default function CategoryFiltersAdminPage() {
     }
   };
 
-  const handleDeleteCategory = async (cat: ProductCategory) => {
-    if (!confirm(`Are you sure you want to delete category "${cat.name}"?`))
-      return;
-    try {
-      await deleteCategory(cat.id);
-      toast.success(`Category "${cat.name}" deleted`);
-      loadData();
-    } catch (err: unknown) {
-      const e = err as Error;
-      toast.error(e.message || "Failed to delete category");
-    }
+  const handleDeleteCategory = (cat: ProductCategory) => {
+    confirmToast({
+      title: "Delete Category?",
+      subtitle: cat.name,
+      description: `Are you sure you want to delete category "${cat.name}"? Products in this category may become unassigned.`,
+      confirmText: "Yes, Delete",
+      cancelText: "Keep Category",
+      variant: "destructive",
+      onConfirm: async () => {
+        try {
+          await deleteCategory(cat.id);
+          toast.success(`Category "${cat.name}" deleted`);
+          loadData();
+        } catch (err: unknown) {
+          const e = err as Error;
+          toast.error(e.message || "Failed to delete category");
+        }
+      },
+    });
   };
 
   // Handle Filter CRUD
@@ -211,19 +220,25 @@ export default function CategoryFiltersAdminPage() {
     }
   };
 
-  const handleDeleteFilter = async (filt: ProductFilter) => {
-    if (
-      !confirm(`Are you sure you want to delete filter group "${filt.name}"?`)
-    )
-      return;
-    try {
-      await deleteFilter(filt.id);
-      toast.success(`Filter group "${filt.name}" deleted`);
-      loadData();
-    } catch (err: unknown) {
-      const e = err as Error;
-      toast.error(e.message || "Failed to delete filter group");
-    }
+  const handleDeleteFilter = (filt: ProductFilter) => {
+    confirmToast({
+      title: "Delete Filter Group?",
+      subtitle: filt.name,
+      description: `Are you sure you want to delete filter group "${filt.name}"? This will remove these filter options from associated products.`,
+      confirmText: "Yes, Delete",
+      cancelText: "Keep Filter",
+      variant: "destructive",
+      onConfirm: async () => {
+        try {
+          await deleteFilter(filt.id);
+          toast.success(`Filter group "${filt.name}" deleted`);
+          loadData();
+        } catch (err: unknown) {
+          const e = err as Error;
+          toast.error(e.message || "Failed to delete filter group");
+        }
+      },
+    });
   };
 
   // Filtered lists based on search

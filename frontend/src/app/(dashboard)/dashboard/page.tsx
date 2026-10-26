@@ -243,7 +243,7 @@ export default function DashboardPage() {
             to {Math.min(page * pageSize, recentOrders.length)} of{" "}
             {recentOrders.length} orders
           </span>
-          {recentOrders.length >= 10 && (
+          {totalPages > 1 && (
             <Pagination className="mx-0 w-auto">
               <PaginationContent>
                 <PaginationItem>

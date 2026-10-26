@@ -1,7 +1,7 @@
 import uuid
 from typing import Dict, Any, List
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, func
+from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies import get_tenant_context, get_rls_db_session, get_current_tenant_admin
 from app.models.tenant import Tenant
@@ -87,26 +87,31 @@ async def get_category(
     tenant: Tenant = Depends(get_tenant_context),
     db: AsyncSession = Depends(get_rls_db_session),
 ) -> Dict[str, Any]:
-    query = select(Category).where(
-        Category.id == category_id,
-        Category.tenant_id == tenant.id,
-        Category.is_deleted == False,
+    query = (
+        select(Category, func.count(Product.id).label("product_count"))
+        .outerjoin(
+            Product,
+            and_(
+                Product.category_id == Category.id,
+                Product.tenant_id == tenant.id,
+                Product.is_deleted == False,
+            ),
+        )
+        .where(
+            Category.id == category_id,
+            Category.tenant_id == tenant.id,
+            Category.is_deleted == False,
+        )
+        .group_by(Category.id)
     )
     result = await db.execute(query)
-    cat = result.scalar_one_or_none()
-    if not cat:
+    row = result.first()
+    if not row:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Category not found",
         )
-
-    # Count products
-    p_count_res = await db.execute(
-        select(func.count(Product.id)).where(
-            Product.category_id == cat.id, Product.tenant_id == tenant.id
-        )
-    )
-    product_count = p_count_res.scalar_one() or 0
+    cat, product_count = row
 
     return success_response(
         data=CategoryResponse(
@@ -220,14 +225,23 @@ async def update_category(
             setattr(category, key, value)
 
     await db.commit()
-    await db.refresh(category)
 
-    p_count_res = await db.execute(
-        select(func.count(Product.id)).where(
-            Product.category_id == category.id, Product.tenant_id == tenant.id
+    query_refreshed = (
+        select(Category, func.count(Product.id).label("product_count"))
+        .outerjoin(
+            Product,
+            and_(
+                Product.category_id == Category.id,
+                Product.tenant_id == tenant.id,
+                Product.is_deleted == False,
+            ),
         )
+        .where(Category.id == category.id, Category.tenant_id == tenant.id)
+        .group_by(Category.id)
     )
-    product_count = p_count_res.scalar_one() or 0
+    res = await db.execute(query_refreshed)
+    row = res.first()
+    category, product_count = row if row else (category, 0)
 
     return success_response(
         data=CategoryResponse(

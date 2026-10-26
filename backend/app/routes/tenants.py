@@ -1,5 +1,5 @@
 import uuid
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -288,6 +288,10 @@ async def get_tenant_seller_stats(
 )
 async def list_tenant_users(
     slug_or_id: str,
+    page: int = 1,
+    per_page: int = 20,
+    search: Optional[str] = None,
+    role: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
@@ -321,7 +325,7 @@ async def list_tenant_users(
     user_res = await db.execute(user_query)
     tenant_users = user_res.scalars().all()
 
-    # Also check orders placed by customers under this tenant
+    # Also check orders placed by customers under this tenant joined with User for avatars
     orders_res = await db.execute(
         select(
             Order.customer_email,
@@ -329,9 +333,21 @@ async def list_tenant_users(
             func.count(Order.id).label("order_count"),
             func.sum(Order.total_amount).label("total_spent"),
             func.max(Order.created_at).label("last_order_at"),
+            User.id.label("user_id"),
+            User.phone_number.label("phone_number"),
+            User.avatar_url.label("avatar_url"),
+            User.gender.label("gender"),
         )
+        .outerjoin(User, func.lower(User.email) == func.lower(Order.customer_email))
         .where(Order.tenant_id == tenant.id)
-        .group_by(Order.customer_email, Order.customer_name)
+        .group_by(
+            Order.customer_email,
+            Order.customer_name,
+            User.id,
+            User.phone_number,
+            User.avatar_url,
+            User.gender,
+        )
     )
     order_customer_stats = {
         row.customer_email.lower(): {
@@ -339,22 +355,16 @@ async def list_tenant_users(
             "total_spent": float(row.total_spent or 0.0),
             "last_order_at": row.last_order_at.isoformat() if row.last_order_at else None,
             "name": row.customer_name,
+            "user_id": str(row.user_id) if row.user_id else None,
+            "phone_number": row.phone_number,
+            "avatar_url": row.avatar_url,
+            "gender": row.gender,
         }
         for row in orders_res.all()
     }
 
     user_list = []
     seen_emails = set()
-
-    # Fetch registered users matching order customer emails to obtain avatars
-    customer_emails = [e for e in order_customer_stats.keys() if e not in seen_emails]
-    customer_user_map = {}
-    if customer_emails:
-        c_users_res = await db.execute(
-            select(User).where(func.lower(User.email).in_(customer_emails))
-        )
-        for cu in c_users_res.scalars().all():
-            customer_user_map[cu.email.lower()] = cu
 
     for u in tenant_users:
         seen_emails.add(u.email.lower())
@@ -383,16 +393,15 @@ async def list_tenant_users(
             name_parts = stats["name"].split(" ", 1)
             first_name = name_parts[0] if name_parts else "Customer"
             last_name = name_parts[1] if len(name_parts) > 1 else ""
-            matching_cu = customer_user_map.get(email.lower())
             user_list.append({
-                "id": str(matching_cu.id) if matching_cu else f"cust-{abs(hash(email)) % 10000000}",
+                "id": stats.get("user_id") or f"cust-{abs(hash(email)) % 10000000}",
                 "first_name": first_name,
                 "last_name": last_name,
                 "full_name": stats["name"],
                 "email": email,
-                "phone_number": getattr(matching_cu, "phone_number", None) if matching_cu else None,
-                "avatar_url": getattr(matching_cu, "avatar_url", None) if matching_cu else None,
-                "gender": getattr(matching_cu, "gender", None) if matching_cu else None,
+                "phone_number": stats.get("phone_number"),
+                "avatar_url": stats.get("avatar_url"),
+                "gender": stats.get("gender"),
                 "role": "customer",
                 "is_active": True,
                 "is_verified": True,
@@ -401,8 +410,38 @@ async def list_tenant_users(
                 "total_spent": stats.get("total_spent", 0.0),
             })
 
+    if role and role.lower() != "all":
+        r_val = role.lower()
+        if r_val == "customer":
+            user_list = [u for u in user_list if u.get("role") == "customer"]
+        elif r_val == "admin":
+            user_list = [u for u in user_list if u.get("role") in ("admin", "tenant_admin", "super_admin")]
+        elif r_val == "staff":
+            user_list = [u for u in user_list if u.get("role") == "staff"]
+
+    if search and search.strip():
+        s = search.strip().lower()
+        user_list = [
+            u for u in user_list
+            if s in (u.get("full_name") or "").lower()
+            or s in (u.get("email") or "").lower()
+            or s in (u.get("phone_number") or "").lower()
+        ]
+
     total = len(user_list)
+    last_page = max(1, (total + per_page - 1) // per_page)
+    offset = (page - 1) * per_page
+    paged_items = user_list[offset : offset + per_page]
+
+    pagination = PaginationMeta(
+        current_page=page,
+        last_page=last_page,
+        per_page=per_page,
+        total=total,
+    )
+
     return success_response(
-        data={"items": user_list, "total": total},
+        data={"items": paged_items, "total": total},
+        pagination=pagination,
         message="Tenant users retrieved successfully",
     )

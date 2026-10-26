@@ -7,10 +7,13 @@ export interface OrderItemDisplay {
 }
 
 export type OrderDisplayStatus =
+  | "Pending"
+  | "Paid"
   | "Accepted"
-  | "Delivered"
   | "Processing"
+  | "Shipped"
   | "On the Way"
+  | "Delivered"
   | "Cancelled";
 
 export interface OrderDisplay {
@@ -25,6 +28,9 @@ export interface OrderDisplay {
   status: OrderDisplayStatus;
   statusDescription: string;
   items: OrderItemDisplay[];
+  createdAt?: string;
+  paymentGateway?: string;
+  rawStatus?: string;
 }
 
 export interface ApiOrderItem {
@@ -51,9 +57,25 @@ export interface OrderItem {
   options?: Record<string, unknown>;
 }
 
+export interface OrderListItem {
+  id: string;
+  gateway_reference?: string | null;
+  customer_name: string;
+  customer_email: string;
+  customer_avatar_url?: string | null;
+  total_amount: number;
+  platform_fee: number;
+  tenant_payout_amount: number;
+  currency: string;
+  status: string;
+  payment_gateway: string;
+  created_at: string;
+  items?: OrderItem[];
+}
+
 export interface ApiOrder {
   id: string;
-  tenant_id: string;
+  tenant_id?: string;
   user_id?: string | null;
   customer_email: string;
   customer_name: string;
@@ -72,7 +94,7 @@ export interface ApiOrder {
   tax_rate?: number;
   tax_title?: string;
   tax_amount?: number;
-  items: OrderItem[];
+  items?: OrderItem[];
   metadata_json?: {
     tenant_slug?: string;
     subaccount_used?: string | null;
@@ -177,8 +199,17 @@ export interface GetOrdersOptions {
   customer_email?: string;
   user_id?: string;
   product_id?: string;
-  sort_by?: "created_at" | "date" | "total_amount" | "product" | "product_name" | string;
+  status?: string;
+  search?: string;
+  sort_by?:
+    | "created_at"
+    | "date"
+    | "total_amount"
+    | "product"
+    | "product_name"
+    | string;
   sort_order?: "asc" | "desc";
+  include_items?: boolean;
 }
 
 export interface PaginatedOrdersResponse {
@@ -189,4 +220,3 @@ export interface CancelOrderInput {
   reason?: string;
   customer_email?: string;
 }
-

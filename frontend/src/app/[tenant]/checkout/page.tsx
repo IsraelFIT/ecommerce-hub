@@ -14,11 +14,11 @@ import {
   ChevronRight,
   ShoppingBag,
   Plus,
-  ShieldCheck,
   Loader2,
   ExternalLink,
   Check,
   Lock,
+  Info,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,11 @@ import {
 import { useCartStore } from "@/store/cart";
 import { useUserStore } from "@/store/user";
 import { formatCurrency, getTenantRoute } from "@/utils/helper";
+import {
+  calculatePaystackFee,
+  getAllPaystackFeeBreakdowns,
+  PaystackCardChannel,
+} from "@/utils/paystack-fees";
 import { getTenantBySlug } from "@/lib/api/tenants";
 import { createOrder, calculateOrderPricing } from "@/lib/api/order";
 import { createCheckoutSession, verifyPayment } from "@/lib/api/payments";
@@ -209,26 +214,13 @@ export default function CheckoutPage() {
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [checkoutSession, setCheckoutSession] =
     useState<CheckoutSessionResponse | null>(null);
+  const [selectedCardChannel, setSelectedCardChannel] =
+    useState<PaystackCardChannel>("local");
 
-  // Initialize payment gateway choice from tenant's default or currency
+  // Initialize payment gateway choice (Stripe disabled for now; defaulting to Paystack)
   useEffect(() => {
-    if (tenantData) {
-      if (
-        tenantData.default_gateway === "stripe" ||
-        tenantData.default_gateway === "paystack"
-      ) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setPaymentGateway(tenantData.default_gateway as "paystack" | "stripe");
-      } else if (
-        tenantData.currency === "USD" ||
-        tenantData.currency === "EUR" ||
-        tenantData.currency === "GBP"
-      ) {
-        setPaymentGateway("stripe");
-      } else {
-        setPaymentGateway("paystack");
-      }
-    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPaymentGateway("paystack");
   }, [tenantData]);
 
   // Server Pricing & Nigerian VAT calculation state
@@ -289,6 +281,13 @@ export default function CheckoutPage() {
   const total =
     serverPricing?.total_amount ??
     Number((subtotal + deliveryFee + taxAmount).toFixed(2));
+
+  const activeFeeBreakdown = calculatePaystackFee(
+    total,
+    selectedCardChannel,
+    storeCurrency,
+  );
+  const allFeeBreakdowns = getAllPaystackFeeBreakdowns(total, storeCurrency);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -423,7 +422,7 @@ export default function CheckoutPage() {
             paymentGateway === "stripe" ? "Stripe" : "Paystack"
           } checkout...`,
         );
-        window.location.href = session.checkout_url;
+        window.location.assign(session.checkout_url);
       } else {
         // Open Interactive Payment Gateway Sandbox modal for local test / simulation
         setIsMockModalOpen(true);
@@ -1062,105 +1061,89 @@ export default function CheckoutPage() {
                   <span className="inline-flex w-6 h-6 rounded-full bg-stone-100 text-foreground items-center justify-center text-xs font-bold">
                     3
                   </span>
-                  Payment Gateway
+                  Payment Gateway & Fee Breakdown
                 </h4>
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
-                  <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                  <span>Split Payouts Protected</span>
-                </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Paystack Option */}
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setPaymentGateway("paystack")}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      setPaymentGateway("paystack");
-                    }
-                  }}
-                  className={cn(
-                    "relative p-4 rounded-xl border-2 transition-all cursor-pointer flex items-center justify-between gap-4 outline-none min-h-18.5",
-                    paymentGateway === "paystack"
-                      ? "border-blue-400 bg-blue-50/20 ring-1 ring-blue-400/30 shadow-xs"
-                      : "border-stone-200 hover:border-stone-300 bg-card text-foreground",
-                  )}
-                >
-                  <div className="relative h-12 w-36">
-                    <Image
-                      src="/logos/paystack.png"
-                      alt="Paystack"
-                      fill
-                      unoptimized
-                      className="object-contain object-left"
-                      priority
-                    />
-                  </div>
-                  <div
-                    className={cn(
-                      "w-5 h-5 rounded-full border flex items-center justify-center transition-colors shrink-0",
-                      paymentGateway === "paystack"
-                        ? "border-blue-400 bg-blue-400 text-white"
-                        : "border-stone-300 bg-white",
-                    )}
-                  >
-                    {paymentGateway === "paystack" && (
-                      <Check className="h-3 w-3 stroke-3" />
-                    )}
-                  </div>
+              {/* Paystack Primary Card */}
+              <div className="relative p-4 rounded-xl border-2 border-blue-400 bg-blue-50/20 ring-1 ring-blue-400/30 shadow-xs flex items-center justify-between gap-4 outline-none mb-4">
+                <div className="relative h-12 w-36">
+                  <Image
+                    src="/logos/paystack.png"
+                    alt="Paystack"
+                    fill
+                    unoptimized
+                    className="object-contain object-left"
+                    priority
+                  />
                 </div>
-
-                {/* Stripe Option */}
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setPaymentGateway("stripe")}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      setPaymentGateway("stripe");
-                    }
-                  }}
-                  className={cn(
-                    "relative p-4 rounded-xl border-2 transition-all cursor-pointer flex items-center justify-between gap-4 outline-none min-h-18.5",
-                    paymentGateway === "stripe"
-                      ? "border-indigo-600 bg-indigo-50/20 ring-1 ring-indigo-600/30 shadow-xs"
-                      : "border-stone-200 hover:border-stone-300 bg-card text-foreground",
-                  )}
-                >
-                  <div className="relative h-7 w-32">
-                    <Image
-                      src="/logos/stripe.png"
-                      alt="Stripe"
-                      fill
-                      unoptimized
-                      className="object-contain object-left"
-                      priority
-                    />
-                  </div>
-                  <div
-                    className={cn(
-                      "w-5 h-5 rounded-full border flex items-center justify-center transition-colors shrink-0",
-                      paymentGateway === "stripe"
-                        ? "border-indigo-600 bg-indigo-600 text-white"
-                        : "border-stone-300 bg-white",
-                    )}
-                  >
-                    {paymentGateway === "stripe" && (
-                      <Check className="h-3 w-3 stroke-3" />
-                    )}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-blue-700 bg-blue-100/80 px-2.5 py-1 rounded-full">
+                    Active Gateway
+                  </span>
+                  <div className="w-5 h-5 rounded-full border border-blue-400 bg-blue-400 text-white flex items-center justify-center shrink-0">
+                    <Check className="h-3 w-3 stroke-3" />
                   </div>
                 </div>
               </div>
 
-              <div className="mt-4 p-3 bg-stone-50 border border-stone-200/80 rounded-md text-xs text-muted-foreground flex items-center gap-2">
-                <Lock className="h-3.5 w-3.5 text-stone-500 shrink-0" />
-                <span className="flex items-center flex-wrap gap-1.5">
-                  Payments are processed securely via
-                  <PaymentGatewayLogo gateway={paymentGateway} />. Platform fees
-                  (2.5%) are retained and net proceeds route straight to the
-                  merchant.
+              {/* Card Channel / Payment Method Select Dropdown */}
+              <div className="space-y-2">
+                <Label
+                  htmlFor="payment-channel-select"
+                  className="text-xs font-bold text-foreground"
+                >
+                  Select Payment Method:
+                </Label>
+
+                <Select
+                  value={selectedCardChannel}
+                  onValueChange={(val) =>
+                    setSelectedCardChannel(val as PaystackCardChannel)
+                  }
+                >
+                  <SelectTrigger
+                    id="payment-channel-select"
+                    className="w-full h-11"
+                  >
+                    <SelectValue placeholder="Select Payment Method">
+                      {allFeeBreakdowns[selectedCardChannel].channelLabel}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border-border text-foreground">
+                    <SelectItem value="local" className="py-2.5">
+                      Local Nigerian Cards (Nigerian Visa, Mastercard, Verve,
+                      Transfer & USSD)
+                    </SelectItem>
+                    <SelectItem value="international" className="py-2.5">
+                      International Cards (US, UK, European & International
+                      Cards)
+                    </SelectItem>
+                    <SelectItem value="amex" className="py-2.5">
+                      American Express (US & Global American Express (Amex)
+                      Cards)
+                    </SelectItem>
+                    <SelectItem value="google_pay" className="py-2.5">
+                      Google Pay
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Informative notice */}
+              <div className="mt-4 p-2 bg-stone-50 border border-stone-200/80 rounded-md text-xs text-muted-foreground flex items-start gap-2">
+                <Info className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+                <span>
+                  Please note that Paystack will automatically add{" "}
+                  <strong className="text-foreground">
+                    +
+                    {formatCurrency(
+                      activeFeeBreakdown.feeAmount.toFixed(2),
+                      storeCurrency,
+                    )}
+                  </strong>{" "}
+                  for your selected payment method when you reach their secure
+                  payment modal.
                 </span>
               </div>
             </div>
@@ -1262,12 +1245,37 @@ export default function CheckoutPage() {
 
               <div className="w-full h-px bg-stone-200 my-2" />
 
-              <div className="flex justify-between items-baseline">
+              {/* Subtotal before gateway fee */}
+              <div className="flex justify-between text-xs text-muted-foreground font-medium">
+                <span>Store Total</span>
+                <span className="font-semibold text-sm text-foreground">
+                  {formatCurrency(total.toFixed(2), storeCurrency)}
+                </span>
+              </div>
+
+              {/* Gateway Processing Fee */}
+              <div className="flex justify-between text-xs text-foreground font-medium">
+                <span>
+                  Gateway Processing Fee ({activeFeeBreakdown.rateDescription})
+                </span>
+                <span className="font-semibold text-sm shrink-0">
+                  +
+                  {formatCurrency(
+                    activeFeeBreakdown.feeAmount.toFixed(2),
+                    storeCurrency,
+                  )}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-baseline pt-1">
                 <span className="text-base font-bold text-foreground">
-                  Grand Total
+                  Total on Paystack
                 </span>
                 <span className="text-2xl font-bold text-foreground">
-                  {formatCurrency(total.toFixed(2), storeCurrency)}
+                  {formatCurrency(
+                    activeFeeBreakdown.totalWithFee.toFixed(2),
+                    storeCurrency,
+                  )}
                 </span>
               </div>
             </div>
@@ -1282,10 +1290,12 @@ export default function CheckoutPage() {
               ) : (
                 <>
                   <CreditCard className="h-5 w-5" />
-                  Pay {formatCurrency(
-                    total.toFixed(2),
+                  Pay{" "}
+                  {formatCurrency(
+                    activeFeeBreakdown.totalWithFee.toFixed(2),
                     storeCurrency,
-                  )} with {paymentGateway === "stripe" ? "Stripe" : "Paystack"}
+                  )}{" "}
+                  on Paystack
                 </>
               )}
             </Button>

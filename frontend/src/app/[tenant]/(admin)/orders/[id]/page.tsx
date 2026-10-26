@@ -41,6 +41,8 @@ import { CopyableId } from "@/components/shared/copyable-id";
 import { OrderDetail } from "@/types/order";
 import { fetchOrderById, updateOrderStatus } from "@/lib/api/order";
 import { formatCurrency, formatDate, getTenantRoute } from "@/utils/helper";
+import { confirmToast } from "@/components/ui/confirm-toast";
+import { cn } from "@/lib/utils";
 
 interface OrderDetailPageProps {
   params: Promise<{
@@ -170,24 +172,40 @@ export default function TenantAdminOrderDetailPage({
 
   const handleUpdateStatus = async () => {
     if (!order) return;
+    if (order.status.toLowerCase() === "pending") {
+      toast.error(
+        "Order status cannot be modified until payment has been completed.",
+      );
+      return;
+    }
+    if (order.status.toLowerCase() === "cancelled") {
+      toast.error("Cancelled orders cannot be modified.");
+      return;
+    }
+    if (
+      (order.status.toLowerCase() === "delivered" ||
+        order.status.toLowerCase() === "fulfilled") &&
+      selectedStatus === "cancelled"
+    ) {
+      toast.error("Delivered orders cannot be cancelled.");
+      return;
+    }
     if (
       selectedStatus === "cancelled" &&
       order.status.toLowerCase() !== "cancelled"
     ) {
       const displayRef =
         order.gateway_reference || order.id.slice(0, 8).toUpperCase();
-      toast(`Cancel Order #${displayRef}?`, {
+      confirmToast({
+        title: "Cancel Order?",
+        subtitle: `#${displayRef}`,
         description:
-          "Are you sure you want to cancel this order? This will mark it as cancelled.",
-        action: {
-          label: "Yes, Cancel",
-          onClick: () => executeUpdateStatus("cancelled"),
-        },
-        cancel: {
-          label: "Keep Order",
-          onClick: () => {},
-        },
-        duration: 8000,
+          "Are you sure you want to cancel this order? This will cancel the order and trigger a 100% full refund to the customer via the payment gateway.",
+        confirmText: "Yes, Cancel & Refund",
+        cancelText: "Keep Order",
+        variant: "destructive",
+        duration: 10000,
+        onConfirm: () => executeUpdateStatus("cancelled"),
       });
       return;
     }
@@ -351,39 +369,74 @@ export default function TenantAdminOrderDetailPage({
           </div>
 
           {/* Quick status update control */}
-          <div className="flex items-center gap-2">
-            <Select
-              value={selectedStatus}
-              onValueChange={(val) => setSelectedStatus(val)}
-            >
-              <SelectTrigger className="h-9 w-40 text-foreground">
-                <SelectValue placeholder="Update status" />
-              </SelectTrigger>
-              <SelectContent className="bg-card border-border text-foreground">
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="paid">Paid</SelectItem>
-                <SelectItem value="accepted">Accepted</SelectItem>
-                <SelectItem value="processing">In Progress</SelectItem>
-                <SelectItem value="shipped">On the Way</SelectItem>
-                <SelectItem value="delivered">Delivered</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+            {order.status.toLowerCase() === "pending" && (
+              <span className="text-xs text-amber-600 dark:text-amber-400 font-medium px-2 py-1 rounded bg-amber-500/10 border border-amber-500/20">
+                Awaiting payment
+              </span>
+            )}
+            <div className="flex items-center gap-2">
+              <Select
+                value={selectedStatus}
+                disabled={
+                  order.status.toLowerCase() === "pending" ||
+                  order.status.toLowerCase() === "cancelled"
+                }
+                onValueChange={(val) => setSelectedStatus(val)}
+              >
+                <SelectTrigger
+                  className="h-9 w-40 text-foreground"
+                  title={
+                    order.status.toLowerCase() === "pending"
+                      ? "Awaiting customer payment before fulfillment"
+                      : order.status.toLowerCase() === "cancelled"
+                        ? "Order cancelled"
+                        : undefined
+                  }
+                >
+                  <SelectValue placeholder="Update status" />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-border text-foreground">
+                  {(order.status.toLowerCase() === "pending" ||
+                    order.status.toLowerCase() === "paid") && (
+                    <SelectItem
+                      value={order.status.toLowerCase()}
+                      disabled
+                      className="opacity-60 italic text-muted-foreground"
+                    >
+                      {order.status.charAt(0).toUpperCase() +
+                        order.status.slice(1)}{" "}
+                      (System)
+                    </SelectItem>
+                  )}
+                  <SelectItem value="accepted">Accepted</SelectItem>
+                  <SelectItem value="processing">Processing</SelectItem>
+                  <SelectItem value="shipped">Shipped</SelectItem>
+                  <SelectItem value="delivered">Delivered</SelectItem>
+                  {order.status.toLowerCase() !== "delivered" &&
+                    order.status.toLowerCase() !== "fulfilled" && (
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    )}
+                </SelectContent>
+              </Select>
 
-            <Button
-              onClick={handleUpdateStatus}
-              disabled={
-                isUpdatingStatus ||
-                selectedStatus === order.status.toLowerCase()
-              }
-            >
-              {isUpdatingStatus ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Save className="w-4 h-4" />
-              )}
-              Save
-            </Button>
+              <Button
+                onClick={handleUpdateStatus}
+                disabled={
+                  isUpdatingStatus ||
+                  order.status.toLowerCase() === "pending" ||
+                  order.status.toLowerCase() === "cancelled" ||
+                  selectedStatus === order.status.toLowerCase()
+                }
+              >
+                {isUpdatingStatus ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4" />
+                )}
+                Save
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -610,6 +663,130 @@ export default function TenantAdminOrderDetailPage({
               />
             </div>
           </div>
+
+          {/* Payment Attempts & Gateway Audit Log (Admin Only) */}
+          {Array.isArray(
+            (order.metadata_json as Record<string, unknown>)?.payment_attempts,
+          ) &&
+            (
+              (
+                order.metadata_json as {
+                  payment_attempts?: Array<{
+                    reference: string;
+                    gateway?: string;
+                    status?: string;
+                    amount?: number;
+                    currency?: string;
+                    initiated_at?: string;
+                    recorded_at?: string;
+                    paid_at?: string;
+                    failed_at?: string;
+                    gateway_response?: string;
+                    note?: string;
+                  }>;
+                }
+              )?.payment_attempts || []
+            ).length > 0 && (
+              <div className="bg-card border border-border rounded-xl p-6 space-y-4">
+                <div className="flex items-center justify-between border-b border-border pb-3">
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="w-4 h-4 text-primary" />
+                    <h6 className="font-secondary font-semibold text-foreground">
+                      Payment History & Attempts (
+                      {
+                        (
+                          order.metadata_json as {
+                            payment_attempts: unknown[];
+                          }
+                        ).payment_attempts.length
+                      }
+                      )
+                    </h6>
+                  </div>
+                  <Badge variant="outline" className="text-xs">
+                    Gateway Audit
+                  </Badge>
+                </div>
+
+                <div className="space-y-3">
+                  {(
+                    order.metadata_json as {
+                      payment_attempts: Array<{
+                        reference: string;
+                        gateway?: string;
+                        status?: string;
+                        amount?: number;
+                        currency?: string;
+                        initiated_at?: string;
+                        recorded_at?: string;
+                        paid_at?: string;
+                        failed_at?: string;
+                        gateway_response?: string;
+                        note?: string;
+                      }>;
+                    }
+                  ).payment_attempts.map((att, idx) => (
+                    <div
+                      key={att.reference || idx}
+                      className="p-3.5 rounded-lg border border-border bg-muted/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-foreground">
+                            Attempt #{idx + 1}
+                          </span>
+                          <Badge
+                            className={cn(
+                              "rounded-full text-[10px] px-2 py-0.5 capitalize",
+                              att.status === "paid"
+                                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
+                                : att.status === "declined"
+                                  ? "bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/20"
+                                  : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20",
+                            )}
+                          >
+                            {att.status || "abandoned"}
+                          </Badge>
+                          <span className="text-muted-foreground uppercase font-mono">
+                            {att.gateway || order.payment_gateway}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
+                          <span>Ref:</span>
+                          <CopyableId
+                            id={att.reference}
+                            length={12}
+                            textClassName="text-foreground font-semibold"
+                          />
+                        </div>
+                        {att.note && (
+                          <p className="text-[11px] text-muted-foreground italic">
+                            {att.note}
+                          </p>
+                        )}
+                        {att.gateway_response && (
+                          <p className="text-[11px] text-red-600 dark:text-red-400">
+                            Gateway message: {att.gateway_response}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="text-right text-[11px] text-muted-foreground shrink-0">
+                        {att.paid_at && (
+                          <div>Paid: {formatDate(att.paid_at)}</div>
+                        )}
+                        {att.failed_at && (
+                          <div>Failed: {formatDate(att.failed_at)}</div>
+                        )}
+                        {att.recorded_at && !att.paid_at && !att.failed_at && (
+                          <div>Recorded: {formatDate(att.recorded_at)}</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
         </div>
 
         {/* Right Column: Customer Info & Delivery Details */}
@@ -737,13 +914,21 @@ export default function TenantAdminOrderDetailPage({
                 placeholder="e.g. Dispatched via DHL Express. Tracking code: DHL-9481923"
                 value={trackingNotes}
                 onChange={(e) => setTrackingNotes(e.target.value)}
+                disabled={
+                  order.status.toLowerCase() === "pending" ||
+                  order.status.toLowerCase() === "cancelled"
+                }
                 rows={3}
                 className="bg-background border-border"
               />
               <Button
                 variant="outline"
                 onClick={handleUpdateStatus}
-                disabled={isUpdatingStatus}
+                disabled={
+                  isUpdatingStatus ||
+                  order.status.toLowerCase() === "pending" ||
+                  order.status.toLowerCase() === "cancelled"
+                }
                 className="w-full"
               >
                 {isUpdatingStatus ? (

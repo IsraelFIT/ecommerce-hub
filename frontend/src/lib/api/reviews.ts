@@ -32,6 +32,8 @@ export async function getReviews(options?: {
   tenantSlug?: string;
   productId?: string;
   status?: string;
+  search?: string;
+  rating?: number;
   page?: number;
   perPage?: number;
 }): Promise<ApiResponse<PaginatedReviewsResponse>> {
@@ -39,6 +41,8 @@ export async function getReviews(options?: {
     tenantSlug,
     productId,
     status,
+    search,
+    rating,
     page = 1,
     perPage = 20,
   } = options || {};
@@ -47,7 +51,10 @@ export async function getReviews(options?: {
     per_page: perPage.toString(),
   });
   if (productId) queryParams.set("product_id", productId);
-  if (status) queryParams.set("status", status);
+  if (status && status !== "all") queryParams.set("status", status);
+  if (search && search.trim()) queryParams.set("search", search.trim());
+  if (rating !== undefined && rating > 0)
+    queryParams.set("rating", rating.toString());
 
   const headers: HeadersInit = {};
   if (tenantSlug) headers["X-Tenant-Slug"] = tenantSlug;

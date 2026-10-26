@@ -1,7 +1,9 @@
+import secrets
+import re
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, func, desc
+from sqlalchemy import select, func, desc, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -57,14 +59,84 @@ async def create_checkout_session(
             detail="Order not found",
         )
 
+    if order.status == OrderStatus.PAID:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Order is already paid.",
+        )
+
     gateway = (payload.gateway or order.payment_gateway or tenant.default_gateway or "paystack").lower()
+    meta = dict(order.metadata_json or {})
+    attempts = list(meta.get("payment_attempts", []))
+    now_iso = datetime.now(timezone.utc).isoformat()
+    callback_url = payload.callback_url
+
+    # Check if a checkout session was previously initiated for this order (e.g. customer visited Paystack, abandoned it, and is now re-initiating payment)
+    if meta.get("checkout_session_initialized") or attempts:
+        prev_ref = order.gateway_reference
+        if not any(a.get("reference") == prev_ref for a in attempts):
+            attempts.append({
+                "reference": prev_ref,
+                "gateway": order.payment_gateway or gateway,
+                "status": meta.get("last_payment_status") or "abandoned",
+                "amount": float(order.total_amount),
+                "currency": order.currency,
+                "initiated_at": meta.get("last_checkout_at", order.created_at.isoformat() if order.created_at else now_iso),
+                "recorded_at": now_iso,
+                "note": "Payment uncompleted/abandoned; re-initiated with fresh gateway reference",
+            })
+
+        # Generate fresh unique reference for Paystack/Stripe
+        new_ref = f"ECH-{tenant.slug.upper()}-{secrets.token_hex(6).upper()}"
+        order.gateway_reference = new_ref
+
+    order.payment_gateway = gateway
+    meta["checkout_session_initialized"] = True
+    meta["last_checkout_at"] = now_iso
+    meta["payment_attempts"] = attempts
+    order.metadata_json = meta
+    await db.commit()
+    await db.refresh(order)
+
+    # Ensure callback_url references the active gateway_reference
+    if "reference=" in callback_url:
+        callback_url = re.sub(r'reference=[^&]+', f'reference={order.gateway_reference}', callback_url)
+
     active_provider = StripePaymentProvider() if gateway == "stripe" else PaystackPaymentProvider()
 
-    session_response = await active_provider.create_checkout_session(
-        order=order,
-        tenant=tenant,
-        callback_url=payload.callback_url,
-    )
+    try:
+        session_response = await active_provider.create_checkout_session(
+            order=order,
+            tenant=tenant,
+            callback_url=callback_url,
+        )
+    except HTTPException as e:
+        # If Paystack reports duplicate reference collision, regenerate once and retry
+        if "Duplicate Transaction Reference" in str(e.detail):
+            retry_ref = f"ECH-{tenant.slug.upper()}-{secrets.token_hex(6).upper()}"
+            attempts.append({
+                "reference": order.gateway_reference,
+                "gateway": gateway,
+                "status": "abandoned",
+                "recorded_at": datetime.now(timezone.utc).isoformat(),
+                "note": "Paystack collision recovery retry",
+            })
+            order.gateway_reference = retry_ref
+            meta["payment_attempts"] = attempts
+            order.metadata_json = meta
+            await db.commit()
+            await db.refresh(order)
+
+            if "reference=" in callback_url:
+                callback_url = re.sub(r'reference=[^&]+', f'reference={retry_ref}', callback_url)
+
+            session_response = await active_provider.create_checkout_session(
+                order=order,
+                tenant=tenant,
+                callback_url=callback_url,
+            )
+        else:
+            raise
 
     return success_response(
         data=session_response.model_dump(mode="json"),
@@ -84,10 +156,23 @@ async def verify_payment(
     db: AsyncSession = Depends(get_rls_db_session),
     tenant: Tenant = Depends(get_tenant_context),
 ) -> Dict[str, Any]:
+    # 1. Search for order by current gateway_reference
     result = await db.execute(
         select(Order).where(Order.gateway_reference == reference).with_for_update()
     )
     order = result.scalar_one_or_none()
+
+    # 2. If not found by current gateway_reference, search inside previous payment_attempts
+    if not order:
+        all_orders_res = await db.execute(
+            select(Order).where(Order.tenant_id == tenant.id).with_for_update()
+        )
+        for cand in all_orders_res.scalars().all():
+            cand_attempts = (cand.metadata_json or {}).get("payment_attempts", [])
+            if any(a.get("reference") == reference for a in cand_attempts):
+                order = cand
+                break
+
     if not order:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -115,13 +200,65 @@ async def verify_payment(
         provider = PaystackPaymentProvider()
         res = await provider.verify_transaction(reference=reference)
 
+    meta = dict(order.metadata_json or {})
+    attempts = list(meta.get("payment_attempts", []))
+    now_iso = datetime.now(timezone.utc).isoformat()
+
     if res.get("status") == "paid":
         order.status = OrderStatus.PAID
-        order.metadata_json = {
-            **(order.metadata_json or {}),
-            "paid_at": datetime.now(timezone.utc).isoformat(),
-            "verified_via": "payment_verify_endpoint",
-        }
+        matched = False
+        for a in attempts:
+            if a.get("reference") == reference:
+                a["status"] = "paid"
+                a["paid_at"] = now_iso
+                matched = True
+            elif a.get("status") != "paid":
+                a["status"] = "abandoned"
+
+        if not matched:
+            attempts.append({
+                "reference": reference,
+                "gateway": gateway,
+                "status": "paid",
+                "amount": float(order.total_amount),
+                "currency": order.currency,
+                "paid_at": now_iso,
+            })
+
+        meta["payment_attempts"] = attempts
+        meta["paid_at"] = now_iso
+        meta["verified_via"] = "payment_verify_endpoint"
+        order.gateway_reference = reference
+        order.metadata_json = meta
+
+        # Mark any older unpaid pending orders for this customer in this tenant as superseded
+        older_pending_res = await db.execute(
+            select(Order).where(
+                Order.tenant_id == tenant.id,
+                func.lower(Order.customer_email) == func.lower(order.customer_email),
+                Order.id != order.id,
+                Order.status == OrderStatus.PENDING,
+                Order.is_deleted == False,
+            ).with_for_update()
+        )
+        for older in older_pending_res.scalars().all():
+            older_meta = dict(older.metadata_json or {})
+            older_meta["is_abandoned_superseded"] = True
+            older_meta["superseded_by_order_id"] = str(order.id)
+            older_meta["superseded_at"] = now_iso
+            older.metadata_json = older_meta
+
+        await db.commit()
+        await db.refresh(order)
+    else:
+        attempt_status = res.get("status") or "failed"
+        for a in attempts:
+            if a.get("reference") == reference:
+                a["status"] = attempt_status
+                a["failed_at"] = now_iso
+        meta["payment_attempts"] = attempts
+        meta["last_payment_status"] = attempt_status
+        order.metadata_json = meta
         await db.commit()
         await db.refresh(order)
 

@@ -3,6 +3,7 @@ from typing import AsyncGenerator, Optional
 from urllib.parse import urlparse
 from fastapi import Depends, Header, HTTPException, Request, status
 from sqlalchemy import select, text
+from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -140,13 +141,12 @@ async def get_tenant_context(
         if customer_email:
             try:
                 from app.models.user import User
-                user_res = await db.execute(
-                    select(User).where(User.email == customer_email.strip().lower())
+                result = await db.execute(
+                    select(Tenant)
+                    .join(User, Tenant.id == User.tenant_id)
+                    .where(User.email == customer_email.strip().lower())
                 )
-                user_record = user_res.scalar_one_or_none()
-                if user_record and user_record.tenant_id:
-                    result = await db.execute(select(Tenant).where(Tenant.id == user_record.tenant_id))
-                    tenant = result.scalar_one_or_none()
+                tenant = result.scalar_one_or_none()
             except Exception:
                 pass
 
@@ -289,7 +289,9 @@ async def get_current_user(
             detail="Malformed token subject",
         )
 
-    result = await db.execute(select(User).where(User.id == user_uuid))
+    result = await db.execute(
+        select(User).options(joinedload(User.tenant)).where(User.id == user_uuid)
+    )
     user = result.scalar_one_or_none()
 
     if not user:

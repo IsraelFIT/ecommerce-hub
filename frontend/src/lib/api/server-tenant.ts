@@ -20,6 +20,7 @@ export async function getTenantServerData(
       `${cleanBase}/api/tenants/by-slug/${slug.toLowerCase()}`,
       {
         cache: "no-store",
+        signal: AbortSignal.timeout(4000),
       },
     );
 

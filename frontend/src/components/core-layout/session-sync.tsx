@@ -23,17 +23,32 @@ export function SessionSyncWrapper({
     syncSession().then((user) => {
       if (user && isMounted) {
         // Core Platform Protection: ONLY super_admin and hub_admin may view core console
-        const isCoreAdmin =
-          user.role === "super_admin" || user.role === "hub_admin";
-        if (!isCoreAdmin) {
-          if (user.tenant_slug && user.tenant_slug !== "core") {
-            window.location.assign(
-              getTenantSubdomainUrl(user.tenant_slug, "/admin"),
-            );
-          } else {
-            router.push("/dashboard");
+        if (typeof window !== "undefined") {
+          const hostname = window.location.hostname.toLowerCase();
+          const pathname = window.location.pathname.toLowerCase();
+          const isCorePlatform =
+            hostname.startsWith("core.") ||
+            pathname === "/core" ||
+            pathname.startsWith("/core/");
+
+          if (isCorePlatform) {
+            const isCoreAdmin =
+              user.role === "super_admin" || user.role === "hub_admin";
+            if (!isCoreAdmin) {
+              if (user.tenant_slug && user.tenant_slug !== "core") {
+                const targetAdminUrl = getTenantSubdomainUrl(
+                  user.tenant_slug,
+                  "/admin",
+                );
+                if (window.location.href !== targetAdminUrl) {
+                  window.location.assign(targetAdminUrl);
+                }
+              } else {
+                router.push("/dashboard");
+              }
+              return;
+            }
           }
-          return;
         }
 
         // Hydrate persisted user cart from backend database

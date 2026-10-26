@@ -261,6 +261,29 @@ class SanityAdapter(ProductRepositoryAdapter):
                 pass
         return []
 
+    async def count_products(
+        self,
+        published_only: bool = True,
+        **kwargs,
+    ) -> int:
+        url = f"{self.base_url}/query/{self.dataset}"
+        filter_expr = '!(_id in path("drafts.**"))' if published_only else "true"
+        tenant_filter = f'(tenant_id == "{str(self.tenant_id)}" || !defined(tenant_id))'
+        query = f'count(*[_type == "product" && {tenant_filter} && {filter_expr}])'
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            try:
+                res = await client.get(
+                    url,
+                    params={"query": query},
+                    headers=self._headers(),
+                )
+                if res.status_code == 200:
+                    return int(res.json().get("result") or 0)
+            except Exception:
+                pass
+        return 0
+
     async def create_product(self, product_in: ProductCreate) -> ProductResponse:
         url = f"{self.base_url}/mutate/{self.dataset}"
         prod_name = product_in.name or product_in.title or "Untitled Product"

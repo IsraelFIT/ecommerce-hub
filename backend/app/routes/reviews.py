@@ -1,7 +1,7 @@
 import uuid
 from typing import Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Header, status
-from sqlalchemy import select, func, desc
+from sqlalchemy import select, func, desc, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -81,6 +81,8 @@ async def resolve_tenant_flexible(
 async def list_reviews(
     product_id: Optional[uuid.UUID] = None,
     status_filter: Optional[str] = Query(None, alias="status"),
+    search: Optional[str] = Query(None),
+    rating: Optional[int] = Query(None),
     page: int = 1,
     per_page: int = 20,
     tenant: Tenant = Depends(resolve_tenant_flexible),
@@ -88,56 +90,77 @@ async def list_reviews(
 ) -> Dict[str, Any]:
     offset = (page - 1) * per_page
     query = (
-        select(Review)
+        select(Review, Product, User)
+        .outerjoin(Product, Review.product_id == Product.id)
+        .outerjoin(
+            User,
+            or_(
+                Review.user_id == User.id,
+                func.lower(Review.customer_email) == func.lower(User.email),
+            ),
+        )
         .where(Review.tenant_id == tenant.id, Review.is_deleted == False)
-        .options(selectinload(Review.product), selectinload(Review.user))
     )
 
     if product_id:
         query = query.where(Review.product_id == product_id)
 
-    if status_filter:
-        query = query.where(Review.status == status_filter)
+    if status_filter and status_filter.lower() != "all":
+        query = query.where(Review.status == status_filter.lower())
+
+    if rating is not None and rating > 0:
+        query = query.where(Review.rating == rating)
+
+    if search and search.strip():
+        s = f"%{search.strip()}%"
+        query = query.where(
+            or_(
+                Review.comment.ilike(s),
+                Review.customer_name.ilike(s),
+                Review.customer_email.ilike(s),
+                Review.title.ilike(s),
+            )
+        )
 
     # Count total
-    count_query = select(func.count(Review.id)).where(Review.tenant_id == tenant.id)
+    count_query = select(func.count(Review.id)).where(Review.tenant_id == tenant.id, Review.is_deleted == False)
     if product_id:
         count_query = count_query.where(Review.product_id == product_id)
-    if status_filter:
-        count_query = count_query.where(Review.status == status_filter)
+    if status_filter and status_filter.lower() != "all":
+        count_query = count_query.where(Review.status == status_filter.lower())
+    if rating is not None and rating > 0:
+        count_query = count_query.where(Review.rating == rating)
+    if search and search.strip():
+        s = f"%{search.strip()}%"
+        count_query = count_query.where(
+            or_(
+                Review.comment.ilike(s),
+                Review.customer_name.ilike(s),
+                Review.customer_email.ilike(s),
+                Review.title.ilike(s),
+            )
+        )
 
     total_res = await db.execute(count_query)
     total = total_res.scalar() or 0
 
     query = query.order_by(desc(Review.created_at)).offset(offset).limit(per_page)
     result = await db.execute(query)
-    reviews = result.scalars().all()
-
-    # Fallback user lookup by customer_email for reviews without direct user_id
-    emails_to_lookup = [
-        r.customer_email.strip().lower()
-        for r in reviews
-        if not r.user and r.customer_email
-    ]
-    email_user_map = {}
-    if emails_to_lookup:
-        eu_res = await db.execute(
-            select(User).where(func.lower(User.email).in_(emails_to_lookup))
-        )
-        for eu in eu_res.scalars().all():
-            email_user_map[eu.email.lower()] = eu
+    rows = result.all()
 
     items = []
-    for r in reviews:
+    for r, prod, u in rows:
         resp = ReviewResponse.model_validate(r)
-        if r.product:
+        if prod:
+            resp.product_name = prod.name or prod.title
+        elif r.product:
             resp.product_name = r.product.name or r.product.title
         
         # Populate avatar
-        if r.user and getattr(r.user, "avatar_url", None):
+        if u and getattr(u, "avatar_url", None):
+            resp.customer_avatar_url = u.avatar_url
+        elif r.user and getattr(r.user, "avatar_url", None):
             resp.customer_avatar_url = r.user.avatar_url
-        elif r.customer_email and r.customer_email.strip().lower() in email_user_map:
-            resp.customer_avatar_url = getattr(email_user_map[r.customer_email.strip().lower()], "avatar_url", None)
 
         items.append(resp.model_dump(mode="json"))
 

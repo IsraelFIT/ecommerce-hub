@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { Star, Search, Trash2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
@@ -41,6 +41,7 @@ import {
 } from "@/lib/api/reviews";
 import { UserAvatar } from "@/components/shared/user-avatar";
 import { PaginationMeta } from "@/types";
+import { confirmToast } from "@/components/ui/confirm-toast";
 
 export default function TenantReviewsAdminPage() {
   const params = useParams();
@@ -52,16 +53,37 @@ export default function TenantReviewsAdminPage() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [ratingFilter, setRatingFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCurrentPage(1);
+  }, [debouncedSearch, statusFilter, ratingFilter]);
+
   const loadData = useCallback(async () => {
     try {
       setIsRefreshing(true);
       const [reviewsRes, statsRes] = await Promise.all([
-        getReviews({ tenantSlug: activeTenantSlug, perPage: 10 }),
+        getReviews({
+          tenantSlug: activeTenantSlug,
+          page: currentPage,
+          perPage: pageSize,
+          status: statusFilter !== "all" ? statusFilter : undefined,
+          search: debouncedSearch.trim() || undefined,
+          rating:
+            ratingFilter !== "all" ? parseInt(ratingFilter, 10) : undefined,
+        }),
         getReviewStats({ tenantSlug: activeTenantSlug }),
       ]);
 
@@ -81,7 +103,14 @@ export default function TenantReviewsAdminPage() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [activeTenantSlug]);
+  }, [
+    activeTenantSlug,
+    currentPage,
+    pageSize,
+    statusFilter,
+    debouncedSearch,
+    ratingFilter,
+  ]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -115,52 +144,37 @@ export default function TenantReviewsAdminPage() {
     }
   };
 
-  const handleDelete = async (reviewId: string) => {
-    if (!confirm("Are you sure you want to permanently delete this review?")) {
-      return;
-    }
-    try {
-      const res = await deleteReview(reviewId, activeTenantSlug);
-      if (res.status === "success") {
-        toast.success("Review deleted successfully");
-        setReviews((prev) => prev.filter((r) => r.id !== reviewId));
-        getReviewStats({ tenantSlug: activeTenantSlug }).then((sRes) => {
-          if (sRes.status === "success" && sRes.data) setStats(sRes.data);
-        });
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to delete review.");
-    }
+  const handleDelete = (reviewId: string) => {
+    confirmToast({
+      title: "Delete Review?",
+      description:
+        "Are you sure you want to permanently delete this customer review? This action cannot be undone.",
+      confirmText: "Yes, Delete",
+      cancelText: "Keep Review",
+      variant: "destructive",
+      onConfirm: async () => {
+        try {
+          const res = await deleteReview(reviewId, activeTenantSlug);
+          if (res.status === "success") {
+            toast.success("Review deleted successfully");
+            setReviews((prev) => prev.filter((r) => r.id !== reviewId));
+            getReviewStats({ tenantSlug: activeTenantSlug }).then((sRes) => {
+              if (sRes.status === "success" && sRes.data) setStats(sRes.data);
+            });
+          }
+        } catch (err) {
+          console.error(err);
+          toast.error("Failed to delete review.");
+        }
+      },
+    });
   };
 
-  const filteredReviews = useMemo(() => {
-    return reviews.filter((r) => {
-      const matchesSearch =
-        searchQuery === "" ||
-        r.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (r.customer_email &&
-          r.customer_email.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (r.product_name &&
-          r.product_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        r.comment.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (r.title && r.title.toLowerCase().includes(searchQuery.toLowerCase()));
-
-      const matchesStatus = statusFilter === "all" || r.status === statusFilter;
-
-      const matchesRating =
-        ratingFilter === "all" || r.rating === parseInt(ratingFilter, 10);
-
-      return matchesSearch && matchesStatus && matchesRating;
-    });
-  }, [reviews, searchQuery, statusFilter, ratingFilter]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredReviews.length / pageSize));
+  const totalReviews = pagination?.total ?? reviews.length;
+  const totalPages =
+    pagination?.last_page ?? Math.max(1, Math.ceil(totalReviews / pageSize));
   const safeCurrentPage = Math.min(currentPage, totalPages);
-  const paginatedReviews = useMemo(() => {
-    const start = (safeCurrentPage - 1) * pageSize;
-    return filteredReviews.slice(start, start + pageSize);
-  }, [filteredReviews, safeCurrentPage, pageSize]);
+  const paginatedReviews = reviews;
 
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return "N/A";
@@ -431,45 +445,52 @@ export default function TenantReviewsAdminPage() {
         </Table>
 
         {/* Pagination */}
-        {(pagination?.total !== undefined
-          ? pagination.total >= 10
-          : filteredReviews.length >= 10) &&
-          totalPages > 1 && (
-            <div className="p-3 border-t border-stone-200 flex items-center justify-between">
-              <span className="text-xs text-stone-500">
-                Page {safeCurrentPage} of {totalPages}
-              </span>
-              <Pagination className="justify-end">
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious
-                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+        {totalReviews > pageSize && (
+          <div className="p-3 border-t border-border flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">
+              Showing {(safeCurrentPage - 1) * pageSize + 1} to{" "}
+              {Math.min(safeCurrentPage * pageSize, totalReviews)} of{" "}
+              {totalReviews} reviews
+            </span>
+            <Pagination className="justify-end">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    className={
+                      safeCurrentPage <= 1
+                        ? "pointer-events-none opacity-50 text-xs"
+                        : "cursor-pointer text-xs"
+                    }
+                  />
+                </PaginationItem>
+                {Array.from({ length: totalPages }).map((_, idx) => (
+                  <PaginationItem key={idx}>
+                    <PaginationLink
+                      isActive={safeCurrentPage === idx + 1}
+                      onClick={() => setCurrentPage(idx + 1)}
                       className="cursor-pointer text-xs"
-                    />
+                    >
+                      {idx + 1}
+                    </PaginationLink>
                   </PaginationItem>
-                  {Array.from({ length: totalPages }).map((_, idx) => (
-                    <PaginationItem key={idx}>
-                      <PaginationLink
-                        isActive={safeCurrentPage === idx + 1}
-                        onClick={() => setCurrentPage(idx + 1)}
-                        className="cursor-pointer text-xs"
-                      >
-                        {idx + 1}
-                      </PaginationLink>
-                    </PaginationItem>
-                  ))}
-                  <PaginationItem>
-                    <PaginationNext
-                      onClick={() =>
-                        setCurrentPage((p) => Math.min(totalPages, p + 1))
-                      }
-                      className="cursor-pointer text-xs"
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            </div>
-          )}
+                ))}
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() =>
+                      setCurrentPage((p) => Math.min(totalPages, p + 1))
+                    }
+                    className={
+                      safeCurrentPage >= totalPages
+                        ? "pointer-events-none opacity-50 text-xs"
+                        : "cursor-pointer text-xs"
+                    }
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
       </div>
     </div>
   );

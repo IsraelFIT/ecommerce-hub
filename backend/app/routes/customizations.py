@@ -1,7 +1,7 @@
 import uuid
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy import select, func, desc, or_
+from sqlalchemy import select, func, desc, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -331,34 +331,48 @@ async def list_tenant_brandings(
     total = total_res.scalar() or 0
 
     offset = (page - 1) * per_page
-    query = query.order_by(desc(Tenant.updated_at)).offset(offset).limit(per_page)
-    t_results = await db.execute(query)
-    tenants = t_results.scalars().all()
 
-    # 2. Check Customization Requests for these tenants (most recent first)
-    tenant_ids = [t.id for t in tenants]
-    reqs_by_tenant = {}
-    if tenant_ids:
-        reqs_res = await db.execute(
-            select(CustomizationRequest)
-            .where(CustomizationRequest.tenant_id.in_(tenant_ids))
-            .order_by(desc(CustomizationRequest.created_at))
+    # 2. Outerjoin latest Customization Request for each tenant in a single query
+    latest_time_subq = (
+        select(
+            CustomizationRequest.tenant_id,
+            func.max(CustomizationRequest.created_at).label("latest_created_at"),
         )
-        for r in reqs_res.scalars().all():
-            if r.tenant_id not in reqs_by_tenant:
-                reqs_by_tenant[r.tenant_id] = r
+        .group_by(CustomizationRequest.tenant_id)
+        .subquery()
+    )
+    latest_req = (
+        select(CustomizationRequest.tenant_id, CustomizationRequest.status)
+        .join(
+            latest_time_subq,
+            and_(
+                CustomizationRequest.tenant_id == latest_time_subq.c.tenant_id,
+                CustomizationRequest.created_at == latest_time_subq.c.latest_created_at,
+            ),
+        )
+        .subquery()
+    )
+
+    query = (
+        query.add_columns(latest_req.c.status.label("req_status"))
+        .outerjoin(latest_req, Tenant.id == latest_req.c.tenant_id)
+        .order_by(desc(Tenant.updated_at))
+        .offset(offset)
+        .limit(per_page)
+    )
+    t_results = await db.execute(query)
+    rows = t_results.all()
 
     items = []
-    for t in tenants:
+    for t, req_status in rows:
         cfg = t.branding_config or {}
-        req = reqs_by_tenant.get(t.id)
         
         l_type = cfg.get("landingPageType", "default")
         if landing_type and landing_type.lower() != "all" and l_type != landing_type.lower():
             continue
 
-        has_custom = req is not None or (cfg.get("customLandingPageStatus") not in (None, "none", ""))
-        cust_status = req.status if req else cfg.get("customLandingPageStatus", "none")
+        has_custom = req_status is not None or (cfg.get("customLandingPageStatus") not in (None, "none", ""))
+        cust_status = req_status if req_status else cfg.get("customLandingPageStatus", "none")
 
         items.append(
             TenantBrandingSummary(

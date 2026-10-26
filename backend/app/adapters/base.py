@@ -38,6 +38,22 @@ class ProductRepositoryAdapter(ABC):
         pass
 
     @abstractmethod
+    async def count_products(
+        self,
+        published_only: bool = True,
+        category: Optional[str] = None,
+        min_price: Optional[float] = None,
+        max_price: Optional[float] = None,
+        availability: Optional[str] = None,
+        search: Optional[str] = None,
+        filters: Optional[dict] = None,
+        product_class: Optional[str] = None,
+        **kwargs,
+    ) -> int:
+        """Count total products matching filters."""
+        pass
+
+    @abstractmethod
     async def create_product(self, product_in: ProductCreate) -> ProductResponse:
         """Create a new product record."""
         pass

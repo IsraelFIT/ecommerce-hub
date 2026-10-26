@@ -31,6 +31,10 @@ export const useUserStore = create<UserState>()(
         try {
           const session = await getSession();
           if (!session || !session.accessToken) {
+            if (!session?.refreshToken) {
+              set({ user: null, isLoading: false, error: null });
+              return null;
+            }
             return get().user;
           }
 

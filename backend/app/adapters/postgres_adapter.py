@@ -1,8 +1,8 @@
 import uuid
 from typing import List, Optional, Dict, Any
-from sqlalchemy import select, or_, func, cast
+from sqlalchemy import select, or_, func, cast, distinct
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import selectinload, defer
+from sqlalchemy.orm import selectinload, defer, joinedload
 from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.adapters.base import ProductRepositoryAdapter
@@ -127,7 +127,7 @@ class PostgresAdapter(ProductRepositoryAdapter):
                 Product.tenant_id == self.tenant_id,
                 Product.is_deleted == False,
             )
-            .options(selectinload(Product.variants), selectinload(Product.category))
+            .options(selectinload(Product.variants), joinedload(Product.category))
         )
         result = await self.session.execute(query)
         product = result.scalar_one_or_none()
@@ -143,7 +143,7 @@ class PostgresAdapter(ProductRepositoryAdapter):
                 Product.tenant_id == self.tenant_id,
                 Product.is_deleted == False,
             )
-            .options(selectinload(Product.variants), selectinload(Product.category))
+            .options(selectinload(Product.variants), joinedload(Product.category))
         )
         result = await self.session.execute(query)
         product = result.scalar_one_or_none()
@@ -170,7 +170,7 @@ class PostgresAdapter(ProductRepositoryAdapter):
             .options(
                 defer(Product.specifications),
                 selectinload(Product.variants),
-                selectinload(Product.category),
+                joinedload(Product.category),
             )
         )
         query = query.where(
@@ -269,6 +269,106 @@ class PostgresAdapter(ProductRepositoryAdapter):
         result = await self.session.execute(query)
         products = result.scalars().all()
         return [self._to_summary_response(p) for p in products]
+
+    async def count_products(
+        self,
+        published_only: bool = True,
+        category: Optional[str] = None,
+        min_price: Optional[float] = None,
+        max_price: Optional[float] = None,
+        availability: Optional[str] = None,
+        search: Optional[str] = None,
+        filters: Optional[Dict[str, List[str]]] = None,
+        product_class: Optional[str] = None,
+        **kwargs,
+    ) -> int:
+        query = select(func.count(distinct(Product.id))).where(
+            Product.tenant_id == self.tenant_id,
+            Product.is_deleted == False,
+        )
+        if published_only:
+            query = query.where(Product.is_published == True)
+
+        if category and category.strip() and category.strip().upper() != "ALL":
+            cat_val = category.strip().lower()
+            query = query.outerjoin(Product.category).where(
+                or_(
+                    func.lower(Category.name) == cat_val,
+                    func.lower(Product.category_name) == cat_val,
+                )
+            )
+
+        if availability and availability.strip() and availability.strip().lower() != "all":
+            avail_val = availability.strip().lower()
+            if avail_val in ("schedule", "preorder"):
+                query = query.where(Product.availability.in_(["preorder", "schedule"]))
+            elif avail_val == "available":
+                query = query.where(
+                    or_(
+                        Product.availability == "available",
+                        Product.availability.is_(None),
+                    )
+                )
+
+        if search and search.strip():
+            s = f"%{search.strip()}%"
+            query = query.where(
+                or_(
+                    Product.name.ilike(s),
+                    Product.title.ilike(s),
+                    Product.description.ilike(s),
+                    Product.variants.any(ProductVariant.sku.ilike(s)),
+                )
+            )
+
+        if min_price is not None:
+            query = query.where(
+                Product.variants.any(ProductVariant.price >= min_price)
+            )
+        if max_price is not None:
+            query = query.where(
+                Product.variants.any(ProductVariant.price <= max_price)
+            )
+
+        if filters:
+            bind = getattr(self.session, "bind", None) or self.session.get_bind()
+            is_postgres = getattr(getattr(bind, "dialect", None), "name", "") == "postgresql"
+
+            for slug, options in filters.items():
+                if not options:
+                    continue
+                option_conds = []
+                for opt in options:
+                    if not opt:
+                        continue
+                    opt_str = str(opt).strip()
+                    if is_postgres:
+                        for variant in {opt_str, opt_str.lower(), opt_str.title(), opt_str.capitalize()}:
+                            option_conds.append(
+                                cast(Product.filters, JSONB).contains({slug: [variant]})
+                            )
+                            option_conds.append(
+                                cast(Product.filters, JSONB).contains({slug: variant})
+                            )
+                    else:
+                        from sqlalchemy import String
+                        option_conds.append(
+                            cast(Product.filters[slug], String).ilike(f"%{opt_str}%")
+                        )
+                if option_conds:
+                    query = query.where(or_(*option_conds))
+
+        if product_class and product_class.strip() and product_class.strip().lower() != "all":
+            from app.models.product import ProductClass
+            class_str = product_class.strip().lower()
+            try:
+                p_class = ProductClass(class_str)
+                query = query.where(Product.product_class == p_class)
+            except ValueError:
+                pass
+
+        result = await self.session.execute(query)
+        return int(result.scalar() or 0)
 
     async def create_product(self, product_in: ProductCreate) -> ProductResponse:
         resolved_name = product_in.name or product_in.title or "Untitled Product"

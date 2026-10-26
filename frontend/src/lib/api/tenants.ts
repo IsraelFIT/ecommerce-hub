@@ -98,11 +98,26 @@ export async function getTenantStats(
 
 export async function getTenantUsers(
   slugOrId: string,
+  options?: {
+    page?: number;
+    per_page?: number;
+    search?: string;
+    role?: string;
+  },
 ): Promise<ApiResponse<TenantUsersResponse>> {
-  return apiRequest<TenantUsersResponse>(
-    `/tenants/${encodeURIComponent(slugOrId)}/users`,
-    {
-      method: "GET",
-    },
-  );
+  const queryParams = new URLSearchParams();
+  if (options?.page) queryParams.set("page", options.page.toString());
+  if (options?.per_page)
+    queryParams.set("per_page", options.per_page.toString());
+  if (options?.search && options.search.trim())
+    queryParams.set("search", options.search.trim());
+  if (options?.role && options.role !== "all")
+    queryParams.set("role", options.role);
+
+  const qs = queryParams.toString();
+  const url = `/tenants/${encodeURIComponent(slugOrId)}/users${qs ? `?${qs}` : ""}`;
+
+  return apiRequest<TenantUsersResponse>(url, {
+    method: "GET",
+  });
 }

@@ -27,8 +27,11 @@ export async function fetchOrders(
     customer_email,
     user_id,
     product_id,
+    status,
+    search,
     sort_by,
     sort_order,
+    include_items,
   } = options || {};
 
   const queryParams = new URLSearchParams({
@@ -45,11 +48,20 @@ export async function fetchOrders(
   if (product_id && product_id.trim()) {
     queryParams.set("product_id", product_id.trim());
   }
+  if (status && status.trim() && status.toLowerCase() !== "all") {
+    queryParams.set("status", status.trim().toLowerCase());
+  }
+  if (search && search.trim()) {
+    queryParams.set("search", search.trim());
+  }
   if (sort_by && sort_by.trim()) {
     queryParams.set("sort_by", sort_by.trim());
   }
   if (sort_order && sort_order.trim()) {
     queryParams.set("sort_order", sort_order.trim());
+  }
+  if (include_items) {
+    queryParams.set("include_items", "true");
   }
 
   const headers: Record<string, string> = {};
@@ -203,21 +215,30 @@ export async function cancelOrder(
  */
 export function mapApiOrderToDisplay(o: ApiOrder): OrderDisplay {
   const rawStatus = (o.status || "pending").toLowerCase();
-  let displayStatus: OrderDisplay["status"] = "Processing";
-  let statusDesc = "Your order is currently processing";
+  let displayStatus: OrderDisplay["status"] = "Pending";
+  let statusDesc = "Awaiting payment completion";
 
   if (rawStatus === "delivered" || rawStatus === "fulfilled") {
     displayStatus = "Delivered";
     statusDesc = "Your order has been delivered";
-  } else if (rawStatus === "shipped") {
-    displayStatus = "On the Way";
+  } else if (rawStatus === "shipped" || rawStatus === "on the way") {
+    displayStatus = "Shipped";
     statusDesc = "Your order is on the way";
-  } else if (rawStatus === "accepted" || rawStatus === "paid") {
+  } else if (rawStatus === "processing" || rawStatus === "in_progress") {
+    displayStatus = "Processing";
+    statusDesc = "Your order is currently processing";
+  } else if (rawStatus === "accepted") {
     displayStatus = "Accepted";
     statusDesc = "Your order has been accepted";
+  } else if (rawStatus === "paid") {
+    displayStatus = "Paid";
+    statusDesc = "Payment confirmed, awaiting fulfillment";
   } else if (rawStatus === "cancelled" || rawStatus === "failed") {
     displayStatus = "Cancelled";
     statusDesc = "Your order has been cancelled";
+  } else if (rawStatus === "pending") {
+    displayStatus = "Pending";
+    statusDesc = "Awaiting payment completion";
   }
 
   const items: OrderItemDisplay[] = (o.items || []).map(
@@ -268,5 +289,8 @@ export function mapApiOrderToDisplay(o: ApiOrder): OrderDisplay {
     status: displayStatus,
     statusDescription: statusDesc,
     items,
+    createdAt: o.created_at,
+    paymentGateway: o.payment_gateway,
+    rawStatus,
   };
 }

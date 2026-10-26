@@ -88,36 +88,30 @@ async def enrich_products_metadata(
     except Exception:
         pass
 
-    # 2. Fetch liked state for the logged-in user or session in batch
+    # 2. Fetch liked state and total likes count per product in single aggregated batch
     liked_product_ids = set()
-    if user_id or session_id:
-        try:
-            conditions = [ProductLike.product_id.in_(product_ids)]
-            if user_id:
-                conditions.append(ProductLike.user_id == user_id)
-            elif session_id:
-                conditions.append(ProductLike.session_id == session_id)
-
-            likes_res = await db.execute(
-                select(ProductLike.product_id).where(*conditions)
-            )
-            liked_product_ids = set(likes_res.scalars().all())
-        except Exception:
-            pass
-
-    # 3. Fetch total likes count per product in batch
     likes_count_map: Dict[uuid.UUID, int] = {}
     try:
+        user_like_cond = (
+            ProductLike.user_id == user_id
+            if user_id
+            else (ProductLike.session_id == session_id if session_id else False)
+        )
         likes_count_stmt = (
             select(
                 ProductLike.product_id,
                 func.count(ProductLike.id).label("likes_count"),
+                func.bool_or(user_like_cond).label("is_liked"),
             )
             .where(ProductLike.product_id.in_(product_ids))
             .group_by(ProductLike.product_id)
         )
         likes_count_res = await db.execute(likes_count_stmt)
-        likes_count_map = {row[0]: int(row[1]) for row in likes_count_res.all()}
+        for row in likes_count_res.all():
+            pid, l_count, is_l = row
+            likes_count_map[pid] = int(l_count or 0)
+            if is_l:
+                liked_product_ids.add(pid)
     except Exception:
         pass
 
@@ -240,11 +234,23 @@ async def list_products(
         for p in enriched_products
     ]
 
+    total = await adapter.count_products(
+        published_only=effective_published_only,
+        category=category,
+        min_price=min_price,
+        max_price=max_price,
+        availability=availability,
+        search=search,
+        filters=parsed_filters or None,
+        product_class=product_class,
+    )
+
+    last_page = max(1, (total + per_page - 1) // per_page)
     pagination = PaginationMeta(
         current_page=page,
-        last_page=1,
+        last_page=last_page,
         per_page=per_page,
-        total=len(items),
+        total=total,
     )
 
     return success_response(

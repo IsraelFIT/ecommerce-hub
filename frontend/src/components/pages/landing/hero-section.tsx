@@ -423,7 +423,7 @@ export function HeroSection() {
                       Emma Rose
                     </TableCell>
                     <TableCell className="py-2.5 px-2 text-muted-foreground text-xs">
-                      <PaymentGatewayLogo gateway="stripe" />
+                      <PaymentGatewayLogo gateway="paystack" />
                     </TableCell>
                     <TableCell className="py-2.5 px-2 font-bold text-foreground text-xs">
                       $350.00

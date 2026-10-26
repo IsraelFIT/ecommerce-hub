@@ -63,6 +63,7 @@ import {
   uploadProductImage,
 } from "@/lib/api/products";
 import { getCategories, createCategory } from "@/lib/api/categories";
+import { confirmToast } from "@/components/ui/confirm-toast";
 import { getFilters, createFilter } from "@/lib/api/filters";
 import {
   Product,
@@ -149,11 +150,24 @@ export default function TenantProductsPage({ params }: ProductsPageProps) {
 
   // Filters & Pagination State
   const [productSearch, setProductSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [classFilter, setClassFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState<PaginationMeta | null>(null);
   const pageSize = 10;
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(productSearch);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [productSearch]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCurrentPage(1);
+  }, [debouncedSearch, categoryFilter, classFilter]);
 
   // Currency State
   const [tenantCurrency, setTenantCurrency] = useState<string>(
@@ -362,7 +376,15 @@ export default function TenantProductsPage({ params }: ProductsPageProps) {
   const loadProducts = useCallback(async () => {
     try {
       setIsLoading(true);
-      const res = await getProducts({ tenantSlug: activeTenantSlug });
+      const res = await getProducts({
+        tenantSlug: activeTenantSlug,
+        page: currentPage,
+        per_page: pageSize,
+        published_only: false,
+        search: debouncedSearch.trim() || undefined,
+        category: categoryFilter !== "all" ? categoryFilter : undefined,
+        product_class: classFilter !== "all" ? classFilter : undefined,
+      });
       if (res.status === "success" && res.data) {
         const items = res.data.items || [];
         setProducts(items);
@@ -379,7 +401,14 @@ export default function TenantProductsPage({ params }: ProductsPageProps) {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [activeTenantSlug]);
+  }, [
+    activeTenantSlug,
+    currentPage,
+    pageSize,
+    debouncedSearch,
+    categoryFilter,
+    classFilter,
+  ]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -702,44 +731,33 @@ export default function TenantProductsPage({ params }: ProductsPageProps) {
   };
 
   // Delete Product Handler
-  const handleDeleteProduct = async (id: string, title: string) => {
-    if (!confirm(`Are you sure you want to delete "${title}"?`)) return;
-
-    try {
-      await deleteProduct(id, activeTenantSlug);
-      setProducts((prev) => prev.filter((p) => p.id !== id));
-      toast.success(`Product "${title}" deleted from catalog`);
-    } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : "Failed to delete product";
-      toast.error(msg);
-    }
+  const handleDeleteProduct = (id: string, title: string) => {
+    confirmToast({
+      title: "Delete Product?",
+      subtitle: title,
+      description: `Are you sure you want to delete "${title}"? This product will be removed from your store catalog.`,
+      confirmText: "Yes, Delete",
+      cancelText: "Keep Product",
+      variant: "destructive",
+      onConfirm: async () => {
+        try {
+          await deleteProduct(id, activeTenantSlug);
+          setProducts((prev) => prev.filter((p) => p.id !== id));
+          toast.success(`Product "${title}" deleted from catalog`);
+        } catch (err: unknown) {
+          const msg =
+            err instanceof Error ? err.message : "Failed to delete product";
+          toast.error(msg);
+        }
+      },
+    });
   };
 
   // Filtered Products
-  const filteredProducts = products.filter((p) => {
-    const name = p.name || p.title || "";
-    const matchesSearch =
-      name.toLowerCase().includes(productSearch.toLowerCase()) ||
-      (p.sku && p.sku.toLowerCase().includes(productSearch.toLowerCase())) ||
-      (p.description &&
-        p.description.toLowerCase().includes(productSearch.toLowerCase()));
-
-    const matchesCategory =
-      categoryFilter === "all" ||
-      (p.category && p.category.toLowerCase() === categoryFilter.toLowerCase());
-
-    const matchesClass =
-      classFilter === "all" || (p.product_class || "physical") === classFilter;
-
-    return matchesSearch && matchesCategory && matchesClass;
-  });
-
-  const totalPages = Math.ceil(filteredProducts.length / pageSize) || 1;
-  const paginatedItems = filteredProducts.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize,
-  );
+  const totalProducts = pagination?.total ?? products.length;
+  const totalPages =
+    pagination?.last_page ?? Math.max(1, Math.ceil(totalProducts / pageSize));
+  const paginatedItems = products;
 
   return (
     <div className="space-y-5 w-full">
@@ -1963,45 +1981,52 @@ export default function TenantProductsPage({ params }: ProductsPageProps) {
         </Table>
 
         {/* Pagination */}
-        {(pagination?.total !== undefined
-          ? pagination.total >= 10
-          : filteredProducts.length >= 10) &&
-          totalPages > 1 && (
-            <div className="p-3 border-t border-stone-200 flex items-center justify-between">
-              <span className="text-xs text-stone-500">
-                Page {currentPage} of {totalPages}
-              </span>
-              <Pagination className="justify-end">
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious
-                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+        {totalProducts > pageSize && (
+          <div className="p-3 border-t border-border flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">
+              Showing {(currentPage - 1) * pageSize + 1} to{" "}
+              {Math.min(currentPage * pageSize, totalProducts)} of{" "}
+              {totalProducts} products
+            </span>
+            <Pagination className="justify-end">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    className={
+                      currentPage <= 1
+                        ? "pointer-events-none opacity-50 text-xs"
+                        : "cursor-pointer text-xs"
+                    }
+                  />
+                </PaginationItem>
+                {Array.from({ length: totalPages }).map((_, idx) => (
+                  <PaginationItem key={idx}>
+                    <PaginationLink
+                      isActive={currentPage === idx + 1}
+                      onClick={() => setCurrentPage(idx + 1)}
                       className="cursor-pointer text-xs"
-                    />
+                    >
+                      {idx + 1}
+                    </PaginationLink>
                   </PaginationItem>
-                  {Array.from({ length: totalPages }).map((_, idx) => (
-                    <PaginationItem key={idx}>
-                      <PaginationLink
-                        isActive={currentPage === idx + 1}
-                        onClick={() => setCurrentPage(idx + 1)}
-                        className="cursor-pointer text-xs"
-                      >
-                        {idx + 1}
-                      </PaginationLink>
-                    </PaginationItem>
-                  ))}
-                  <PaginationItem>
-                    <PaginationNext
-                      onClick={() =>
-                        setCurrentPage((p) => Math.min(totalPages, p + 1))
-                      }
-                      className="cursor-pointer text-xs"
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            </div>
-          )}
+                ))}
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() =>
+                      setCurrentPage((p) => Math.min(totalPages, p + 1))
+                    }
+                    className={
+                      currentPage >= totalPages
+                        ? "pointer-events-none opacity-50 text-xs"
+                        : "cursor-pointer text-xs"
+                    }
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
       </div>
     </div>
   );

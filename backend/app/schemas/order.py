@@ -118,6 +118,41 @@ class OrderResponse(BaseModel):
     updated_at: datetime
 
 
+class OrderListItemResponse(BaseModel):
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "example": {
+                "id": "18492048-e230-4131-b841-382947192301",
+                "customer_email": "jane@example.com",
+                "customer_name": "Jane Doe",
+                "total_amount": 140.0,
+                "platform_fee": 3.5,
+                "tenant_payout_amount": 136.5,
+                "currency": "USD",
+                "status": "pending",
+                "payment_gateway": "stripe",
+                "gateway_reference": "ECH-CAKES-BY-BODE-A9B2C3",
+                "created_at": "2026-09-23T10:15:30Z",
+            }
+        },
+    )
+
+    id: uuid.UUID
+    gateway_reference: str
+    customer_name: str
+    customer_email: str
+    customer_avatar_url: Optional[str] = None
+    total_amount: float
+    platform_fee: float
+    tenant_payout_amount: float
+    currency: str
+    status: OrderStatus
+    payment_gateway: str
+    created_at: datetime
+    items: Optional[List[Dict[str, Any]]] = None
+
+
 class OrderCalculateRequest(BaseModel):
     items: List[OrderItem] = Field(..., min_length=1)
     fulfillment_type: Optional[str] = "pickup"

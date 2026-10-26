@@ -1,8 +1,9 @@
 import uuid
 import secrets
+from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, String
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,9 +13,12 @@ from app.models.tenant import Tenant
 from app.models.order import Order, OrderStatus
 from app.models.user import User
 from app.models.product import Product, ProductVariant
+from app.payments.paystack import PaystackPaymentProvider
+from app.payments.stripe import StripePaymentProvider
 from app.schemas.order import (
     OrderCreate,
     OrderResponse,
+    OrderListItemResponse,
     OrderStatusUpdate,
     OrderCancelRequest,
     OrderCalculateRequest,
@@ -78,29 +82,21 @@ async def enrich_order_items_from_products(
             if p.name:
                 prod_by_title[p.name.strip().lower()] = p
 
-        # 2. Check remaining candidate IDs against ProductVariant table to locate parent Product
+        # 2. Check remaining candidate IDs against ProductVariant table joined with parent Product
         remaining_ids = [uid for uid in raw_ids if str(uid) not in prod_by_id]
         if remaining_ids:
             pv_res = await db.execute(
-                select(ProductVariant).where(ProductVariant.id.in_(remaining_ids))
+                select(ProductVariant, Product)
+                .join(Product, ProductVariant.product_id == Product.id)
+                .where(ProductVariant.id.in_(remaining_ids))
             )
-            variants = pv_res.scalars().all()
-            variant_parent_ids = {v.product_id for v in variants}
-
-            if variant_parent_ids:
-                parent_res = await db.execute(
-                    select(Product).where(Product.id.in_(variant_parent_ids))
-                )
-                parent_map = {p.id: p for p in parent_res.scalars().all()}
-                for v in variants:
-                    if v.product_id in parent_map:
-                        parent_p = parent_map[v.product_id]
-                        variant_to_prod[str(v.id)] = parent_p
-                        prod_by_id[str(parent_p.id)] = parent_p
-                        if parent_p.title:
-                            prod_by_title[parent_p.title.strip().lower()] = parent_p
-                        if parent_p.name:
-                            prod_by_title[parent_p.name.strip().lower()] = parent_p
+            for v, parent_p in pv_res.all():
+                variant_to_prod[str(v.id)] = parent_p
+                prod_by_id[str(parent_p.id)] = parent_p
+                if parent_p.title:
+                    prod_by_title[parent_p.title.strip().lower()] = parent_p
+                if parent_p.name:
+                    prod_by_title[parent_p.name.strip().lower()] = parent_p
 
     # 3. Look up remaining items by title/name from Product table
     if raw_titles:
@@ -222,24 +218,17 @@ async def compute_server_pricing(
         remaining_ids = [uid for uid in raw_ids if str(uid) not in prod_by_id]
         if remaining_ids:
             pv_res = await db.execute(
-                select(ProductVariant).where(ProductVariant.id.in_(remaining_ids))
+                select(ProductVariant, Product)
+                .join(Product, ProductVariant.product_id == Product.id)
+                .where(ProductVariant.id.in_(remaining_ids))
             )
-            variants = pv_res.scalars().all()
-            variant_parent_ids = {v.product_id for v in variants}
-            if variant_parent_ids:
-                parent_res = await db.execute(
-                    select(Product).where(Product.id.in_(variant_parent_ids))
-                )
-                parent_map = {p.id: p for p in parent_res.scalars().all()}
-                for v in variants:
-                    if v.product_id in parent_map:
-                        parent_p = parent_map[v.product_id]
-                        variant_to_prod[str(v.id)] = parent_p
-                        prod_by_id[str(parent_p.id)] = parent_p
-                        if parent_p.title:
-                            prod_by_title[parent_p.title.strip().lower()] = parent_p
-                        if parent_p.name:
-                            prod_by_title[parent_p.name.strip().lower()] = parent_p
+            for v, parent_p in pv_res.all():
+                variant_to_prod[str(v.id)] = parent_p
+                prod_by_id[str(parent_p.id)] = parent_p
+                if parent_p.title:
+                    prod_by_title[parent_p.title.strip().lower()] = parent_p
+                if parent_p.name:
+                    prod_by_title[parent_p.name.strip().lower()] = parent_p
 
     if raw_titles:
         title_res = await db.execute(
@@ -569,13 +558,13 @@ async def create_order(
 
 @router.get(
     "",
-    response_model=ApiResponse[PaginatedData[OrderResponse]],
+    response_model=ApiResponse[PaginatedData[OrderListItemResponse]],
     summary="List orders isolated by PostgreSQL RLS",
     description="Retrieves orders filtered strictly at database level by PostgreSQL RLS for the tenant, with product sorting support.",
 )
 @router.get(
     "/",
-    response_model=ApiResponse[PaginatedData[OrderResponse]],
+    response_model=ApiResponse[PaginatedData[OrderListItemResponse]],
     include_in_schema=False,
 )
 async def list_orders(
@@ -584,8 +573,11 @@ async def list_orders(
     customer_email: Optional[str] = None,
     user_id: Optional[uuid.UUID] = None,
     product_id: Optional[uuid.UUID] = None,
+    status: Optional[str] = None,
+    search: Optional[str] = None,
     sort_by: Optional[str] = "created_at",
     sort_order: Optional[str] = "desc",
+    include_items: bool = False,
     tenant: Tenant = Depends(get_tenant_context),
     db: AsyncSession = Depends(get_rls_db_session),
     current_user: User = Depends(get_current_user),
@@ -597,10 +589,15 @@ async def list_orders(
         Order.is_deleted == False,
     )
     query_items = (
-        select(Order)
+        select(Order, User)
+        .outerjoin(
+            User,
+            or_(
+                Order.user_id == User.id,
+                func.lower(Order.customer_email) == func.lower(User.email),
+            ),
+        )
         .where(Order.tenant_id == tenant.id, Order.is_deleted == False)
-        .options(selectinload(Order.user))
-        .order_by(Order.created_at.desc())
     )
 
     is_admin = (
@@ -630,14 +627,52 @@ async def list_orders(
         query_count = query_count.where(cust_condition)
         query_items = query_items.where(cust_condition)
 
+        # For regular customers, hide abandoned orders that were superseded after customer paid again
+        superseded_filter = func.cast(Order.metadata_json, String).not_ilike('%"is_abandoned_superseded": true%')
+        query_count = query_count.where(superseded_filter)
+        query_items = query_items.where(superseded_filter)
+
+    # Status filter at SQL level
+    if status and status.strip().lower() != "all":
+        clean_status = status.strip().lower()
+        status_cond = func.lower(func.cast(Order.status, String)) == clean_status
+        query_count = query_count.where(status_cond)
+        query_items = query_items.where(status_cond)
+
+    # Search filter at SQL level across name, email, gateway ref, and ID
+    if search and search.strip():
+        term = f"%{search.strip().lower()}%"
+        search_filter = or_(
+            func.lower(Order.customer_name).ilike(term),
+            func.lower(Order.customer_email).ilike(term),
+            func.lower(Order.gateway_reference).ilike(term),
+            func.lower(Order.payment_gateway).ilike(term),
+            func.cast(Order.id, String).ilike(term),
+        )
+        query_count = query_count.where(search_filter)
+        query_items = query_items.where(search_filter)
+
+    # Apply database-level ordering before pagination
+    if sort_by in ("total_amount", "amount"):
+        sort_col = Order.total_amount.desc() if (sort_order or "desc").lower() == "desc" else Order.total_amount.asc()
+        query_items = query_items.order_by(sort_col)
+    elif sort_by in ("created_at", "date"):
+        sort_col = Order.created_at.desc() if (sort_order or "desc").lower() == "desc" else Order.created_at.asc()
+        query_items = query_items.order_by(sort_col)
+    else:
+        query_items = query_items.order_by(Order.created_at.desc())
+
     total_query = await db.execute(query_count)
     total = total_query.scalar() or 0
 
     result = await db.execute(query_items.offset(offset).limit(per_page))
-    orders = list(result.scalars().all())
+    rows = list(result.all())
+    orders = [r[0] for r in rows]
+    user_map = {r[0].id: r[1] for r in rows}
 
-    # Automatically enrich orders directly from the products table in the DB
-    await enrich_order_items_from_products(orders, db, persist=True)
+    # Only enrich items when requested (e.g. for customer invoices)
+    if include_items:
+        await enrich_order_items_from_products(orders, db, persist=True)
 
     # Filter by product_id if provided
     if product_id:
@@ -656,26 +691,6 @@ async def list_orders(
                 return str(first_item.get("title") or first_item.get("product_title") or "").lower()
             return ""
         orders.sort(key=get_product_sort_key, reverse=is_desc)
-    elif sort_by in ("total_amount", "amount"):
-        is_desc = (sort_order or "desc").lower() == "desc"
-        orders.sort(key=lambda o: float(o.total_amount or 0.0), reverse=is_desc)
-    elif sort_by in ("created_at", "date"):
-        is_desc = (sort_order or "desc").lower() == "desc"
-        orders.sort(key=lambda o: o.created_at, reverse=is_desc)
-
-    # Fallback lookup for guest/unlinked orders with matching customer_email
-    emails_to_lookup = [
-        o.customer_email.strip().lower()
-        for o in orders
-        if not o.user and o.customer_email
-    ]
-    email_user_map = {}
-    if emails_to_lookup:
-        eu_res = await db.execute(
-            select(User).where(func.lower(User.email).in_(emails_to_lookup))
-        )
-        for eu in eu_res.scalars().all():
-            email_user_map[eu.email.lower()] = eu
 
     last_page = max(1, (total + per_page - 1) // per_page)
     pagination = PaginationMeta(
@@ -687,19 +702,27 @@ async def list_orders(
 
     items = []
     for o in orders:
-        resp = OrderResponse.model_validate(o)
-        meta = o.metadata_json or {}
-        resp.subtotal = meta.get("subtotal")
-        resp.delivery_fee = meta.get("delivery_fee")
-        resp.tax_rate = meta.get("tax_rate")
-        resp.tax_title = meta.get("tax_title")
-        resp.tax_amount = meta.get("tax_amount")
+        u = user_map.get(o.id)
+        resp = OrderListItemResponse(
+            id=o.id,
+            gateway_reference=o.gateway_reference,
+            customer_name=o.customer_name,
+            customer_email=o.customer_email,
+            customer_avatar_url=getattr(u, "avatar_url", None) if u else None,
+            total_amount=float(o.total_amount),
+            platform_fee=float(o.platform_fee),
+            tenant_payout_amount=float(o.tenant_payout_amount),
+            currency=o.currency,
+            status=o.status,
+            payment_gateway=o.payment_gateway,
+            created_at=o.created_at,
+            items=o.items if include_items else None,
+        )
 
-        if o.user and getattr(o.user, "avatar_url", None):
-            resp.customer_avatar_url = o.user.avatar_url
-        elif o.customer_email and o.customer_email.strip().lower() in email_user_map:
-            resp.customer_avatar_url = getattr(email_user_map[o.customer_email.strip().lower()], "avatar_url", None)
-        items.append(resp.model_dump(mode="json"))
+        if include_items:
+            items.append(resp.model_dump(mode="json"))
+        else:
+            items.append(resp.model_dump(mode="json", exclude={"items"}))
 
     return success_response(
         data={"items": items},
@@ -718,10 +741,20 @@ async def get_order(
     email: Optional[str] = None,
     db: AsyncSession = Depends(get_rls_db_session),
 ) -> Dict[str, Any]:
+    base_query = (
+        select(Order, User)
+        .outerjoin(
+            User,
+            or_(
+                Order.user_id == User.id,
+                func.lower(Order.customer_email) == func.lower(User.email),
+            ),
+        )
+    )
     clean_ident = order_identifier.strip().lstrip("#")
     if "@" in clean_ident:
         query = (
-            select(Order)
+            base_query
             .where(
                 func.lower(Order.customer_email) == clean_ident.lower(),
                 Order.is_deleted == False,
@@ -731,10 +764,10 @@ async def get_order(
     else:
         try:
             order_uuid = uuid.UUID(clean_ident)
-            query = select(Order).where(Order.id == order_uuid, Order.is_deleted == False)
+            query = base_query.where(Order.id == order_uuid, Order.is_deleted == False)
         except ValueError:
             query = (
-                select(Order)
+                base_query
                 .where(
                     or_(
                         func.lower(Order.gateway_reference) == clean_ident.lower(),
@@ -745,13 +778,14 @@ async def get_order(
                 .order_by(Order.created_at.desc())
             )
 
-    result = await db.execute(query.options(selectinload(Order.user)))
-    order = result.scalars().first()
-    if not order:
+    result = await db.execute(query)
+    row = result.first()
+    if not row:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Order '{order_identifier}' not found in tenant store",
         )
+    order, user = row
 
     # Automatically enrich order directly from the products table in the DB
     await enrich_order_items_from_products([order], db, persist=True)
@@ -770,15 +804,8 @@ async def get_order(
     resp.tax_title = meta.get("tax_title")
     resp.tax_amount = meta.get("tax_amount")
 
-    if order.user and getattr(order.user, "avatar_url", None):
-        resp.customer_avatar_url = order.user.avatar_url
-    elif order.customer_email:
-        cu_res = await db.execute(
-            select(User).where(func.lower(User.email) == order.customer_email.strip().lower())
-        )
-        cu = cu_res.scalar_one_or_none()
-        if cu and getattr(cu, "avatar_url", None):
-            resp.customer_avatar_url = cu.avatar_url
+    if user and getattr(user, "avatar_url", None):
+        resp.customer_avatar_url = user.avatar_url
 
     return success_response(
         data=resp.model_dump(mode="json"),
@@ -882,11 +909,12 @@ async def delete_order(
 async def update_order_status(
     order_id: uuid.UUID,
     payload: OrderStatusUpdate,
+    tenant: Tenant = Depends(get_tenant_context),
     db: AsyncSession = Depends(get_rls_db_session),
     current_user: User = Depends(get_current_tenant_admin),
 ) -> Dict[str, Any]:
     result = await db.execute(
-        select(Order).where(Order.id == order_id, Order.is_deleted == False).with_for_update()
+        select(Order).where(Order.id == order_id, Order.tenant_id == tenant.id, Order.is_deleted == False).with_for_update()
     )
     order = result.scalar_one_or_none()
     if not order:
@@ -895,17 +923,67 @@ async def update_order_status(
             detail="Order not found in tenant store",
         )
 
-    try:
-        new_status = OrderStatus(payload.status.lower())
-    except ValueError:
+    if order.status == OrderStatus.PENDING:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid status '{payload.status}'. Valid statuses: {[s.value for s in OrderStatus]}",
+            detail="Order status cannot be modified until payment has been completed.",
         )
 
-    # If transitioning to cancelled, restore reserved inventory
+    clean_status = payload.status.strip().lower()
+    if clean_status in ("pending", "paid"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Status '{clean_status}' is an automated payment lifecycle status and cannot be set manually by administrators.",
+        )
+
+    allowed_admin_statuses = {
+        OrderStatus.ACCEPTED.value: OrderStatus.ACCEPTED,
+        OrderStatus.PROCESSING.value: OrderStatus.PROCESSING,
+        OrderStatus.SHIPPED.value: OrderStatus.SHIPPED,
+        OrderStatus.DELIVERED.value: OrderStatus.DELIVERED,
+        OrderStatus.CANCELLED.value: OrderStatus.CANCELLED,
+    }
+
+    if clean_status not in allowed_admin_statuses:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid status '{payload.status}'. Tenant admins can only update orders to: {list(allowed_admin_statuses.keys())}",
+        )
+
+    new_status = allowed_admin_statuses[clean_status]
+
+    if order.status in (OrderStatus.DELIVERED, OrderStatus.FULFILLED) and new_status == OrderStatus.CANCELLED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Order has already been delivered and cannot be cancelled.",
+        )
+
+    # If transitioning to cancelled, restore reserved inventory and trigger 100% gateway refund
     if new_status == OrderStatus.CANCELLED and order.status != OrderStatus.CANCELLED:
         await _restock_cancelled_order(order, db)
+
+        meta = dict(order.metadata_json or {})
+        now_utc = datetime.now(timezone.utc)
+        meta["cancelled_at"] = now_utc.isoformat()
+        meta["cancelled_by"] = f"admin:{current_user.email}"
+
+        # If order was paid, accepted, or processing, trigger full 100% refund via gateway
+        if order.status in (OrderStatus.PAID, OrderStatus.ACCEPTED, OrderStatus.PROCESSING):
+            gateway = (order.payment_gateway or tenant.default_gateway or "paystack").lower()
+            provider = StripePaymentProvider() if gateway == "stripe" else PaystackPaymentProvider()
+            refund_res = await provider.refund_transaction(
+                reference=order.gateway_reference,
+                amount=float(order.total_amount),
+                currency=order.currency,
+            )
+            meta["refund_amount"] = float(order.total_amount)
+            meta["refund_percentage"] = 100.0
+            meta["tenant_retention_amount"] = 0.0
+            meta["refund_status"] = "processed"
+            meta["refund_triggered_by"] = f"admin:{current_user.email}"
+            meta["refund_gateway_response"] = refund_res
+
+        order.metadata_json = meta
 
     order.status = new_status
     if payload.tracking_notes:
@@ -981,29 +1059,92 @@ async def cancel_order(
             detail="You are not authorized to cancel this order",
         )
 
-    if order.status in (OrderStatus.DELIVERED, OrderStatus.FULFILLED, OrderStatus.CANCELLED):
+    if order.status in (OrderStatus.DELIVERED, OrderStatus.FULFILLED):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Order cannot be cancelled in its current status '{order.status.value}'",
+            detail="Order has already been delivered and cannot be cancelled.",
+        )
+
+    # Customer cancellation constraints:
+    # Processing, shipped, delivered, fulfilled, and cancelled cannot be cancelled by customer
+    if not is_admin and order.status in (
+        OrderStatus.PROCESSING,
+        OrderStatus.SHIPPED,
+        OrderStatus.DELIVERED,
+        OrderStatus.FULFILLED,
+        OrderStatus.CANCELLED,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Order cannot be cancelled in its current status '{order.status.value}'. Please contact store support.",
+        )
+
+    # Admin cancellation constraints:
+    if is_admin and order.status in (OrderStatus.DELIVERED, OrderStatus.FULFILLED, OrderStatus.CANCELLED):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Order cannot be cancelled in its current status '{order.status.value}'.",
         )
 
     # Restock inventory under row lock
     await _restock_cancelled_order(order, db)
 
-    order.status = OrderStatus.CANCELLED
+    now_utc = datetime.now(timezone.utc)
     meta = dict(order.metadata_json or {})
-    import datetime
-    meta["cancelled_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    meta["cancelled_at"] = now_utc.isoformat()
     if is_admin and current_user:
         meta["cancelled_by"] = f"admin:{current_user.email}"
     elif current_user:
         meta["cancelled_by"] = f"customer:{current_user.email}"
     else:
-        meta["cancelled_by"] = "customer:guest"
+        meta["cancelled_by"] = f"customer:{order.customer_email}"
 
     if payload and payload.reason:
         meta["cancel_reason"] = payload.reason
 
+    # Process gateway refund if order was paid or accepted
+    if order.status in (OrderStatus.PAID, OrderStatus.ACCEPTED, OrderStatus.PROCESSING):
+        total = float(order.total_amount)
+        if is_admin:
+            # Full 100% refund when admin cancels
+            customer_refund = total
+            refund_pct = 100.0
+            tenant_retention = 0.0
+        else:
+            # Customer policy:
+            # <= 24 hours: 100% refund
+            # > 24 hours: 70% refund to customer, 30% retained by tenant admin
+            order_time = order.created_at
+            if order_time.tzinfo is None:
+                order_time = order_time.replace(tzinfo=timezone.utc)
+            elapsed_seconds = (now_utc - order_time).total_seconds()
+            is_within_one_day = elapsed_seconds <= 86400
+
+            if is_within_one_day:
+                customer_refund = total
+                refund_pct = 100.0
+                tenant_retention = 0.0
+            else:
+                customer_refund = round(total * 0.70, 2)
+                refund_pct = 70.0
+                tenant_retention = round(total * 0.30, 2)
+
+        gateway = (order.payment_gateway or tenant.default_gateway or "paystack").lower()
+        provider = StripePaymentProvider() if gateway == "stripe" else PaystackPaymentProvider()
+        refund_res = await provider.refund_transaction(
+            reference=order.gateway_reference,
+            amount=customer_refund,
+            currency=order.currency,
+        )
+
+        meta["refund_amount"] = customer_refund
+        meta["refund_percentage"] = refund_pct
+        meta["tenant_retention_amount"] = tenant_retention
+        meta["refund_status"] = "processed"
+        meta["refund_triggered_by"] = meta["cancelled_by"]
+        meta["refund_gateway_response"] = refund_res
+
+    order.status = OrderStatus.CANCELLED
     order.metadata_json = meta
     await db.commit()
     await db.refresh(order)

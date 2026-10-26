@@ -57,15 +57,33 @@ export default function TenantUsersAdminPage() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCurrentPage(1);
+  }, [debouncedSearch, roleFilter, statusFilter]);
+
   const loadData = useCallback(async () => {
     try {
       setIsRefreshing(true);
-      const res = await getTenantUsers(activeTenantSlug);
+      const res = await getTenantUsers(activeTenantSlug, {
+        page: currentPage,
+        per_page: pageSize,
+        search: debouncedSearch.trim() || undefined,
+        role: roleFilter !== "all" ? roleFilter : undefined,
+      });
       if (res.status === "success" && res.data?.items) {
         setUsers(res.data.items);
         if (res.pagination) {
@@ -81,7 +99,7 @@ export default function TenantUsersAdminPage() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [activeTenantSlug]);
+  }, [activeTenantSlug, currentPage, pageSize, debouncedSearch, roleFilter]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -90,48 +108,19 @@ export default function TenantUsersAdminPage() {
 
   // Filtered users
   const filteredUsers = useMemo(() => {
+    if (statusFilter === "all") return users;
     return users.filter((u) => {
-      // Role filter
-      if (roleFilter !== "all") {
-        if (roleFilter === "customer" && u.role !== "customer") return false;
-        if (
-          roleFilter === "admin" &&
-          u.role !== "tenant_admin" &&
-          u.role !== "admin" &&
-          u.role !== "super_admin"
-        )
-          return false;
-        if (roleFilter === "staff" && u.role !== "staff") return false;
-      }
-
-      // Status filter
-      if (statusFilter !== "all") {
-        if (statusFilter === "active" && !u.is_active) return false;
-        if (statusFilter === "inactive" && u.is_active) return false;
-      }
-
-      // Search query
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase();
-        const matchesName =
-          u.full_name?.toLowerCase().includes(query) ||
-          u.first_name?.toLowerCase().includes(query) ||
-          u.last_name?.toLowerCase().includes(query);
-        const matchesEmail = u.email?.toLowerCase().includes(query);
-        const matchesPhone = u.phone_number?.toLowerCase().includes(query);
-        return matchesName || matchesEmail || matchesPhone;
-      }
-
+      if (statusFilter === "active" && !u.is_active) return false;
+      if (statusFilter === "inactive" && u.is_active) return false;
       return true;
     });
-  }, [users, roleFilter, statusFilter, searchQuery]);
+  }, [users, statusFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
+  const totalUsers = pagination?.total ?? filteredUsers.length;
+  const totalPages =
+    pagination?.last_page ?? Math.max(1, Math.ceil(totalUsers / pageSize));
   const safeCurrentPage = Math.min(currentPage, totalPages);
-  const paginatedUsers = useMemo(() => {
-    const start = (safeCurrentPage - 1) * pageSize;
-    return filteredUsers.slice(start, start + pageSize);
-  }, [filteredUsers, safeCurrentPage, pageSize]);
+  const paginatedUsers = filteredUsers;
 
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return "N/A";
@@ -403,45 +392,52 @@ export default function TenantUsersAdminPage() {
         </Table>
 
         {/* Pagination */}
-        {(pagination?.total !== undefined
-          ? pagination.total >= 10
-          : filteredUsers.length >= 10) &&
-          totalPages > 1 && (
-            <div className="p-3 border-t border-stone-200 flex items-center justify-between">
-              <span className="text-xs text-stone-500">
-                Page {safeCurrentPage} of {totalPages}
-              </span>
-              <Pagination className="justify-end">
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious
-                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+        {totalUsers > pageSize && (
+          <div className="p-3 border-t border-border flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">
+              Showing {(safeCurrentPage - 1) * pageSize + 1} to{" "}
+              {Math.min(safeCurrentPage * pageSize, totalUsers)} of {totalUsers}{" "}
+              users
+            </span>
+            <Pagination className="justify-end">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    className={
+                      safeCurrentPage <= 1
+                        ? "pointer-events-none opacity-50 text-xs"
+                        : "cursor-pointer text-xs"
+                    }
+                  />
+                </PaginationItem>
+                {Array.from({ length: totalPages }).map((_, idx) => (
+                  <PaginationItem key={idx}>
+                    <PaginationLink
+                      isActive={safeCurrentPage === idx + 1}
+                      onClick={() => setCurrentPage(idx + 1)}
                       className="cursor-pointer text-xs"
-                    />
+                    >
+                      {idx + 1}
+                    </PaginationLink>
                   </PaginationItem>
-                  {Array.from({ length: totalPages }).map((_, idx) => (
-                    <PaginationItem key={idx}>
-                      <PaginationLink
-                        isActive={safeCurrentPage === idx + 1}
-                        onClick={() => setCurrentPage(idx + 1)}
-                        className="cursor-pointer text-xs"
-                      >
-                        {idx + 1}
-                      </PaginationLink>
-                    </PaginationItem>
-                  ))}
-                  <PaginationItem>
-                    <PaginationNext
-                      onClick={() =>
-                        setCurrentPage((p) => Math.min(totalPages, p + 1))
-                      }
-                      className="cursor-pointer text-xs"
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            </div>
-          )}
+                ))}
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() =>
+                      setCurrentPage((p) => Math.min(totalPages, p + 1))
+                    }
+                    className={
+                      safeCurrentPage >= totalPages
+                        ? "pointer-events-none opacity-50 text-xs"
+                        : "cursor-pointer text-xs"
+                    }
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
       </div>
     </div>
   );

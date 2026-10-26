@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, func, update
+from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -267,8 +268,10 @@ async def login(
     payload: LoginRequest,
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
-    # 1. Fetch user by email
-    query = await db.execute(select(User).where(User.email == payload.email))
+    # 1. Fetch user by email with tenant pre-joined
+    query = await db.execute(
+        select(User).options(joinedload(User.tenant)).where(User.email == payload.email)
+    )
     user = query.scalar_one_or_none()
 
     if not user or not verify_password(payload.password, user.hashed_password):
@@ -283,15 +286,9 @@ async def login(
             detail="Your account has been blocked or deactivated. Please contact support.",
         )
 
-    # 2. Fetch tenant details if associated
-    tenant_slug = None
-    tenant_name = None
-    if user.tenant_id:
-        t_query = await db.execute(select(Tenant).where(Tenant.id == user.tenant_id))
-        tenant = t_query.scalar_one_or_none()
-        if tenant:
-            tenant_slug = tenant.slug
-            tenant_name = tenant.name
+    # 2. Extract tenant details from pre-joined relationship
+    tenant_slug = user.tenant.slug if user.tenant else None
+    tenant_name = user.tenant.name if user.tenant else None
 
     # 3. Create 30-minute Access Token & 12-hour Refresh Token
     token_claims = {
@@ -354,8 +351,10 @@ async def refresh_token(
             detail="Malformed token subject.",
         )
 
-    # 2. Check user in database
-    query = await db.execute(select(User).where(User.id == user_uuid))
+    # 2. Check user in database with tenant pre-joined
+    query = await db.execute(
+        select(User).options(joinedload(User.tenant)).where(User.id == user_uuid)
+    )
     user = query.scalar_one_or_none()
 
     if not user:
@@ -370,14 +369,8 @@ async def refresh_token(
             detail="Your account has been blocked or deactivated. Please contact support.",
         )
 
-    tenant_slug = None
-    tenant_name = None
-    if user.tenant_id:
-        t_query = await db.execute(select(Tenant).where(Tenant.id == user.tenant_id))
-        tenant = t_query.scalar_one_or_none()
-        if tenant:
-            tenant_slug = tenant.slug
-            tenant_name = tenant.name
+    tenant_slug = user.tenant.slug if user.tenant else None
+    tenant_name = user.tenant.name if user.tenant else None
 
     # 3. Issue fresh 30-minute access token and updated 12-hour refresh token
     token_claims = {
@@ -508,15 +501,13 @@ async def get_me(
 ) -> Dict[str, Any]:
     user_data = UserResponse.model_validate(current_user).model_dump(mode="json")
     user_data["full_name"] = f"{current_user.first_name} {current_user.last_name}"
-    if current_user.tenant_id:
-        t_res = await db.execute(select(Tenant).where(Tenant.id == current_user.tenant_id))
-        tenant = t_res.scalar_one_or_none()
-        if tenant:
-            user_data["tenant_slug"] = tenant.slug
-            user_data["tenant_name"] = tenant.name
-            user_data["paystack_subaccount_code"] = tenant.paystack_subaccount_code
-            user_data["stripe_account_id"] = tenant.stripe_account_id
-            user_data["tenant_branding"] = tenant.branding_config
+    tenant = current_user.tenant
+    if tenant:
+        user_data["tenant_slug"] = tenant.slug
+        user_data["tenant_name"] = tenant.name
+        user_data["paystack_subaccount_code"] = tenant.paystack_subaccount_code
+        user_data["stripe_account_id"] = tenant.stripe_account_id
+        user_data["tenant_branding"] = tenant.branding_config
     return success_response(
         data=user_data,
         message="User details retrieved successfully",

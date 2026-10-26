@@ -38,6 +38,7 @@ import { CopyableId } from "@/components/shared/copyable-id";
 import { ApiOrder, PaginationMeta } from "@/types";
 import { fetchOrders, updateOrderStatus } from "@/lib/api/order";
 import { formatCurrency, formatDate, getTenantRoute } from "@/utils/helper";
+import { confirmToast } from "@/components/ui/confirm-toast";
 
 interface OrdersPageProps {
   params?: Promise<{
@@ -59,18 +60,30 @@ export default function TenantOrdersPage({ params }: OrdersPageProps) {
 
   // Filters & Search
   const [orderSearch, setOrderSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
   useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(orderSearch);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [orderSearch]);
+
+  useEffect(() => {
     let isMounted = true;
 
     async function loadOrders() {
+      setIsLoading(true);
       try {
         const res = await fetchOrders({
           tenantSlug,
-          per_page: 10,
+          page: currentPage,
+          per_page: pageSize,
+          search: debouncedSearch.trim() || undefined,
+          status: statusFilter !== "all" ? statusFilter : undefined,
         });
         if (isMounted) {
           setOrders(res.data?.items || []);
@@ -96,7 +109,7 @@ export default function TenantOrdersPage({ params }: OrdersPageProps) {
     return () => {
       isMounted = false;
     };
-  }, [tenantSlug]);
+  }, [tenantSlug, currentPage, statusFilter, debouncedSearch]);
 
   const handleSearchChange = (val: string) => {
     setOrderSearch(val);
@@ -138,42 +151,42 @@ export default function TenantOrdersPage({ params }: OrdersPageProps) {
   };
 
   const handleStatusSelect = (order: ApiOrder, nextStatus: string) => {
+    if (order.status.toLowerCase() === "pending") {
+      toast.error(
+        "Order status cannot be modified until payment has been completed.",
+      );
+      return;
+    }
+    if (
+      (order.status.toLowerCase() === "delivered" ||
+        order.status.toLowerCase() === "fulfilled") &&
+      nextStatus.toLowerCase() === "cancelled"
+    ) {
+      toast.error("Delivered orders cannot be cancelled.");
+      return;
+    }
     if (nextStatus.toLowerCase() === "cancelled") {
       const displayRef =
         order.gateway_reference || order.id.slice(0, 8).toUpperCase();
-      toast(`Cancel Order #${displayRef}?`, {
+      confirmToast({
+        title: "Cancel Order?",
+        subtitle: `#${displayRef}`,
         description:
-          "Are you sure you want to cancel this order? This will mark it as cancelled.",
-        action: {
-          label: "Yes, Cancel",
-          onClick: () => handleUpdateOrderStatus(order.id, "cancelled"),
-        },
-        cancel: {
-          label: "Keep Order",
-          onClick: () => {},
-        },
-        duration: 8000,
+          "Are you sure you want to cancel this order? This will cancel the order and trigger a 100% full refund to the customer via the payment gateway.",
+        confirmText: "Yes, Cancel & Refund",
+        cancelText: "Keep Order",
+        variant: "destructive",
+        duration: 10000,
+        onConfirm: () => handleUpdateOrderStatus(order.id, "cancelled"),
       });
       return;
     }
     handleUpdateOrderStatus(order.id, nextStatus);
   };
 
-  const filteredOrders = orders.filter((o) => {
-    const q = orderSearch.toLowerCase();
-    const matchesSearch =
-      o.id.toLowerCase().includes(q) ||
-      (o.gateway_reference && o.gateway_reference.toLowerCase().includes(q)) ||
-      o.customer_name.toLowerCase().includes(q) ||
-      o.customer_email.toLowerCase().includes(q) ||
-      o.payment_gateway.toLowerCase().includes(q);
-
-    const matchesStatus =
-      statusFilter === "all" ||
-      o.status.toLowerCase() === statusFilter.toLowerCase();
-
-    return matchesSearch && matchesStatus;
-  });
+  const totalOrders = pagination?.total ?? orders.length;
+  const totalPages =
+    pagination?.last_page ?? Math.max(1, Math.ceil(totalOrders / pageSize));
 
   return (
     <div className="space-y-4 w-full text-foreground">
@@ -199,6 +212,7 @@ export default function TenantOrdersPage({ params }: OrdersPageProps) {
             </SelectTrigger>
             <SelectContent className="bg-card border-border text-foreground">
               <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="paid">Paid</SelectItem>
               <SelectItem value="accepted">Accepted</SelectItem>
               <SelectItem value="processing">In Progress</SelectItem>
@@ -283,7 +297,7 @@ export default function TenantOrdersPage({ params }: OrdersPageProps) {
                   </TableCell>
                 </TableRow>
               ))
-            ) : filteredOrders.length === 0 ? (
+            ) : orders.length === 0 ? (
               <TableRow className="border-border">
                 <TableCell
                   colSpan={8}
@@ -293,153 +307,175 @@ export default function TenantOrdersPage({ params }: OrdersPageProps) {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredOrders
-                .slice((currentPage - 1) * pageSize, currentPage * pageSize)
-                .map((ord) => {
-                  const orderDetailUrl = getTenantRoute(
-                    tenantSlug,
-                    `/orders/${ord.id}`,
-                  );
+              orders.map((ord) => {
+                const orderDetailUrl = getTenantRoute(
+                  tenantSlug,
+                  `/orders/${ord.id}`,
+                );
 
-                  return (
-                    <TableRow
-                      key={ord.id}
-                      className="border-border hover:bg-muted/40 transition-colors group"
-                    >
-                      <TableCell className="p-4 text-xs font-semibold text-foreground">
-                        <CopyableId
-                          id={ord.gateway_reference || ord.id}
-                          length={7}
-                          prefix="#"
-                          asLink={orderDetailUrl}
-                          textClassName="hover:text-primary font-bold"
+                return (
+                  <TableRow
+                    key={ord.id}
+                    className="border-border hover:bg-muted/40 transition-colors group"
+                  >
+                    <TableCell className="p-4 text-xs font-semibold text-foreground">
+                      <CopyableId
+                        id={ord.gateway_reference || ord.id}
+                        length={7}
+                        prefix="#"
+                        asLink={orderDetailUrl}
+                        textClassName="hover:text-primary font-bold"
+                      />
+                      <span className="text-[10px] text-muted-foreground font-normal block mt-0.5">
+                        {formatDate(ord.created_at)}
+                      </span>
+                    </TableCell>
+
+                    <TableCell className="p-4">
+                      <div className="flex items-center gap-3">
+                        <UserAvatar
+                          src={ord.customer_avatar_url || undefined}
+                          name={ord.customer_name}
+                          email={ord.customer_email}
+                          size="sm"
+                          shape="rounded"
                         />
-                        <span className="text-[10px] text-muted-foreground font-normal block mt-0.5">
-                          {formatDate(ord.created_at)}
-                        </span>
-                      </TableCell>
-
-                      <TableCell className="p-4">
-                        <div className="flex items-center gap-3">
-                          <UserAvatar
-                            src={ord.customer_avatar_url || undefined}
-                            name={ord.customer_name}
-                            email={ord.customer_email}
-                            size="sm"
-                            shape="rounded"
-                          />
-                          <div className="min-w-0">
-                            <div className="font-semibold text-foreground text-xs truncate">
-                              {ord.customer_name}
-                            </div>
-                            <div className="text-[11px] text-muted-foreground truncate">
-                              {ord.customer_email}
-                            </div>
+                        <div className="min-w-0">
+                          <div className="font-semibold text-foreground truncate">
+                            {ord.customer_name}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground truncate">
+                            {ord.customer_email}
                           </div>
                         </div>
-                      </TableCell>
+                      </div>
+                    </TableCell>
 
-                      <TableCell className="p-4">
-                        <PaymentGatewayLogo gateway={ord.payment_gateway} />
-                      </TableCell>
+                    <TableCell className="p-4">
+                      <PaymentGatewayLogo gateway={ord.payment_gateway} />
+                    </TableCell>
 
-                      <TableCell className="p-4 font-bold text-foreground text-xs">
-                        {formatCurrency(ord.total_amount, ord.currency)}
-                      </TableCell>
+                    <TableCell className="p-4 font-bold text-foreground">
+                      {formatCurrency(ord.total_amount, ord.currency)}
+                    </TableCell>
 
-                      <TableCell className="p-4 font-bold text-emerald-600 dark:text-emerald-400 text-xs">
-                        {formatCurrency(ord.tenant_payout_amount, ord.currency)}
-                      </TableCell>
+                    <TableCell className="p-4 font-bold text-emerald-600 dark:text-emerald-400">
+                      {formatCurrency(ord.tenant_payout_amount, ord.currency)}
+                    </TableCell>
 
-                      <TableCell className="p-4 text-muted-foreground text-xs">
-                        {formatCurrency(ord.platform_fee, ord.currency)}
-                      </TableCell>
+                    <TableCell className="p-4 text-muted-foreground">
+                      {formatCurrency(ord.platform_fee, ord.currency)}
+                    </TableCell>
 
-                      <TableCell className="p-4">
-                        <Badge
-                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold capitalize ${
-                            ord.status === "delivered" ||
-                            ord.status === "fulfilled"
-                              ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
-                              : ord.status === "shipped"
-                                ? "bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20"
-                                : ord.status === "cancelled" ||
-                                    ord.status === "failed"
-                                  ? "bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/20"
-                                  : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20"
-                          }`}
+                    <TableCell className="p-4">
+                      <Badge
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 font-semibold capitalize ${
+                          ord.status === "delivered" ||
+                          ord.status === "fulfilled"
+                            ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
+                            : ord.status === "shipped"
+                              ? "bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20"
+                              : ord.status === "cancelled" ||
+                                  ord.status === "failed"
+                                ? "bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/20"
+                                : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20"
+                        }`}
+                      >
+                        {ord.status}
+                      </Badge>
+                      {Boolean(
+                        (ord.metadata_json as Record<string, unknown>)
+                          ?.is_abandoned_superseded,
+                      ) && (
+                        <span className="block mt-1 text-[10px] text-muted-foreground italic">
+                          (Superseded)
+                        </span>
+                      )}
+                    </TableCell>
+
+                    <TableCell className="p-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Select
+                          value={ord.status.toLowerCase()}
+                          disabled={
+                            updatingId === ord.id ||
+                            ord.status.toLowerCase() === "cancelled" ||
+                            ord.status.toLowerCase() === "pending"
+                          }
+                          onValueChange={(val) => handleStatusSelect(ord, val)}
                         >
-                          {ord.status}
-                        </Badge>
-                      </TableCell>
-
-                      <TableCell className="p-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Select
-                            value={ord.status.toLowerCase()}
-                            disabled={updatingId === ord.id}
-                            onValueChange={(val) =>
-                              handleStatusSelect(ord, val)
+                          <SelectTrigger
+                            className="h-8 w-28 bg-background border-border text-foreground"
+                            title={
+                              ord.status.toLowerCase() === "pending"
+                                ? "Awaiting customer payment before fulfillment"
+                                : ord.status.toLowerCase() === "cancelled"
+                                  ? "Order cancelled"
+                                  : undefined
                             }
                           >
-                            <SelectTrigger className="h-8 w-28 text-xs bg-background border-border text-foreground">
-                              {updatingId === ord.id ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" />
-                              ) : (
-                                <SelectValue placeholder="Status" />
+                            {updatingId === ord.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" />
+                            ) : (
+                              <SelectValue placeholder="Status" />
+                            )}
+                          </SelectTrigger>
+                          <SelectContent className="bg-card border-border text-foreground">
+                            {(ord.status.toLowerCase() === "pending" ||
+                              ord.status.toLowerCase() === "paid") && (
+                              <SelectItem
+                                value={ord.status.toLowerCase()}
+                                disabled
+                                className="opacity-60 italic text-muted-foreground"
+                              >
+                                {ord.status.charAt(0).toUpperCase() +
+                                  ord.status.slice(1)}{" "}
+                                (System)
+                              </SelectItem>
+                            )}
+                            <SelectItem value="accepted">Accepted</SelectItem>
+                            <SelectItem value="processing">
+                              Processing
+                            </SelectItem>
+                            <SelectItem value="shipped">Shipped</SelectItem>
+                            <SelectItem value="delivered">Delivered</SelectItem>
+                            {ord.status.toLowerCase() !== "delivered" &&
+                              ord.status.toLowerCase() !== "fulfilled" && (
+                                <SelectItem value="cancelled">
+                                  Cancelled
+                                </SelectItem>
                               )}
-                            </SelectTrigger>
-                            <SelectContent className="bg-card border-border text-foreground">
-                              <SelectItem value="pending">Pending</SelectItem>
-                              <SelectItem value="paid">Paid</SelectItem>
-                              <SelectItem value="accepted">Accepted</SelectItem>
-                              <SelectItem value="processing">
-                                Processing
-                              </SelectItem>
-                              <SelectItem value="shipped">Shipped</SelectItem>
-                              <SelectItem value="delivered">
-                                Delivered
-                              </SelectItem>
-                              <SelectItem value="cancelled">
-                                Cancelled
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
+                          </SelectContent>
+                        </Select>
 
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            asChild
-                            className="h-8 w-8 p-0 rounded-lg text-muted-foreground hover:text-foreground"
-                          >
-                            <Link href={orderDetailUrl} title="View Details">
-                              <ArrowRight className="w-4 h-4" />
-                            </Link>
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          asChild
+                          className="h-8 w-8 p-0 rounded-lg text-muted-foreground hover:text-foreground"
+                        >
+                          <Link href={orderDetailUrl} title="View Details">
+                            <ArrowRight className="w-4 h-4" />
+                          </Link>
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
 
         {/* Pagination Footer */}
-        {filteredOrders.length > 0 && (
+        {orders.length > 0 && (
           <div className="p-4 border-t border-border flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs text-muted-foreground">
             <span>
-              Showing{" "}
-              {Math.min(
-                (currentPage - 1) * pageSize + 1,
-                filteredOrders.length,
-              )}{" "}
-              to {Math.min(currentPage * pageSize, filteredOrders.length)} of{" "}
-              {filteredOrders.length} orders
+              Showing {totalOrders === 0 ? 0 : (currentPage - 1) * pageSize + 1}{" "}
+              to {Math.min(currentPage * pageSize, totalOrders)} of{" "}
+              {totalOrders} orders
             </span>
-            {(pagination?.total !== undefined
-              ? pagination.total >= 10
-              : filteredOrders.length >= 10) && (
+            {totalPages > 1 && (
               <Pagination className="mx-0 w-auto">
                 <PaginationContent>
                   <PaginationItem>
@@ -447,10 +483,10 @@ export default function TenantOrdersPage({ params }: OrdersPageProps) {
                       href="#"
                       onClick={(e) => {
                         e.preventDefault();
-                        if (currentPage > 1) setCurrentPage(currentPage - 1);
+                        if (currentPage > 1) setCurrentPage((prev) => prev - 1);
                       }}
                       className={
-                        currentPage === 1
+                        currentPage <= 1
                           ? "pointer-events-none opacity-50"
                           : "cursor-pointer"
                       }
@@ -458,7 +494,7 @@ export default function TenantOrdersPage({ params }: OrdersPageProps) {
                   </PaginationItem>
                   {Array.from(
                     {
-                      length: Math.ceil(filteredOrders.length / pageSize) || 1,
+                      length: totalPages,
                     },
                     (_, idx) => (
                       <PaginationItem key={idx + 1}>
@@ -481,15 +517,11 @@ export default function TenantOrdersPage({ params }: OrdersPageProps) {
                       href="#"
                       onClick={(e) => {
                         e.preventDefault();
-                        if (
-                          currentPage <
-                          Math.ceil(filteredOrders.length / pageSize)
-                        )
-                          setCurrentPage(currentPage + 1);
+                        if (currentPage < totalPages)
+                          setCurrentPage((prev) => prev + 1);
                       }}
                       className={
-                        currentPage >=
-                        Math.ceil(filteredOrders.length / pageSize)
+                        currentPage >= totalPages
                           ? "pointer-events-none opacity-50"
                           : "cursor-pointer"
                       }

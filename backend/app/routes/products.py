@@ -19,6 +19,7 @@ from app.schemas.product import (
     ProductMenuSummaryResponse,
 )
 from app.schemas.response import success_response, PaginationMeta, ApiResponse, PaginatedData, ErrorResponse
+from app.routes.uploads import auto_resolve_image_url
 
 router = APIRouter(
     prefix="/products",
@@ -339,6 +340,8 @@ async def create_product(
     current_user: User = Depends(get_current_tenant_admin),
     adapter: ProductRepositoryAdapter = Depends(get_product_adapter),
 ) -> Dict[str, Any]:
+    if product_in.images:
+        product_in.images = [await auto_resolve_image_url(img) for img in product_in.images]
     product = await adapter.create_product(product_in)
     return success_response(
         data=product.model_dump(mode="json") if hasattr(product, "model_dump") else product,
@@ -362,6 +365,8 @@ async def update_product(
     current_user: User = Depends(get_current_tenant_admin),
     adapter: ProductRepositoryAdapter = Depends(get_product_adapter),
 ) -> Dict[str, Any]:
+    if product_in.images:
+        product_in.images = [await auto_resolve_image_url(img) for img in product_in.images]
     product = await adapter.update_product(product_id, product_in)
     if not product:
         raise HTTPException(

@@ -1,5 +1,6 @@
 import { apiRequest } from "./client";
 import { ApiResponse } from "@/types/users";
+import { ResolveImageUrlResponse } from "@/types/products";
 
 export interface UploadImageResponse {
   url: string;
@@ -27,5 +28,18 @@ export async function uploadImage(
     method: "POST",
     headers,
     body: formData,
+  });
+}
+
+/**
+ * Resolves a webpage photo URL (such as Unsplash, Pinterest, etc.) into a direct photo asset binary URL.
+ */
+export async function resolveImageUrl(
+  url: string,
+): Promise<ApiResponse<ResolveImageUrlResponse>> {
+  return apiRequest<ResolveImageUrlResponse>("/uploads/resolve-url", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
   });
 }

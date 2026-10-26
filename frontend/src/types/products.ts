@@ -162,3 +162,9 @@ export interface UpdateProductInput {
   currency?: string;
   inventory_count?: number;
 }
+
+export interface ResolveImageUrlResponse {
+  resolved_url: string;
+  original_url: string;
+  is_converted: boolean;
+}

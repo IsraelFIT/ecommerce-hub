@@ -48,6 +48,7 @@ import {
   deleteProduct,
   uploadProductImage,
 } from "@/lib/api/products";
+import { resolveImageUrl } from "@/lib/api/uploads";
 import { getCategories, createCategory } from "@/lib/api/categories";
 import { getFilters, createFilter } from "@/lib/api/filters";
 import {
@@ -133,6 +134,10 @@ export default function TenantProductDetailPage({
   const [images, setImages] = useState<string[]>([]);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
   const [customImageUrl, setCustomImageUrl] = useState("");
+  const [isResolvingUrl, setIsResolvingUrl] = useState(false);
+  const [imageErrorMap, setImageErrorMap] = useState<Record<number, boolean>>(
+    {},
+  );
 
   // Dynamic Categories and Custom Filters State
   const [tenantCategories, setTenantCategories] = useState<ProductCategory[]>(
@@ -268,7 +273,26 @@ export default function TenantProductDetailPage({
           p.currency || tenant?.currency || user?.tenant_currency || "NGN",
         );
         setIsPublished(p.is_published ?? true);
-        setImages(p.images && p.images.length > 0 ? p.images.slice(0, 5) : []);
+        const rawImages =
+          p.images && p.images.length > 0 ? p.images.slice(0, 5) : [];
+        setImages(rawImages);
+        if (rawImages.some((img) => img.includes("unsplash.com/photos/"))) {
+          Promise.all(
+            rawImages.map(async (img) => {
+              if (img.includes("unsplash.com/photos/")) {
+                try {
+                  const res = await resolveImageUrl(img);
+                  return res.data?.resolved_url || img;
+                } catch {
+                  return img;
+                }
+              }
+              return img;
+            }),
+          ).then((resolved) => {
+            setImages(resolved);
+          });
+        }
 
         // Load specifications
         if (p.specifications && Object.keys(p.specifications).length > 0) {
@@ -862,16 +886,34 @@ export default function TenantProductDetailPage({
     }
   };
 
-  const handleAddCustomUrl = () => {
-    if (!customImageUrl.trim()) return;
+  const handleAddCustomUrl = async () => {
+    const rawUrl = customImageUrl.trim();
+    if (!rawUrl) return;
     if (images.length >= 5) {
       toast.error("Maximum 5 images allowed per product");
       return;
     }
-    setImages((prev) => [...prev, customImageUrl.trim()].slice(0, 5));
-    setSelectedImageIndex(Math.min(images.length, 4));
-    setCustomImageUrl("");
-    toast.success("Image added to gallery");
+
+    try {
+      setIsResolvingUrl(true);
+      const res = await resolveImageUrl(rawUrl);
+      const finalUrl = res.data?.resolved_url || rawUrl;
+      setImages((prev) => [...prev, finalUrl].slice(0, 5));
+      setSelectedImageIndex(Math.min(images.length, 4));
+      setCustomImageUrl("");
+      if (res.data?.is_converted) {
+        toast.success("Converted photo page link to direct high-res image");
+      } else {
+        toast.success("Image added to gallery");
+      }
+    } catch {
+      setImages((prev) => [...prev, rawUrl].slice(0, 5));
+      setSelectedImageIndex(Math.min(images.length, 4));
+      setCustomImageUrl("");
+      toast.success("Image added to gallery");
+    } finally {
+      setIsResolvingUrl(false);
+    }
   };
 
   const handleRemoveImage = (indexToRemove: number) => {
@@ -1670,18 +1712,28 @@ export default function TenantProductDetailPage({
 
             {/* Main Preview */}
             <div className="relative aspect-square w-full rounded-xl bg-muted border border-border overflow-hidden">
-              {images.length > 0 ? (
+              {images.length > 0 && !imageErrorMap[selectedImageIndex] ? (
                 <Image
                   src={images[selectedImageIndex] || images[0]}
                   alt="Product Image"
                   fill
                   sizes="(max-width: 768px) 100vw, 400px"
                   className="object-cover"
+                  onError={() => {
+                    setImageErrorMap((prev) => ({
+                      ...prev,
+                      [selectedImageIndex]: true,
+                    }));
+                  }}
                 />
               ) : (
                 <div className="flex h-full flex-col items-center justify-center text-muted-foreground gap-2">
                   <Package className="h-8 w-8" />
-                  <span className="text-xs">No images uploaded</span>
+                  <span className="text-xs">
+                    {images.length > 0
+                      ? "Unable to preview image format"
+                      : "No images uploaded"}
+                  </span>
                 </div>
               )}
             </div>
@@ -1699,13 +1751,22 @@ export default function TenantProductDetailPage({
                         : "border-border"
                     }`}
                   >
-                    <Image
-                      src={img}
-                      alt={`Thumb ${i}`}
-                      fill
-                      sizes="56px"
-                      className="object-cover"
-                    />
+                    {!imageErrorMap[i] ? (
+                      <Image
+                        src={img}
+                        alt={`Thumb ${i}`}
+                        fill
+                        sizes="56px"
+                        className="object-cover"
+                        onError={() => {
+                          setImageErrorMap((prev) => ({ ...prev, [i]: true }));
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground">
+                        <Package className="h-4 w-4" />
+                      </div>
+                    )}
                     <button
                       type="button"
                       onClick={(e) => {
@@ -1767,9 +1828,9 @@ export default function TenantProductDetailPage({
                 placeholder={
                   images.length >= 5
                     ? "Maximum 5 images reached"
-                    : "Paste Image URL"
+                    : "Paste image or Unsplash URL"
                 }
-                disabled={images.length >= 5}
+                disabled={images.length >= 5 || isResolvingUrl}
                 value={customImageUrl}
                 onChange={(e) => setCustomImageUrl(e.target.value)}
                 className="h-8 text-xs bg-background border-border text-foreground"
@@ -1778,11 +1839,20 @@ export default function TenantProductDetailPage({
                 type="button"
                 variant="outline"
                 size="sm"
-                disabled={images.length >= 5 || !customImageUrl.trim()}
+                disabled={
+                  images.length >= 5 || !customImageUrl.trim() || isResolvingUrl
+                }
                 onClick={handleAddCustomUrl}
-                className="h-8 text-xs border-border bg-card hover:bg-muted text-foreground"
+                className="h-8 text-xs border-border bg-card hover:bg-muted text-foreground shrink-0"
               >
-                Add
+                {isResolvingUrl ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                    Resolving...
+                  </>
+                ) : (
+                  "Add"
+                )}
               </Button>
             </div>
           </div>

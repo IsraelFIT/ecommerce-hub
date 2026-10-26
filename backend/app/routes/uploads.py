@@ -1,8 +1,11 @@
 import os
+import re
 import uuid
 import mimetypes
 import asyncio
 from typing import Dict, Any, Optional
+from urllib.parse import urlparse
+from pydantic import BaseModel
 import httpx
 import boto3
 import botocore.client
@@ -219,4 +222,83 @@ async def proxy_image(url: str):
             raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
+
+
+class ResolveUrlRequest(BaseModel):
+    url: str
+
+
+async def auto_resolve_image_url(url: str) -> str:
+    """
+    Given an image URL or webpage photo link (e.g., Unsplash photo page),
+    resolves and returns the direct photo asset binary URL.
+    """
+    if not url or not isinstance(url, str):
+        return url
+    raw_url = url.strip()
+    if not (raw_url.startswith("http://") or raw_url.startswith("https://")):
+        return raw_url
+
+    # Check if already a direct image extension
+    path = urlparse(raw_url).path.lower()
+    if any(path.endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".webp", ".svg", ".gif", ".avif"]):
+        return raw_url
+
+    # Check if already direct Unsplash CDN image
+    if "images.unsplash.com/photo-" in raw_url or "plus.unsplash.com/premium_photo-" in raw_url:
+        return raw_url
+
+    try:
+        headers = {
+            "User-Agent": "curl/8.7.1",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/*,*/*;q=0.8",
+        }
+        async with httpx.AsyncClient(headers=headers, follow_redirects=True, timeout=12.0) as client:
+            resp = await client.get(raw_url)
+            if resp.status_code == 200:
+                ct = resp.headers.get("content-type", "").lower()
+                if "image/" in ct:
+                    return str(resp.url)
+
+                html_text = resp.text
+                match = (
+                    re.search(r'property=["\']og:image["\']\s+content=["\']([^"\']+)["\']', html_text)
+                    or re.search(r'content=["\']([^"\']+)["\']\s+property=["\']og:image["\']', html_text)
+                    or re.search(r'name=["\']twitter:image["\']\s+content=["\']([^"\']+)["\']', html_text)
+                    or re.search(r'content=["\']([^"\']+)["\']\s+name=["\']twitter:image["\']', html_text)
+                )
+                if match:
+                    og_url = match.group(1).replace("&amp;", "&")
+                    if "unsplash.com" in raw_url or "unsplash.com" in og_url:
+                        parsed = urlparse(og_url)
+                        clean_base = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+                        return f"{clean_base}?auto=format&fit=crop&w=1200&q=80"
+                    return og_url
+    except Exception:
+        pass
+    return raw_url
+
+
+@router.post("/resolve-url", summary="Resolve photo webpage link (e.g. Unsplash) to direct image asset")
+async def resolve_image_url(payload: ResolveUrlRequest):
+    """
+    Resolves webpage photo URLs (such as Unsplash, Pinterest, etc.) into high-res direct image assets
+    so they render properly in Next.js <Image /> tags without broken image indicators.
+    """
+    raw_url = payload.url.strip()
+    if not (raw_url.startswith("http://") or raw_url.startswith("https://")):
+        raise HTTPException(status_code=400, detail="Invalid URL protocol. Must start with http:// or https://")
+
+    resolved_url = await auto_resolve_image_url(raw_url)
+    is_converted = resolved_url != raw_url
+
+    return success_response(
+        data={
+            "resolved_url": resolved_url,
+            "original_url": raw_url,
+            "is_converted": is_converted,
+        },
+        message="Image URL resolved successfully" if is_converted else "Direct image URL verified",
+    )
+
 

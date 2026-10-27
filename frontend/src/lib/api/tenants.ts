@@ -121,3 +121,37 @@ export async function getTenantUsers(
     method: "GET",
   });
 }
+
+/**
+ * Fetch all platform tenants with live metrics (Super Admin / Hub Admin).
+ */
+export async function getTenants(options?: {
+  page?: number;
+  per_page?: number;
+  search?: string;
+}): Promise<ApiResponse<{ items: import("@/types").TenantRecord[] }>> {
+  const query = new URLSearchParams();
+  if (options?.page) query.set("page", String(options.page));
+  if (options?.per_page) query.set("per_page", String(options.per_page));
+  if (options?.search && options.search.trim())
+    query.set("search", options.search.trim());
+  const qs = query.toString();
+  return apiRequest<{ items: import("@/types").TenantRecord[] }>(
+    `/tenants${qs ? `?${qs}` : ""}`,
+    {
+      method: "GET",
+    },
+  );
+}
+
+/**
+ * Provision / create a new tenant store (Super Admin).
+ */
+export async function createTenant(
+  payload: import("@/types").CreateTenantPayload,
+): Promise<ApiResponse<import("@/types").TenantRecord>> {
+  return apiRequest<import("@/types").TenantRecord>("/tenants", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}

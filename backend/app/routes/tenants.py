@@ -1,11 +1,12 @@
 import uuid
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.tenant import Tenant
+from app.models.product import Product
 from app.models.user import User
 from app.models.review import Review
 from app.models.order import Order, OrderStatus
@@ -31,6 +32,12 @@ router = APIRouter(
     response_model=ApiResponse[TenantResponse],
     summary="Provision a new tenant store",
     description="Provisions a new store and registers it in the Core Registry with dedicated database/CMS configurations.",
+)
+@router.post(
+    "",
+    include_in_schema=False,
+    status_code=status.HTTP_201_CREATED,
+    response_model=ApiResponse[TenantResponse],
 )
 async def create_tenant(
     tenant_in: TenantCreate,
@@ -194,21 +201,67 @@ async def update_tenant(
 @router.get(
     "/",
     response_model=ApiResponse[PaginatedData[TenantResponse]],
-    summary="List all platform tenants (Super-admin)",
+    summary="List all platform tenants with live metrics (Super-admin & Hub-admin)",
+)
+@router.get(
+    "",
+    include_in_schema=False,
+    response_model=ApiResponse[PaginatedData[TenantResponse]],
 )
 async def list_tenants(
     page: int = 1,
-    per_page: int = 15,
+    per_page: int = 50,
+    search: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_super_admin),
 ) -> Dict[str, Any]:
     offset = (page - 1) * per_page
 
-    total_query = await db.execute(select(func.count(Tenant.id)))
-    total = total_query.scalar() or 0
+    query = select(Tenant).where(Tenant.is_deleted == False)
+    if search and search.strip():
+        s = f"%{search.strip().lower()}%"
+        query = query.where(
+            or_(
+                func.lower(Tenant.name).ilike(s),
+                func.lower(Tenant.slug).ilike(s),
+                func.lower(Tenant.category).ilike(s),
+            )
+        )
 
-    result = await db.execute(select(Tenant).offset(offset).limit(per_page))
+    total_query = select(func.count()).select_from(query.subquery())
+    total_res = await db.execute(total_query)
+    total = total_res.scalar() or 0
+
+    result = await db.execute(
+        query.order_by(desc(Tenant.created_at)).offset(offset).limit(per_page)
+    )
     tenants = result.scalars().all()
+
+    # Pre-aggregate product counts across tenants
+    prod_stmt = (
+        select(Product.tenant_id, func.count(Product.id))
+        .where(Product.is_deleted == False)
+        .group_by(Product.tenant_id)
+    )
+    prod_res = await db.execute(prod_stmt)
+    prod_counts = {str(r[0]): int(r[1]) for r in prod_res.all()}
+
+    # Pre-aggregate orders count & total volume across tenants
+    ord_stmt = (
+        select(
+            Order.tenant_id,
+            func.count(Order.id),
+            func.sum(Order.total_amount),
+        )
+        .where(Order.is_deleted == False)
+        .group_by(Order.tenant_id)
+    )
+    ord_res = await db.execute(ord_stmt)
+    ord_counts = {}
+    vol_counts = {}
+    for r in ord_res.all():
+        ord_counts[str(r[0])] = int(r[1] or 0)
+        vol_counts[str(r[0])] = float(r[2] or 0.0)
 
     last_page = max(1, (total + per_page - 1) // per_page)
     pagination = PaginationMeta(
@@ -218,12 +271,22 @@ async def list_tenants(
         total=total,
     )
 
-    items = [TenantResponse.model_validate(t).model_dump(mode="json") for t in tenants]
+    items = []
+    for t in tenants:
+        tid = str(t.id)
+        td = TenantResponse.model_validate(t).model_dump(mode="json")
+        td["product_count"] = prod_counts.get(tid, 0)
+        td["orders_count"] = ord_counts.get(tid, 0)
+        td["total_volume"] = vol_counts.get(tid, 0.0)
+        td["status"] = "Active" if t.is_active else "Suspended"
+        items.append(td)
+
     return success_response(
         data={"items": items},
         pagination=pagination,
         message="Tenants retrieved successfully",
     )
+
 
 
 @router.get(

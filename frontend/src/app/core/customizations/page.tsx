@@ -32,6 +32,14 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import {
   getTenantBrandings,
   getCustomizationRequests,
   updateCustomizationRequest,
@@ -46,6 +54,10 @@ export default function CoreCustomizationsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [landingTypeFilter, setLandingTypeFilter] = useState("all");
+  const [brandingsPage, setBrandingsPage] = useState(1);
+  const brandingsPageSize = 10;
+  const [requestsPage, setRequestsPage] = useState(1);
+  const requestsPageSize = 10;
   const [isLoading, setIsLoading] = useState(true);
 
   // Data states
@@ -154,6 +166,20 @@ export default function CoreCustomizationsPage() {
 
     return matchesSearch && matchesStatus;
   });
+
+  const totalBrandingsPages =
+    Math.ceil(filteredBrandings.length / brandingsPageSize) || 1;
+  const paginatedBrandings = filteredBrandings.slice(
+    (brandingsPage - 1) * brandingsPageSize,
+    brandingsPage * brandingsPageSize,
+  );
+
+  const totalRequestsPages =
+    Math.ceil(filteredRequests.length / requestsPageSize) || 1;
+  const paginatedRequests = filteredRequests.slice(
+    (requestsPage - 1) * requestsPageSize,
+    requestsPage * requestsPageSize,
+  );
 
   // Metrics
   const totalRequests = requests.length;
@@ -421,7 +447,7 @@ export default function CoreCustomizationsPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredBrandings.map((tenant) => {
+                paginatedBrandings.map((tenant) => {
                   const subUrl = getTenantSubdomainUrl(tenant.slug);
                   return (
                     <TableRow
@@ -568,6 +594,85 @@ export default function CoreCustomizationsPage() {
               )}
             </TableBody>
           </Table>
+
+          {/* Brandings Pagination Footer */}
+          {totalBrandingsPages > 1 && (
+            <div className="p-3 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3">
+              <span className="text-xs text-muted-foreground">
+                Showing{" "}
+                <strong className="text-foreground">
+                  {(brandingsPage - 1) * brandingsPageSize + 1}
+                </strong>{" "}
+                to{" "}
+                <strong className="text-foreground">
+                  {Math.min(
+                    brandingsPage * brandingsPageSize,
+                    filteredBrandings.length,
+                  )}
+                </strong>{" "}
+                of{" "}
+                <strong className="text-foreground">
+                  {filteredBrandings.length}
+                </strong>{" "}
+                store brandings
+              </span>
+
+              <Pagination className="mx-0 w-auto">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (brandingsPage > 1)
+                          setBrandingsPage(brandingsPage - 1);
+                      }}
+                      className={
+                        brandingsPage <= 1
+                          ? "pointer-events-none opacity-50"
+                          : "cursor-pointer"
+                      }
+                    />
+                  </PaginationItem>
+
+                  {Array.from(
+                    { length: totalBrandingsPages },
+                    (_, i) => i + 1,
+                  ).map((pageNum) => (
+                    <PaginationItem key={pageNum}>
+                      <PaginationLink
+                        href="#"
+                        isActive={brandingsPage === pageNum}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setBrandingsPage(pageNum);
+                        }}
+                        className="cursor-pointer text-xs"
+                      >
+                        {pageNum}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (brandingsPage < totalBrandingsPages)
+                          setBrandingsPage(brandingsPage + 1);
+                      }}
+                      className={
+                        brandingsPage >= totalBrandingsPages
+                          ? "pointer-events-none opacity-50"
+                          : "cursor-pointer"
+                      }
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
         </div>
       )}
 
@@ -635,7 +740,7 @@ export default function CoreCustomizationsPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredRequests.map((req) => {
+                  paginatedRequests.map((req) => {
                     const isUpdating = updatingStatusId === req.id;
                     return (
                       <TableRow
@@ -788,6 +893,85 @@ export default function CoreCustomizationsPage() {
                 )}
               </TableBody>
             </Table>
+
+            {/* Requests Pagination Footer */}
+            {totalRequestsPages > 1 && (
+              <div className="p-3 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3">
+                <span className="text-xs text-muted-foreground">
+                  Showing{" "}
+                  <strong className="text-foreground">
+                    {(requestsPage - 1) * requestsPageSize + 1}
+                  </strong>{" "}
+                  to{" "}
+                  <strong className="text-foreground">
+                    {Math.min(
+                      requestsPage * requestsPageSize,
+                      filteredRequests.length,
+                    )}
+                  </strong>{" "}
+                  of{" "}
+                  <strong className="text-foreground">
+                    {filteredRequests.length}
+                  </strong>{" "}
+                  customization requests
+                </span>
+
+                <Pagination className="mx-0 w-auto">
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (requestsPage > 1)
+                            setRequestsPage(requestsPage - 1);
+                        }}
+                        className={
+                          requestsPage <= 1
+                            ? "pointer-events-none opacity-50"
+                            : "cursor-pointer"
+                        }
+                      />
+                    </PaginationItem>
+
+                    {Array.from(
+                      { length: totalRequestsPages },
+                      (_, i) => i + 1,
+                    ).map((pageNum) => (
+                      <PaginationItem key={pageNum}>
+                        <PaginationLink
+                          href="#"
+                          isActive={requestsPage === pageNum}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setRequestsPage(pageNum);
+                          }}
+                          className="cursor-pointer text-xs"
+                        >
+                          {pageNum}
+                        </PaginationLink>
+                      </PaginationItem>
+                    ))}
+
+                    <PaginationItem>
+                      <PaginationNext
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (requestsPage < totalRequestsPages)
+                            setRequestsPage(requestsPage + 1);
+                        }}
+                        className={
+                          requestsPage >= totalRequestsPages
+                            ? "pointer-events-none opacity-50"
+                            : "cursor-pointer"
+                        }
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
           </div>
 
           {/* Detailed Request Drawer / Modal */}

@@ -100,8 +100,8 @@ function LoginForm() {
         `Welcome back, ${authData.first_name || authData.full_name || "Merchant"}!`,
       );
 
-      // 1. Super Administrator redirect to core console
-      if (authData.role === "super_admin") {
+      // 1. Super Administrator & Hub Administrator redirect to core console
+      if (authData.role === "super_admin" || authData.role === "hub_admin") {
         const targetPath = redirectPath || "/";
         const coreUrl = getTenantSubdomainUrl("core", targetPath);
         const urlObj = new URL(coreUrl);

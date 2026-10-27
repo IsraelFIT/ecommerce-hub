@@ -61,15 +61,26 @@ export async function proxy(request: NextRequest) {
 
     // 1. Resolve access token from Authorization header or auth cookies
     const rawAuth = requestHeaders.get("authorization");
-    const token =
-      (rawAuth && rawAuth.startsWith("Bearer ")
+    let token =
+      rawAuth && rawAuth.startsWith("Bearer ")
         ? rawAuth.split("Bearer ")[1]?.trim() || rawAuth.slice(7).trim()
-        : null) ||
-      request.cookies.get("auth_session")?.value ||
-      request.cookies.get("auth_token")?.value;
+        : null;
 
-    if (token && !requestHeaders.has("authorization")) {
+    if (token === "undefined" || token === "null" || token === "") {
+      token = null;
+    }
+
+    if (!token) {
+      token =
+        request.cookies.get("auth_session")?.value ||
+        request.cookies.get("auth_token")?.value ||
+        null;
+    }
+
+    if (token) {
       requestHeaders.set("authorization", `Bearer ${token}`);
+    } else {
+      requestHeaders.delete("authorization");
     }
 
     // 2. Primary Source of Truth: Decode verified JWT claims from access token
@@ -505,6 +516,32 @@ export async function proxy(request: NextRequest) {
     const redirectUrl = new URL(
       `${request.nextUrl.protocol}//${targetHost}${subPath}`,
     );
+
+    // Forward existing search parameters (e.g. search queries or pagination)
+    request.nextUrl.searchParams.forEach((val, key) => {
+      redirectUrl.searchParams.set(key, val);
+    });
+
+    // Cross-subdomain token handoff from root/host domain to core console
+    const currentToken =
+      request.cookies.get("auth_session")?.value ||
+      request.cookies.get("auth_token")?.value;
+    const currentRefreshToken = request.cookies.get("refresh_token")?.value;
+    const currentRole = request.cookies.get("userRole")?.value;
+
+    if (currentToken && !redirectUrl.searchParams.has("auth_token")) {
+      redirectUrl.searchParams.set("auth_token", currentToken);
+      if (
+        currentRefreshToken &&
+        !redirectUrl.searchParams.has("refresh_token")
+      ) {
+        redirectUrl.searchParams.set("refresh_token", currentRefreshToken);
+      }
+      if (currentRole && !redirectUrl.searchParams.has("role")) {
+        redirectUrl.searchParams.set("role", currentRole);
+      }
+    }
+
     return NextResponse.redirect(redirectUrl);
   }
 

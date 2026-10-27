@@ -8,12 +8,13 @@ import {
   RefreshCw,
   ShieldCheck,
   Building2,
-  ExternalLink,
   MoreVertical,
   UserCheck,
   UserX,
   Crown,
   ShoppingBag,
+  UserCircle2,
+  UserCog2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -71,7 +72,7 @@ export default function CoreUsersPage() {
   const pageSize = 15;
 
   // Action loading states
-  const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
+  const [, setUpdatingRoleId] = useState<string | null>(null);
   const [, setUpdatingStatusId] = useState<string | null>(null);
 
   const loadUsers = useCallback(async () => {
@@ -168,22 +169,22 @@ export default function CoreUsersPage() {
     switch (role) {
       case "super_admin":
         return (
-          <Badge className="bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-300/40 font-semibold gap-1 text-[11px]">
-            <Crown className="size-3" />
+          <Badge className="bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-300/40 font-semibold gap-1 text-xs">
+            <Crown className="size-3.5" />
             <span>Super Admin</span>
           </Badge>
         );
       case "hub_admin":
         return (
-          <Badge className="bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-300/40 font-semibold gap-1 text-[11px]">
-            <ShieldCheck className="size-3" />
+          <Badge className="bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-300/40 font-semibold gap-1 text-xs">
+            <UserCog2 className="size-3.5" />
             <span>Hub Admin</span>
           </Badge>
         );
       case "tenant_admin":
         return (
-          <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-300/40 font-semibold gap-1 text-[11px]">
-            <Building2 className="size-3" />
+          <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-300/40 font-semibold gap-1 text-xs">
+            <UserCircle2 className="size-3.5" />
             <span>Tenant Admin</span>
           </Badge>
         );
@@ -191,7 +192,7 @@ export default function CoreUsersPage() {
         return (
           <Badge
             variant="outline"
-            className="text-muted-foreground border-border text-[11px]"
+            className="text-muted-foreground border-border text-xs"
           >
             Customer
           </Badge>
@@ -338,6 +339,9 @@ export default function CoreUsersPage() {
                 User Profile
               </TableHead>
               <TableHead className="text-xs font-bold text-foreground">
+                Email/Phone
+              </TableHead>
+              <TableHead className="text-xs font-bold text-foreground">
                 Role
               </TableHead>
               <TableHead className="text-xs font-bold text-foreground">
@@ -361,10 +365,12 @@ export default function CoreUsersPage() {
                   <TableCell className="py-3.5">
                     <div className="flex items-center gap-3">
                       <Skeleton className="w-9 h-9 rounded-full shrink-0" />
-                      <div className="space-y-1.5 min-w-0">
-                        <Skeleton className="h-4 w-32" />
-                        <Skeleton className="h-3 w-40" />
-                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="space-y-1.5 min-w-0">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-3 w-40" />
                     </div>
                   </TableCell>
                   <TableCell>
@@ -401,9 +407,6 @@ export default function CoreUsersPage() {
                     (userItem.last_name?.[0] || "") ||
                   userItem.email.slice(0, 2).toUpperCase();
 
-                const isTenantAdmin = userItem.role === "tenant_admin";
-                const isHubAdmin = userItem.role === "hub_admin";
-
                 return (
                   <TableRow
                     key={userItem.id}
@@ -416,18 +419,24 @@ export default function CoreUsersPage() {
                           {initials}
                         </div>
                         <div className="min-w-0">
-                          <div className="font-semibold text-xs text-foreground truncate">
+                          <div className="font-semibold text-foreground truncate">
                             {userItem.full_name || userItem.email}
                           </div>
-                          <div className="text-[11px] text-muted-foreground truncate">
-                            {userItem.email}
-                          </div>
-                          {userItem.phone_number && (
-                            <div className="text-[10px] text-muted-foreground font-mono">
-                              {userItem.phone_number}
-                            </div>
-                          )}
                         </div>
+                      </div>
+                    </TableCell>
+
+                    {/* Email/Phone */}
+                    <TableCell className="py-3.5">
+                      <div className="space-y-1.5 min-w-0">
+                        <div className="text-foreground truncate">
+                          {userItem.email}
+                        </div>
+                        {userItem.phone_number && (
+                          <div className="text-xs text-muted-foreground">
+                            {userItem.phone_number}
+                          </div>
+                        )}
                       </div>
                     </TableCell>
 
@@ -440,10 +449,10 @@ export default function CoreUsersPage() {
                     <TableCell className="py-3.5">
                       {userItem.tenant_name ? (
                         <div className="space-y-0.5">
-                          <span className="font-medium text-xs text-foreground block">
+                          <span className="font-medium text-foreground block">
                             {userItem.tenant_name}
                           </span>
-                          <span className="text-[10px] font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                          <span className="text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                             {userItem.tenant_slug}
                           </span>
                         </div>
@@ -456,7 +465,7 @@ export default function CoreUsersPage() {
 
                     {/* Activity */}
                     <TableCell className="py-3.5">
-                      <div className="text-xs space-y-0.5">
+                      <div className="space-y-0.5">
                         <div className="text-muted-foreground">
                           {userItem.orders_count > 0 ? (
                             <span className="font-semibold text-foreground">
@@ -467,7 +476,7 @@ export default function CoreUsersPage() {
                           )}
                         </div>
                         {userItem.total_spent > 0 && (
-                          <div className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                          <div className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
                             {formatCurrency(userItem.total_spent, "NGN")}
                           </div>
                         )}
@@ -480,8 +489,8 @@ export default function CoreUsersPage() {
                         variant="outline"
                         className={
                           userItem.is_active
-                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 text-[10px]"
-                            : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20 text-[10px]"
+                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 text-xs"
+                            : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20 text-xs"
                         }
                       >
                         {userItem.is_active ? "Active" : "Disabled"}
@@ -491,54 +500,6 @@ export default function CoreUsersPage() {
                     {/* Actions */}
                     <TableCell className="py-3.5 text-right">
                       <div className="flex items-center justify-end gap-1.5">
-                        {/* Manage store customers button for tenant admins or hub admins */}
-                        {(isTenantAdmin ||
-                          isHubAdmin ||
-                          userItem.tenant_id) && (
-                          <Button
-                            asChild
-                            size="sm"
-                            variant="outline"
-                            className="h-8 text-xs gap-1 border-border text-foreground hover:bg-muted"
-                          >
-                            <Link href={`/core/users/${userItem.id}`}>
-                              <span>Manage Store</span>
-                              <ExternalLink className="size-3" />
-                            </Link>
-                          </Button>
-                        )}
-
-                        {/* Quick Role Elevation Button */}
-                        {isTenantAdmin && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() =>
-                              handleRoleChange(userItem.id, "hub_admin")
-                            }
-                            disabled={updatingRoleId === userItem.id}
-                            className="h-8 text-xs bg-blue-500/10 text-blue-600 border-blue-200 hover:bg-blue-500/20 cursor-pointer"
-                            title="Elevate this Tenant Admin to Hub Admin"
-                          >
-                            <span>Make Hub Admin</span>
-                          </Button>
-                        )}
-
-                        {isHubAdmin && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() =>
-                              handleRoleChange(userItem.id, "tenant_admin")
-                            }
-                            disabled={updatingRoleId === userItem.id}
-                            className="h-8 text-xs bg-amber-500/10 text-amber-600 border-amber-200 hover:bg-amber-500/20 cursor-pointer"
-                            title="Revert Hub Admin to regular Tenant Admin"
-                          >
-                            <span>Revert to Tenant Admin</span>
-                          </Button>
-                        )}
-
                         {/* Dropdown Menu for granular management */}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>

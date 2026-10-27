@@ -259,6 +259,46 @@ async def get_core_user_detail(
                     "created_at": eu.created_at.isoformat() if eu.created_at else None,
                 })
 
+    # Fetch all orders placed by this specific user
+    user_orders_stmt = (
+        select(Order, Tenant)
+        .join(Tenant, Order.tenant_id == Tenant.id, isouter=True)
+        .where(
+            or_(
+                Order.user_id == target_user.id,
+                func.lower(Order.customer_email) == target_user.email.lower(),
+            ),
+            Order.is_deleted == False,
+        )
+        .order_by(desc(Order.created_at))
+    )
+    user_orders_res = await db.execute(user_orders_stmt)
+    user_order_rows = user_orders_res.all()
+
+    user_orders = []
+    user_total_spent = 0.0
+    for ord_obj, ord_tenant in user_order_rows:
+        tot = float(ord_obj.total_amount or 0.0)
+        user_total_spent += tot
+        user_orders.append({
+            "id": str(ord_obj.id),
+            "order_number": ord_obj.gateway_reference or f"ORD-{str(ord_obj.id)[:8].upper()}",
+            "created_at": ord_obj.created_at.isoformat() if ord_obj.created_at else None,
+            "total_amount": tot,
+            "currency": ord_obj.currency or (ord_tenant.currency if ord_tenant else (tenant.currency if tenant else "NGN")),
+            "status": ord_obj.status.value if hasattr(ord_obj.status, "value") else str(ord_obj.status),
+            "payment_gateway": ord_obj.payment_gateway,
+            "items_count": len(ord_obj.items or []),
+            "items": ord_obj.items or [],
+            "tenant_name": ord_tenant.name if ord_tenant else (tenant.name if tenant else None),
+            "tenant_slug": ord_tenant.slug if ord_tenant else (tenant.slug if tenant else None),
+        })
+
+    user_orders_count = len(user_orders)
+    user_avg_order = (user_total_spent / user_orders_count) if user_orders_count > 0 else 0.0
+    user_last_order_at = user_orders[0]["created_at"] if user_orders else None
+    user_currency = user_orders[0]["currency"] if user_orders else (tenant.currency if tenant else "NGN")
+
     avg_order_value = (total_revenue / total_orders) if total_orders > 0 else 0.0
 
     user_data = {
@@ -290,7 +330,15 @@ async def get_core_user_detail(
             "avg_order_value": avg_order_value,
             "currency": tenant.currency if tenant else "NGN",
         },
+        "user_stats": {
+            "orders_count": user_orders_count,
+            "total_spent": user_total_spent,
+            "avg_order_value": user_avg_order,
+            "last_order_at": user_last_order_at,
+            "currency": user_currency,
+        },
         "customers": customers_list,
+        "orders": user_orders,
     }
 
     return success_response(

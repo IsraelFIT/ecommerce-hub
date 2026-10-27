@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   Store,
@@ -11,30 +11,41 @@ import {
   Layers,
   CheckCircle2,
   Settings,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { PaymentGatewayLogo } from "@/components/shared/payment-gateway-logo";
-
-interface TenantRecord {
-  id: string;
-  name: string;
-  slug: string;
-  domain: string;
-  category: string;
-  backend: "postgres" | "sanity";
-  gateway: "paystack" | "stripe";
-  subaccount: string;
-  status: "Active" | "Pending" | "Suspended";
-  productCount: number;
-  ordersCount: number;
-  totalVolume: string;
-  createdAt: string;
-}
+import { getTenants, createTenant } from "@/lib/api/tenants";
+import { TenantRecord } from "@/types";
+import {
+  formatCurrency,
+  getTenantSubdomainUrl,
+  getTenantRoute,
+} from "@/utils/helper";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+} from "@/components/ui/table";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 export default function CoreTenantsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newStoreName, setNewStoreName] = useState("");
   const [newStoreSlug, setNewStoreSlug] = useState("");
@@ -42,125 +53,92 @@ export default function CoreTenantsPage() {
   const [newBackend, setNewBackend] = useState<"postgres" | "sanity">(
     "postgres",
   );
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [tenants, setTenants] = useState<TenantRecord[]>([
-    {
-      id: "t-1",
-      name: "Jazz Cakes LTD",
-      slug: "jazz-cakes",
-      domain: "cakes.jazz-luxury.com",
-      category: "Bakery & Confectionery",
-      backend: "postgres",
-      gateway: "paystack",
-      subaccount: "ACCT_7493021948",
-      status: "Active",
-      productCount: 42,
-      ordersCount: 318,
-      totalVolume: "$48,920.00",
-      createdAt: "2026-09-15",
-    },
-    {
-      id: "t-2",
-      name: "Velvet Couture Atelier",
-      slug: "velvet-couture",
-      domain: "velvetcouture.io",
-      category: "Luxury Fashion",
-      backend: "sanity",
-      gateway: "stripe",
-      subaccount: "acct_1NZX8302183",
-      status: "Active",
-      productCount: 128,
-      ordersCount: 540,
-      totalVolume: "$92,400.00",
-      createdAt: "2026-08-20",
-    },
-    {
-      id: "t-3",
-      name: "Nordic Minimalist Home",
-      slug: "nordic-home",
-      domain: "nordichome.store",
-      category: "Interior Design",
-      backend: "postgres",
-      gateway: "paystack",
-      subaccount: "ACCT_8839201940",
-      status: "Active",
-      productCount: 64,
-      ordersCount: 210,
-      totalVolume: "$34,150.00",
-      createdAt: "2026-09-02",
-    },
-    {
-      id: "t-4",
-      name: "Aura Artisan Coffee",
-      slug: "aura-coffee",
-      domain: "aura.coffee",
-      category: "Specialty Cafe",
-      backend: "postgres",
-      gateway: "stripe",
-      subaccount: "acct_1MKL8392011",
-      status: "Active",
-      productCount: 18,
-      ordersCount: 412,
-      totalVolume: "$21,800.00",
-      createdAt: "2026-09-18",
-    },
-    {
-      id: "t-5",
-      name: "Solstice Organic Skincare",
-      slug: "solstice-skin",
-      domain: "solsticeskin.co",
-      category: "Beauty & Wellness",
-      backend: "postgres",
-      gateway: "paystack",
-      subaccount: "ACCT_3392019481",
-      status: "Active",
-      productCount: 35,
-      ordersCount: 189,
-      totalVolume: "$18,450.00",
-      createdAt: "2026-09-24",
-    },
-  ]);
+  const [tenants, setTenants] = useState<TenantRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const loadTenants = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const res = await getTenants({ search: searchTerm.trim() || undefined });
+      if (res.data?.items) {
+        setTenants(res.data.items);
+      }
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : "Failed to load tenants list";
+      toast.error(msg);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, [searchTerm]);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setCurrentPage(1);
+      loadTenants();
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [loadTenants]);
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    loadTenants();
+  };
 
   const filteredTenants = tenants.filter((t) => {
-    const matchesSearch =
-      t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.slug.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.domain.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory =
       categoryFilter === "all" || t.category === categoryFilter;
-    return matchesSearch && matchesCategory;
+    return matchesCategory;
   });
 
-  const handleCreateTenant = (e: React.FormEvent) => {
+  const totalPages = Math.ceil(filteredTenants.length / pageSize) || 1;
+  const paginatedTenants = filteredTenants.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  );
+
+  const handleCreateTenant = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newStoreName || !newStoreSlug) {
       toast.error("Please provide both store name and URL slug.");
       return;
     }
 
-    const created: TenantRecord = {
-      id: `t-${tenants.length + 1}`,
-      name: newStoreName,
-      slug: newStoreSlug.toLowerCase().replace(/[^a-z0-9-]/g, "-"),
-      domain: `${newStoreSlug}.ecommerce-hub.com`,
-      category: newCategory,
-      backend: newBackend,
-      gateway: "paystack",
-      subaccount: `ACCT_${Math.floor(1000000000 + Math.random() * 9000000000)}`,
-      status: "Active",
-      productCount: 0,
-      ordersCount: 0,
-      totalVolume: "$0.00",
-      createdAt: new Date().toISOString().split("T")[0],
-    };
+    setIsSubmitting(true);
+    try {
+      const cleanedSlug = newStoreSlug
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, "-")
+        .replace(/-+/g, "-");
 
-    setTenants([created, ...tenants]);
-    setIsCreateOpen(false);
-    setNewStoreName("");
-    setNewStoreSlug("");
-    toast.success(
-      `Store "${created.name}" provisioned successfully on Neon Postgres!`,
-    );
+      const res = await createTenant({
+        name: newStoreName.trim(),
+        slug: cleanedSlug,
+        category: newCategory,
+        backend_type: newBackend,
+        default_gateway: "paystack",
+      });
+
+      if (res.data) {
+        toast.success(
+          `Store "${res.data.name}" provisioned successfully on Neon Postgres!`,
+        );
+        setIsCreateOpen(false);
+        setNewStoreName("");
+        setNewStoreSlug("");
+        loadTenants();
+      }
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : "Failed to provision store";
+      toast.error(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -172,19 +150,34 @@ export default function CoreTenantsPage() {
             Multi-Tenant Storefront Directory
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Manage store boundaries, custom domains, payment subaccounts, and
-            data layer adapters
+            Manage live store boundaries, custom domains, payment subaccounts,
+            and data layer adapters
           </p>
         </div>
 
-        <Button
-          size="md"
-          onClick={() => setIsCreateOpen(true)}
-          className="gap-1.5 h-8 text-xs cursor-pointer self-start md:self-auto"
-        >
-          <Plus className="size-3.5" />
-          <span>Provision New Store</span>
-        </Button>
+        <div className="flex items-center gap-2 self-start md:self-auto">
+          <Button
+            variant="outline"
+            size="md"
+            onClick={handleRefresh}
+            disabled={isRefreshing || isLoading}
+            className="gap-1.5 h-8 text-xs cursor-pointer"
+          >
+            <RefreshCw
+              className={`size-3.5 ${isRefreshing ? "animate-spin" : ""}`}
+            />
+            <span>Refresh</span>
+          </Button>
+
+          <Button
+            size="md"
+            onClick={() => setIsCreateOpen(true)}
+            className="gap-1.5 h-8 text-xs cursor-pointer"
+          >
+            <Plus className="size-3.5" />
+            <span>Provision New Store</span>
+          </Button>
+        </div>
       </div>
 
       {/* Filters & Search Row */}
@@ -195,7 +188,7 @@ export default function CoreTenantsPage() {
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Filter stores by name, slug, domain..."
+            placeholder="Filter stores by name, slug, category..."
             className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-border bg-card text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
           />
         </div>
@@ -213,100 +206,255 @@ export default function CoreTenantsPage() {
 
       {/* Tenants Table */}
       <div className="bg-card border border-border rounded-xl overflow-hidden shadow-xs">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="border-b border-border bg-card-gray/30 dark:bg-white/5 text-[11px] text-muted-foreground">
-                <th className="p-3.5 font-medium">Store & Subdomain</th>
-                <th className="p-3.5 font-medium">Category</th>
-                <th className="p-3.5 font-medium">Data Adapter</th>
-                <th className="p-3.5 font-medium">Payment Subaccount</th>
-                <th className="p-3.5 font-medium">Products / Orders</th>
-                <th className="p-3.5 font-medium">Total Volume (GMV)</th>
-                <th className="p-3.5 font-medium">Status</th>
-                <th className="p-3.5 font-medium text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {filteredTenants.map((t) => (
-                <tr key={t.id} className="hover:bg-muted/40 transition-colors">
-                  <td className="p-3.5">
-                    <div className="font-bold text-foreground text-[13px] flex items-center gap-1.5">
-                      <span>{t.name}</span>
+        <Table>
+          <TableHeader className="bg-muted/50 border-b border-border">
+            <TableRow className="border-border hover:bg-transparent">
+              <TableHead className="text-xs font-semibold text-muted-foreground">
+                Store & Subdomain
+              </TableHead>
+              <TableHead className="text-xs font-semibold text-muted-foreground">
+                Category
+              </TableHead>
+              <TableHead className="text-xs font-semibold text-muted-foreground">
+                Data Adapter
+              </TableHead>
+              <TableHead className="text-xs font-semibold text-muted-foreground">
+                Payment Subaccount
+              </TableHead>
+              <TableHead className="text-xs font-semibold text-muted-foreground">
+                Products / Orders
+              </TableHead>
+              <TableHead className="text-xs font-semibold text-muted-foreground">
+                Total Volume (GMV)
+              </TableHead>
+              <TableHead className="text-xs font-semibold text-muted-foreground">
+                Status
+              </TableHead>
+              <TableHead className="text-xs font-semibold text-muted-foreground text-right">
+                Actions
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <TableRow key={i} className="border-border">
+                  <TableCell className="p-3.5">
+                    <div className="space-y-1.5">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-3 w-40" />
                     </div>
-                    <div className="text-[11px]  text-muted-foreground mt-0.5 flex items-center gap-1">
-                      <span>{t.slug}.ecommerce-hub.com</span>
-                    </div>
-                  </td>
-                  <td className="p-3.5">
-                    <span className="px-2 py-0.5 rounded-md bg-card-gray border border-border text-[11px] text-foreground font-medium">
-                      {t.category}
-                    </span>
-                  </td>
-                  <td className="p-3.5">
-                    {t.backend === "postgres" ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 text-[10px] font-semibold">
-                        <Database className="size-2.5" />
-                        Neon Postgres
+                  </TableCell>
+                  <TableCell className="p-3.5">
+                    <Skeleton className="h-5 w-24 rounded-md" />
+                  </TableCell>
+                  <TableCell className="p-3.5">
+                    <Skeleton className="h-5 w-20 rounded-full" />
+                  </TableCell>
+                  <TableCell className="p-3.5">
+                    <Skeleton className="h-4 w-28" />
+                  </TableCell>
+                  <TableCell className="p-3.5">
+                    <Skeleton className="h-4 w-20" />
+                  </TableCell>
+                  <TableCell className="p-3.5">
+                    <Skeleton className="h-4 w-24" />
+                  </TableCell>
+                  <TableCell className="p-3.5">
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                  </TableCell>
+                  <TableCell className="p-3.5 text-right">
+                    <Skeleton className="h-7 w-16 ml-auto rounded-md" />
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : filteredTenants.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={8}
+                  className="text-center py-12 text-muted-foreground text-xs"
+                >
+                  <Store className="size-8 text-muted-foreground/40 mx-auto mb-2" />
+                  No stores found matching your criteria.
+                </TableCell>
+              </TableRow>
+            ) : (
+              paginatedTenants.map((t) => {
+                const subaccount =
+                  t.paystack_subaccount_code ||
+                  t.stripe_account_id ||
+                  "Subaccount Direct";
+                const gateway = (t.default_gateway || "paystack") as
+                  | "paystack"
+                  | "stripe";
+                const storeDomain = t.custom_domain
+                  ? t.custom_domain
+                  : `${t.slug}.localhost:3000`;
+
+                return (
+                  <TableRow
+                    key={t.id}
+                    className="hover:bg-muted/40 transition-colors border-border"
+                  >
+                    <TableCell className="p-3.5">
+                      <div className="font-bold text-foreground text-[13px] flex items-center gap-1.5">
+                        <span>{t.name}</span>
+                      </div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1 font-mono">
+                        <span>{storeDomain}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="p-3.5">
+                      <span className="px-2 py-0.5 rounded-md bg-card-gray border border-border text-[11px] text-foreground font-medium">
+                        {t.category || "General Retail"}
                       </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[10px] font-semibold">
-                        <Layers className="size-2.5" />
-                        Sanity CMS
+                    </TableCell>
+                    <TableCell className="p-3.5">
+                      {t.backend_type === "sanity" ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[10px] font-semibold">
+                          <Layers className="size-2.5" />
+                          Sanity CMS
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 text-[10px] font-semibold">
+                          <Database className="size-2.5" />
+                          Neon Postgres
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="p-3.5 text-[11px]">
+                      <div className="font-semibold text-foreground mb-1">
+                        <PaymentGatewayLogo gateway={gateway} />
+                      </div>
+                      <div className="text-muted-foreground text-[10px] font-mono">
+                        {subaccount}
+                      </div>
+                    </TableCell>
+                    <TableCell className="p-3.5">
+                      <div className="text-foreground font-medium">
+                        {t.product_count ?? 0} items
+                      </div>
+                      <div className="text-muted-foreground text-[10px]">
+                        {t.orders_count ?? 0} orders
+                      </div>
+                    </TableCell>
+                    <TableCell className="p-3.5 font-bold text-foreground text-[13px]">
+                      {formatCurrency(t.total_volume ?? 0, t.currency || "NGN")}
+                    </TableCell>
+                    <TableCell className="p-3.5">
+                      <span
+                        className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                          t.is_active !== false
+                            ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
+                            : "text-rose-600 dark:text-rose-400 bg-rose-500/10"
+                        }`}
+                      >
+                        <CheckCircle2 className="size-2.5" />
+                        {t.is_active !== false ? "Active" : "Suspended"}
                       </span>
-                    )}
-                  </td>
-                  <td className="p-3.5 text-[11px]">
-                    <div className="font-semibold text-foreground mb-1">
-                      <PaymentGatewayLogo gateway={t.gateway} />
-                    </div>
-                    <div className="text-muted-foreground text-[10px]">
-                      {t.subaccount}
-                    </div>
-                  </td>
-                  <td className="p-3.5">
-                    <div className="text-foreground font-medium">
-                      {t.productCount} items
-                    </div>
-                    <div className="text-muted-foreground text-[10px]">
-                      {t.ordersCount} orders
-                    </div>
-                  </td>
-                  <td className="p-3.5 font-bold  text-foreground text-[13px]">
-                    {t.totalVolume}
-                  </td>
-                  <td className="p-3.5">
-                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                      <CheckCircle2 className="size-2.5" />
-                      {t.status}
-                    </span>
-                  </td>
-                  <td className="p-3.5 text-right">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <Link
-                        href={`/${t.slug}`}
-                        target="_blank"
-                        className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-primary transition-colors inline-flex items-center"
-                        title="View Storefront"
-                      >
-                        <ExternalLink className="size-3.5" />
-                      </Link>
-                      <Link
-                        href={`/${t.slug}/admin`}
-                        target="_blank"
-                        className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-primary transition-colors inline-flex items-center"
-                        title="Tenant Admin Portal"
-                      >
-                        <Settings className="size-3.5" />
-                      </Link>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    </TableCell>
+                    <TableCell className="p-3.5 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <a
+                          href={getTenantSubdomainUrl(t.slug)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-primary transition-colors inline-flex items-center"
+                          title="Visit Live Storefront"
+                        >
+                          <ExternalLink className="size-3.5" />
+                        </a>
+                        <Link
+                          href={getTenantRoute(t.slug, "/dashboard")}
+                          target="_blank"
+                          className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-primary transition-colors inline-flex items-center"
+                          title="Tenant Admin Dashboard"
+                        >
+                          <Settings className="size-3.5" />
+                        </Link>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
       </div>
+
+      {/* Pagination Footer */}
+      {totalPages > 1 && (
+        <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <span className="text-xs text-muted-foreground">
+            Showing{" "}
+            <strong className="text-foreground">
+              {(currentPage - 1) * pageSize + 1}
+            </strong>{" "}
+            to{" "}
+            <strong className="text-foreground">
+              {Math.min(currentPage * pageSize, filteredTenants.length)}
+            </strong>{" "}
+            of{" "}
+            <strong className="text-foreground">
+              {filteredTenants.length}
+            </strong>{" "}
+            stores
+          </span>
+
+          <Pagination className="mx-0 w-auto">
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (currentPage > 1) setCurrentPage(currentPage - 1);
+                  }}
+                  className={
+                    currentPage <= 1
+                      ? "pointer-events-none opacity-50"
+                      : "cursor-pointer"
+                  }
+                />
+              </PaginationItem>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                (pageNum) => (
+                  <PaginationItem key={pageNum}>
+                    <PaginationLink
+                      href="#"
+                      isActive={currentPage === pageNum}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setCurrentPage(pageNum);
+                      }}
+                      className="cursor-pointer text-xs"
+                    >
+                      {pageNum}
+                    </PaginationLink>
+                  </PaginationItem>
+                ),
+              )}
+
+              <PaginationItem>
+                <PaginationNext
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (currentPage < totalPages)
+                      setCurrentPage(currentPage + 1);
+                  }}
+                  className={
+                    currentPage >= totalPages
+                      ? "pointer-events-none opacity-50"
+                      : "cursor-pointer"
+                  }
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
 
       {/* Provision Store Modal */}
       {isCreateOpen && (
@@ -368,7 +516,7 @@ export default function CoreTenantsPage() {
                     onChange={(e) => setNewStoreSlug(e.target.value)}
                     className="flex-1 px-3 py-2 bg-transparent text-foreground focus:outline-none"
                   />
-                  <span className="px-2.5 py-2 bg-muted/50 text-muted-foreground  text-[11px] border-l border-border">
+                  <span className="px-2.5 py-2 bg-muted/50 text-muted-foreground text-[11px] border-l border-border">
                     .ecommerce-hub.com
                   </span>
                 </div>
@@ -391,6 +539,7 @@ export default function CoreTenantsPage() {
                   <option value="Interior Design">Interior Design</option>
                   <option value="Beauty & Wellness">Beauty & Wellness</option>
                   <option value="Boutique & Retail">Boutique & Retail</option>
+                  <option value="Artisanal Goods">Artisanal Goods</option>
                 </select>
               </div>
 
@@ -443,9 +592,10 @@ export default function CoreTenantsPage() {
                 <Button
                   type="submit"
                   size="md"
+                  disabled={isSubmitting}
                   className="h-8 text-xs cursor-pointer"
                 >
-                  Provision Storefront
+                  {isSubmitting ? "Provisioning..." : "Provision Storefront"}
                 </Button>
               </div>
             </form>

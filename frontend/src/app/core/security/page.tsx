@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   ShieldCheck,
   Lock,
@@ -11,9 +12,28 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useUserStore } from "@/store/user";
 import { UserAvatar } from "@/components/shared/user-avatar";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+} from "@/components/ui/table";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 export default function CoreSecurityPage() {
   const { user } = useUserStore();
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 5;
+
   const auditLogs = [
     {
       id: "LOG-3091",
@@ -56,6 +76,12 @@ export default function CoreSecurityPage() {
       status: "Success",
     },
   ];
+
+  const totalPages = Math.ceil(auditLogs.length / pageSize) || 1;
+  const paginatedLogs = auditLogs.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  );
 
   return (
     <div className="flex flex-col gap-5 w-full pb-8">
@@ -135,76 +161,157 @@ export default function CoreSecurityPage() {
           </span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="border-b border-border bg-card-gray/30 dark:bg-white/5 text-[11px] text-muted-foreground">
-                <th className="p-3.5 font-medium">Log ID</th>
-                <th className="p-3.5 font-medium">Event Description</th>
-                <th className="p-3.5 font-medium">Actor / Email</th>
-                <th className="p-3.5 font-medium">Role</th>
-                <th className="p-3.5 font-medium">Origin IP</th>
-                <th className="p-3.5 font-medium">Timestamp</th>
-                <th className="p-3.5 font-medium text-right">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {auditLogs.map((log) => (
-                <tr
-                  key={log.id}
-                  className="hover:bg-muted/40 transition-colors"
-                >
-                  <td className="p-3.5  text-[11px] text-muted-foreground">
-                    {log.id}
-                  </td>
-                  <td className="p-3.5 font-semibold text-foreground">
-                    {log.event}
-                  </td>
-                  <td className="p-3.5">
-                    <div className="flex items-center gap-2">
-                      <UserAvatar
-                        src={
-                          user?.email === log.actor
-                            ? user.avatar_url
-                            : undefined
-                        }
-                        email={log.actor}
-                        name={
-                          log.actor.includes("@")
-                            ? log.actor.split("@")[0]
-                            : log.actor
-                        }
-                        size="xs"
-                        shape="rounded"
-                      />
-                      <span className=" text-[11px] text-muted-foreground truncate">
-                        {log.actor}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="p-3.5">
-                    <span className="px-2 py-0.5 rounded bg-primary/10 text-primary  text-[10px] font-semibold">
-                      {log.role}
+        <Table>
+          <TableHeader className="bg-card-gray/30 dark:bg-white/5 border-b border-border">
+            <TableRow className="border-border hover:bg-transparent">
+              <TableHead className="text-xs font-semibold text-muted-foreground">
+                Log ID
+              </TableHead>
+              <TableHead className="text-xs font-semibold text-muted-foreground">
+                Event Description
+              </TableHead>
+              <TableHead className="text-xs font-semibold text-muted-foreground">
+                Actor / Email
+              </TableHead>
+              <TableHead className="text-xs font-semibold text-muted-foreground">
+                Role
+              </TableHead>
+              <TableHead className="text-xs font-semibold text-muted-foreground">
+                Origin IP
+              </TableHead>
+              <TableHead className="text-xs font-semibold text-muted-foreground">
+                Timestamp
+              </TableHead>
+              <TableHead className="text-xs font-semibold text-muted-foreground text-right">
+                Status
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {paginatedLogs.map((log) => (
+              <TableRow
+                key={log.id}
+                className="hover:bg-muted/40 transition-colors border-border"
+              >
+                <TableCell className="p-3.5 text-[11px] text-muted-foreground">
+                  {log.id}
+                </TableCell>
+                <TableCell className="p-3.5 font-semibold text-foreground text-xs">
+                  {log.event}
+                </TableCell>
+                <TableCell className="p-3.5">
+                  <div className="flex items-center gap-2">
+                    <UserAvatar
+                      src={
+                        user?.email === log.actor ? user.avatar_url : undefined
+                      }
+                      email={log.actor}
+                      name={
+                        log.actor.includes("@")
+                          ? log.actor.split("@")[0]
+                          : log.actor
+                      }
+                      size="xs"
+                      shape="rounded"
+                    />
+                    <span className="text-[11px] text-muted-foreground truncate">
+                      {log.actor}
                     </span>
-                  </td>
-                  <td className="p-3.5  text-[11px] text-muted-foreground">
-                    {log.ip}
-                  </td>
-                  <td className="p-3.5 text-muted-foreground text-[11px]">
-                    {log.time}
-                  </td>
-                  <td className="p-3.5 text-right">
-                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                      <CheckCircle2 className="size-2.5" />
-                      {log.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  </div>
+                </TableCell>
+                <TableCell className="p-3.5">
+                  <span className="px-2 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-semibold">
+                    {log.role}
+                  </span>
+                </TableCell>
+                <TableCell className="p-3.5 text-[11px] text-muted-foreground">
+                  {log.ip}
+                </TableCell>
+                <TableCell className="p-3.5 text-muted-foreground text-[11px]">
+                  {log.time}
+                </TableCell>
+                <TableCell className="p-3.5 text-right">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                    <CheckCircle2 className="size-2.5" />
+                    {log.status}
+                  </span>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </div>
+
+      {/* Pagination Footer */}
+      {totalPages > 1 && (
+        <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <span className="text-xs text-muted-foreground">
+            Showing{" "}
+            <strong className="text-foreground">
+              {(currentPage - 1) * pageSize + 1}
+            </strong>{" "}
+            to{" "}
+            <strong className="text-foreground">
+              {Math.min(currentPage * pageSize, auditLogs.length)}
+            </strong>{" "}
+            of <strong className="text-foreground">{auditLogs.length}</strong>{" "}
+            logs
+          </span>
+
+          <Pagination className="mx-0 w-auto">
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (currentPage > 1) setCurrentPage(currentPage - 1);
+                  }}
+                  className={
+                    currentPage <= 1
+                      ? "pointer-events-none opacity-50"
+                      : "cursor-pointer"
+                  }
+                />
+              </PaginationItem>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                (pageNum) => (
+                  <PaginationItem key={pageNum}>
+                    <PaginationLink
+                      href="#"
+                      isActive={currentPage === pageNum}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setCurrentPage(pageNum);
+                      }}
+                      className="cursor-pointer text-xs"
+                    >
+                      {pageNum}
+                    </PaginationLink>
+                  </PaginationItem>
+                ),
+              )}
+
+              <PaginationItem>
+                <PaginationNext
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (currentPage < totalPages)
+                      setCurrentPage(currentPage + 1);
+                  }}
+                  className={
+                    currentPage >= totalPages
+                      ? "pointer-events-none opacity-50"
+                      : "cursor-pointer"
+                  }
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
     </div>
   );
 }

@@ -50,6 +50,21 @@ export function setAuthSession(
     user.role,
     refreshCookieOptions,
   );
+
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem("auth_token", token);
+      localStorage.setItem("auth_session", token);
+      if (refreshToken) {
+        localStorage.setItem("refresh_token", refreshToken);
+      }
+      if (user.role) {
+        localStorage.setItem("userRole", user.role);
+      }
+    } catch {
+      // Ignore quota errors
+    }
+  }
 }
 
 export function clearAuthSession() {
@@ -113,5 +128,17 @@ export function getRefreshToken(): string | undefined {
     (getCookie("refresh_token") as string | undefined) ||
     (getCookie("auth_refresh_token") as string | undefined);
   if (cookieVal && cookieVal.trim().length > 0) return cookieVal;
+
+  if (typeof window !== "undefined") {
+    try {
+      const localVal =
+        localStorage.getItem("refresh_token") ||
+        localStorage.getItem("auth_refresh_token") ||
+        sessionStorage.getItem("refresh_token");
+      if (localVal && localVal.trim().length > 0) return localVal;
+    } catch {
+      // Ignore storage access errors
+    }
+  }
   return undefined;
 }

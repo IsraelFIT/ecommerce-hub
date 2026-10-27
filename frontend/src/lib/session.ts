@@ -110,17 +110,41 @@ export function getSessionTokenClient(): string | undefined {
  * Returns the current active session object with tokens and role.
  */
 export async function getSession(): Promise<ClientSession | null> {
-  const accessToken =
+  let accessToken =
     (getCookie(AUTH_TOKEN_KEY) as string | undefined) ||
     (getCookie("auth_session") as string | undefined) ||
     (getCookie("auth_token") as string | undefined);
-  const refreshToken =
+  let refreshToken =
     (getCookie(REFRESH_TOKEN_KEY) as string | undefined) ||
     (getCookie("refresh_token") as string | undefined) ||
     (getCookie("auth_refresh_token") as string | undefined);
-  const role =
+  let role =
     (getCookie(USER_ROLE_KEY) as string | undefined) ||
     (getCookie("userRole") as string | undefined);
+
+  // Client-side fallback to persistent browser storage if cookies are host-isolated or not yet synced
+  if (typeof window !== "undefined") {
+    if (!accessToken) {
+      accessToken =
+        localStorage.getItem("auth_token") ||
+        localStorage.getItem("auth_session") ||
+        sessionStorage.getItem("auth_token") ||
+        undefined;
+    }
+    if (!refreshToken) {
+      refreshToken =
+        localStorage.getItem("refresh_token") ||
+        localStorage.getItem("auth_refresh_token") ||
+        sessionStorage.getItem("refresh_token") ||
+        undefined;
+    }
+    if (!role) {
+      role =
+        localStorage.getItem("userRole") ||
+        sessionStorage.getItem("userRole") ||
+        undefined;
+    }
+  }
 
   if (!accessToken && !refreshToken) {
     return null;
@@ -196,6 +220,22 @@ export async function createSession(
   if (role) {
     setCookie(USER_ROLE_KEY, role, refreshCookieOptions);
     setCookie("userRole", role, refreshCookieOptions);
+  }
+
+  // Mirror tokens in client-side storage for robust resilience against cross-subdomain cookie drops
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem("auth_token", accessToken);
+      localStorage.setItem("auth_session", accessToken);
+      if (refreshToken) {
+        localStorage.setItem("refresh_token", refreshToken);
+      }
+      if (role) {
+        localStorage.setItem("userRole", role);
+      }
+    } catch {
+      // Ignore quota errors
+    }
   }
 }
 

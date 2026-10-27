@@ -181,4 +181,9 @@ class TenantResponse(TenantBase):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+    product_count: Optional[int] = 0
+    orders_count: Optional[int] = 0
+    total_volume: Optional[float] = 0.0
+    status: Optional[str] = "Active"
+
 

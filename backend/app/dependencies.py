@@ -344,11 +344,12 @@ async def get_current_super_admin(
     user: User = Depends(get_current_user),
 ) -> User:
     """
-    Ensures that the authenticated user possesses super_admin privileges.
+    Ensures that the authenticated user possesses super_admin or hub_admin privileges.
     """
-    if user.role not in ["super_admin", "admin"]:
+    if user.role not in ["super_admin", "admin", "hub_admin"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Platform super administrative privileges required.",
         )
     return user
+

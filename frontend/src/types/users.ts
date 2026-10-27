@@ -231,6 +231,26 @@ export interface TenantCustomerSummary {
   created_at?: string | null;
 }
 
+export interface CoreUserOrder {
+  id: string;
+  order_number: string;
+  created_at?: string | null;
+  total_amount: number;
+  currency: string;
+  status: string;
+  payment_gateway: string;
+  items_count: number;
+  items: Array<{
+    product_name?: string;
+    name?: string;
+    quantity?: number;
+    price?: number;
+    image?: string;
+  }>;
+  tenant_name?: string | null;
+  tenant_slug?: string | null;
+}
+
 export interface CoreUserDetailResponse {
   id: string;
   first_name: string;
@@ -260,7 +280,15 @@ export interface CoreUserDetailResponse {
     avg_order_value: number;
     currency: string;
   };
+  user_stats?: {
+    orders_count: number;
+    total_spent: number;
+    avg_order_value: number;
+    last_order_at?: string | null;
+    currency: string;
+  };
   customers: TenantCustomerSummary[];
+  orders?: CoreUserOrder[];
 }
 
 export interface UpdateUserRoleInput {
@@ -305,4 +333,36 @@ export interface CoreRevenueData {
   transactions: CoreSplitTransaction[];
   total_orders: number;
   primary_currency: string;
+}
+
+export interface TenantRecord {
+  id: string;
+  name: string;
+  slug: string;
+  category?: string;
+  country?: string;
+  currency?: string;
+  custom_domain?: string | null;
+  backend_type?: "postgres" | "sanity";
+  default_gateway?: string;
+  paystack_subaccount_code?: string | null;
+  stripe_account_id?: string | null;
+  product_count?: number;
+  orders_count?: number;
+  total_volume?: number;
+  status?: string;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CreateTenantPayload {
+  name: string;
+  slug: string;
+  category?: string;
+  country?: string;
+  currency?: string;
+  backend_type?: "postgres" | "sanity";
+  default_gateway?: string;
+  custom_domain?: string;
 }

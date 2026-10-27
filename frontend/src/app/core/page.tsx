@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   DollarSign,
@@ -9,26 +9,96 @@ import {
   TrendingUp,
   Activity,
   CheckCircle2,
-  ExternalLink,
   ShieldCheck,
   Zap,
   ArrowRight,
+  RefreshCw,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { formatCurrency } from "@/utils/helper";
+import { Skeleton } from "@/components/ui/skeleton";
+import { formatCurrency, getTenantSubdomainUrl } from "@/utils/helper";
+import { getCoreRevenueAnalytics } from "@/lib/api/payments";
+import { getTenants } from "@/lib/api/tenants";
+import { CoreRevenueData, TenantRecord } from "@/types";
+import { useUserStore } from "@/store/user";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+} from "@/components/ui/table";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 export default function CoreDashboardPage() {
   const [selectedRange, setSelectedRange] = useState("30d");
+  const { user } = useUserStore();
 
-  // Sample real-time platform ecosystem metrics
+  const [revenueData, setRevenueData] = useState<CoreRevenueData | null>(null);
+  const [tenants, setTenants] = useState<TenantRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const loadDashboardData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const [revRes, tenantRes] = await Promise.all([
+        getCoreRevenueAnalytics().catch(() => null),
+        getTenants().catch(() => null),
+      ]);
+
+      if (revRes?.data) {
+        setRevenueData(revRes.data);
+      }
+      if (tenantRes?.data?.items) {
+        setTenants(tenantRes.data.items);
+      }
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    loadDashboardData();
+  };
+
+  // Derive metrics from real database data
+  const primaryCurrency = revenueData?.primary_currency || "NGN";
+  const transactions = revenueData?.transactions || [];
+
+  const totalGMV =
+    revenueData?.metrics?.find((m) => m.id === "gmv")?.rawAmount ??
+    transactions.reduce((acc, tx) => acc + (tx.gross || 0), 0);
+
+  const platformFee =
+    revenueData?.metrics?.find((m) => m.id === "fees")?.rawAmount ??
+    transactions.reduce((acc, tx) => acc + (tx.platformFee || 0), 0);
+
+  const totalStores = tenants.length;
+
   const stats = [
     {
       title: "Gross Platform Volume (GMV)",
-      value: "$284,520.00",
-      change: "+18.4%",
+      value: formatCurrency(totalGMV, primaryCurrency),
+      change: `${transactions.length} total orders recorded`,
       trend: "up",
-      subtitle: "Across 18 multi-tenant stores",
+      subtitle: `Across ${totalStores} multi-tenant stores`,
       icon: DollarSign,
       color: "text-emerald-500",
       bg: "bg-emerald-500/10",
@@ -36,10 +106,10 @@ export default function CoreDashboardPage() {
     },
     {
       title: "Platform Fee Revenue (2.5%)",
-      value: "$7,113.00",
-      change: "+22.1%",
+      value: formatCurrency(platformFee, primaryCurrency),
+      change: "Automatic 2.5% take-rate",
       trend: "up",
-      subtitle: "Automatic split take-rate",
+      subtitle: "Paystack & Stripe automated split",
       icon: TrendingUp,
       color: "text-primary",
       bg: "bg-primary/10",
@@ -47,8 +117,8 @@ export default function CoreDashboardPage() {
     },
     {
       title: "Active Tenants & Stores",
-      value: "18",
-      change: "+3 this month",
+      value: String(totalStores),
+      change: `${totalStores} stores provisioned`,
       trend: "up",
       subtitle: "100% database isolated",
       icon: Store,
@@ -69,99 +139,26 @@ export default function CoreDashboardPage() {
     },
   ];
 
-  const recentTenants = [
-    {
-      id: "t-1",
-      name: "Jazz Cakes LTD",
-      slug: "jazz-cakes",
-      domain: "cakes.jazz-luxury.com",
-      category: "Bakery & Confectionery",
-      backend: "Postgres (Neon)",
-      splitStatus: "Paystack Split Active",
-      revenue: "$48,920.00",
-      status: "Active",
-    },
-    {
-      id: "t-2",
-      name: "Velvet Couture Atelier",
-      slug: "velvet-couture",
-      domain: "velvetcouture.io",
-      category: "Luxury Fashion",
-      backend: "Sanity CMS + Postgres",
-      splitStatus: "Stripe Connect",
-      revenue: "$92,400.00",
-      status: "Active",
-    },
-    {
-      id: "t-3",
-      name: "Nordic Minimalist Home",
-      slug: "nordic-home",
-      domain: "nordichome.store",
-      category: "Interior Design",
-      backend: "Postgres (Neon)",
-      splitStatus: "Paystack Split Active",
-      revenue: "$34,150.00",
-      status: "Active",
-    },
-    {
-      id: "t-4",
-      name: "Aura Artisan Coffee",
-      slug: "aura-coffee",
-      domain: "aura.coffee",
-      category: "Specialty Cafe",
-      backend: "Postgres (Neon)",
-      splitStatus: "Stripe Connect",
-      revenue: "$21,800.00",
-      status: "Active",
-    },
-  ];
+  // Top stores sorted by total volume or orders
+  const topTenants = [...tenants].sort(
+    (a, b) => (b.total_volume ?? 0) - (a.total_volume ?? 0),
+  );
 
-  const recentTransactions = [
-    {
-      id: "TX-9482",
-      tenant: "Jazz Cakes LTD",
-      customer: "Amara Johnson",
-      gross: 185.0,
-      fee: 4.63,
-      payout: 180.37,
-      gateway: "Paystack Subaccount",
-      status: "Settled",
-      time: "4 mins ago",
-    },
-    {
-      id: "TX-9481",
-      tenant: "Velvet Couture Atelier",
-      customer: "Kelechi Obi",
-      gross: 650.0,
-      fee: 16.25,
-      payout: 633.75,
-      gateway: "Stripe Split",
-      status: "Settled",
-      time: "18 mins ago",
-    },
-    {
-      id: "TX-9480",
-      tenant: "Nordic Minimalist Home",
-      customer: "Sarah Jenkins",
-      gross: 320.0,
-      fee: 8.0,
-      payout: 312.0,
-      gateway: "Paystack Subaccount",
-      status: "Settled",
-      time: "42 mins ago",
-    },
-    {
-      id: "TX-9479",
-      tenant: "Aura Artisan Coffee",
-      customer: "David Chen",
-      gross: 45.0,
-      fee: 1.13,
-      payout: 43.87,
-      gateway: "Stripe Split",
-      status: "Settled",
-      time: "1 hour ago",
-    },
-  ];
+  const [txPage, setTxPage] = useState(1);
+  const txPageSize = 5;
+  const totalTxPages = Math.ceil(transactions.length / txPageSize) || 1;
+  const paginatedTransactions = transactions.slice(
+    (txPage - 1) * txPageSize,
+    txPage * txPageSize,
+  );
+
+  const [storesPage, setStoresPage] = useState(1);
+  const storesPageSize = 5;
+  const totalStoresPages = Math.ceil(topTenants.length / storesPageSize) || 1;
+  const paginatedTenants = topTenants.slice(
+    (storesPage - 1) * storesPageSize,
+    storesPage * storesPageSize,
+  );
 
   return (
     <div className="flex flex-col gap-5 w-full pb-8">
@@ -174,7 +171,7 @@ export default function CoreDashboardPage() {
           <p className="text-xs text-muted-foreground mt-0.5">
             Super Administrator Control Plane • Logged in as{" "}
             <span className="text-primary font-medium">
-              israelfolaranmi01@gmail.com
+              {user?.email || "Super Administrator"}
             </span>
           </p>
         </div>
@@ -198,7 +195,20 @@ export default function CoreDashboardPage() {
             ))}
           </div>
 
-          <Link href="/tenants">
+          <Button
+            variant="outline"
+            size="md"
+            onClick={handleRefresh}
+            disabled={isRefreshing || isLoading}
+            className="gap-1.5 h-8 text-xs cursor-pointer"
+          >
+            <RefreshCw
+              className={`size-3.5 ${isRefreshing ? "animate-spin" : ""}`}
+            />
+            <span>Refresh</span>
+          </Button>
+
+          <Link href="/core/tenants">
             <Button size="md" className="gap-1.5 h-8 text-xs cursor-pointer">
               <Store className="size-3.5" />
               <span>Manage Stores</span>
@@ -228,9 +238,13 @@ export default function CoreDashboardPage() {
               </div>
 
               <div className="mt-3">
-                <h3 className="text-xl md:text-2xl font-bold font-secondary text-foreground tracking-tight">
-                  {stat.value}
-                </h3>
+                {isLoading ? (
+                  <Skeleton className="h-7 w-32 my-1" />
+                ) : (
+                  <h3 className="text-xl md:text-2xl font-bold font-secondary text-foreground tracking-tight">
+                    {stat.value}
+                  </h3>
+                )}
                 <div className="flex items-center justify-between mt-1.5">
                   <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
                     {stat.change}
@@ -259,7 +273,7 @@ export default function CoreDashboardPage() {
                   <h4 className="text-sm font-bold font-secondary text-foreground">
                     Neon Postgres Infrastructure
                   </h4>
-                  <span className="text-[10px] text-muted-foreground ">
+                  <span className="text-[10px] text-muted-foreground">
                     eu-central-1 (Frankfurt)
                   </span>
                 </div>
@@ -276,17 +290,19 @@ export default function CoreDashboardPage() {
             <div className="flex flex-col gap-3 mt-3.5 text-xs">
               <div className="flex items-center justify-between p-2.5 rounded-lg bg-card-gray/50 dark:bg-white/5 border border-border">
                 <span className="text-muted-foreground">Active Branch</span>
-                <span className=" font-semibold text-primary">
+                <span className="font-semibold text-primary font-mono">
                   staging (checked out)
                 </span>
               </div>
               <div className="flex items-center justify-between p-2.5 rounded-lg bg-card-gray/50 dark:bg-white/5 border border-border">
                 <span className="text-muted-foreground">Production Branch</span>
-                <span className=" text-foreground">production (protected)</span>
+                <span className="text-foreground font-mono">
+                  production (protected)
+                </span>
               </div>
               <div className="flex items-center justify-between p-2.5 rounded-lg bg-card-gray/50 dark:bg-white/5 border border-border">
                 <span className="text-muted-foreground">Connection Pooler</span>
-                <span className=" text-emerald-600 dark:text-emerald-400 font-semibold">
+                <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
                   PgBouncer / asyncpg Active
                 </span>
               </div>
@@ -302,17 +318,17 @@ export default function CoreDashboardPage() {
 
             <div className="mt-4 pt-3 border-t border-border flex items-center justify-between">
               <Link
-                href="/adapters"
+                href="/core/tenants"
                 className="text-xs text-primary font-semibold hover:underline flex items-center gap-1"
               >
-                <span>Adapter Configuration</span>
+                <span>Store Directory</span>
                 <ArrowRight className="size-3" />
               </Link>
               <Link
-                href="/developers"
-                className="text-xs text-muted-foreground hover:text-foreground "
+                href="/core/settings"
+                className="text-xs text-muted-foreground hover:text-foreground"
               >
-                View Connection String →
+                Settings & Registry →
               </Link>
             </div>
           </div>
@@ -324,32 +340,32 @@ export default function CoreDashboardPage() {
             </h4>
             <div className="grid grid-cols-2 gap-2">
               <Link
-                href="/tenants"
+                href="/core/tenants"
                 className="flex items-center gap-2 p-2.5 rounded-lg border border-border bg-card-gray/30 dark:bg-white/5 hover:border-primary/50 hover:bg-primary/5 transition-all text-xs font-medium text-foreground group"
               >
                 <Store className="size-4 text-primary group-hover:scale-110 transition-transform" />
-                <span>Add Storefront</span>
+                <span>Store Directory</span>
               </Link>
               <Link
-                href="/revenue"
+                href="/core/users"
                 className="flex items-center gap-2 p-2.5 rounded-lg border border-border bg-card-gray/30 dark:bg-white/5 hover:border-primary/50 hover:bg-primary/5 transition-all text-xs font-medium text-foreground group"
               >
-                <DollarSign className="size-4 text-emerald-500 group-hover:scale-110 transition-transform" />
-                <span>Audit Escrow</span>
+                <ShieldCheck className="size-4 text-emerald-500 group-hover:scale-110 transition-transform" />
+                <span>Users & Roles</span>
               </Link>
               <Link
-                href="/developers"
+                href="/core/revenue"
                 className="flex items-center gap-2 p-2.5 rounded-lg border border-border bg-card-gray/30 dark:bg-white/5 hover:border-primary/50 hover:bg-primary/5 transition-all text-xs font-medium text-foreground group"
               >
-                <Zap className="size-4 text-purple-500 group-hover:scale-110 transition-transform" />
-                <span>API Keys</span>
+                <DollarSign className="size-4 text-purple-500 group-hover:scale-110 transition-transform" />
+                <span>Escrow & Revenue</span>
               </Link>
               <Link
-                href="/security"
+                href="/core/settings"
                 className="flex items-center gap-2 p-2.5 rounded-lg border border-border bg-card-gray/30 dark:bg-white/5 hover:border-primary/50 hover:bg-primary/5 transition-all text-xs font-medium text-foreground group"
               >
-                <ShieldCheck className="size-4 text-sky-500 group-hover:scale-110 transition-transform" />
-                <span>Audit Logs</span>
+                <Zap className="size-4 text-sky-500 group-hover:scale-110 transition-transform" />
+                <span>Registry Config</span>
               </Link>
             </div>
           </div>
@@ -372,7 +388,7 @@ export default function CoreDashboardPage() {
                   </span>
                 </div>
               </div>
-              <Link href="/revenue">
+              <Link href="/core/revenue">
                 <Button
                   variant="ghost"
                   size="md"
@@ -384,132 +400,401 @@ export default function CoreDashboardPage() {
               </Link>
             </div>
 
-            <div className="mt-3 overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-border text-[11px] text-muted-foreground">
-                    <th className="py-2 font-medium">Tx ID / Time</th>
-                    <th className="py-2 font-medium">Tenant Store</th>
-                    <th className="py-2 font-medium">Gross Total</th>
-                    <th className="py-2 font-medium text-primary">
+            <div className="mt-3 overflow-hidden rounded-lg border border-border">
+              <Table>
+                <TableHeader className="bg-muted/40 border-b border-border">
+                  <TableRow className="border-border hover:bg-transparent">
+                    <TableHead className="py-2.5 text-xs font-semibold text-muted-foreground">
+                      Tx ID / Date
+                    </TableHead>
+                    <TableHead className="py-2.5 text-xs font-semibold text-muted-foreground">
+                      Tenant Store
+                    </TableHead>
+                    <TableHead className="py-2.5 text-xs font-semibold text-muted-foreground">
+                      Gross Total
+                    </TableHead>
+                    <TableHead className="py-2.5 text-xs font-semibold text-primary">
                       Fee (2.5%)
-                    </th>
-                    <th className="py-2 font-medium text-emerald-600 dark:text-emerald-400">
+                    </TableHead>
+                    <TableHead className="py-2.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
                       Tenant Payout
-                    </th>
-                    <th className="py-2 font-medium">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {recentTransactions.map((tx) => (
-                    <tr
-                      key={tx.id}
-                      className="hover:bg-muted/40 transition-colors"
-                    >
-                      <td className="py-2.5 ">
-                        <div className="font-semibold text-foreground">
-                          {tx.id}
-                        </div>
-                        <div className="text-[10px] text-muted-foreground">
-                          {tx.time}
-                        </div>
-                      </td>
-                      <td className="py-2.5">
-                        <div className="font-medium text-foreground">
-                          {tx.tenant}
-                        </div>
-                        <div className="text-[10px] text-muted-foreground ">
-                          {tx.gateway}
-                        </div>
-                      </td>
-                      <td className="py-2.5 font-semibold text-foreground ">
-                        {formatCurrency(tx.gross)}
-                      </td>
-                      <td className="py-2.5 font-semibold text-primary ">
-                        +{formatCurrency(tx.fee)}
-                      </td>
-                      <td className="py-2.5 font-semibold text-emerald-600 dark:text-emerald-400 ">
-                        {formatCurrency(tx.payout)}
-                      </td>
-                      <td className="py-2.5">
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                          <CheckCircle2 className="size-2.5" />
-                          {tx.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                    </TableHead>
+                    <TableHead className="py-2.5 text-xs font-semibold text-muted-foreground">
+                      Status
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    Array.from({ length: 4 }).map((_, i) => (
+                      <TableRow key={i} className="border-border">
+                        <TableCell className="py-2.5">
+                          <Skeleton className="h-4 w-20 mb-1" />
+                          <Skeleton className="h-3 w-14" />
+                        </TableCell>
+                        <TableCell className="py-2.5">
+                          <Skeleton className="h-4 w-24 mb-1" />
+                          <Skeleton className="h-3 w-16" />
+                        </TableCell>
+                        <TableCell className="py-2.5">
+                          <Skeleton className="h-4 w-16" />
+                        </TableCell>
+                        <TableCell className="py-2.5">
+                          <Skeleton className="h-4 w-16" />
+                        </TableCell>
+                        <TableCell className="py-2.5">
+                          <Skeleton className="h-4 w-16" />
+                        </TableCell>
+                        <TableCell className="py-2.5">
+                          <Skeleton className="h-5 w-16 rounded-full" />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : transactions.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={6}
+                        className="py-8 text-center text-muted-foreground text-xs"
+                      >
+                        No platform split transactions recorded yet.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    paginatedTransactions.map((tx) => (
+                      <TableRow
+                        key={tx.id}
+                        className="hover:bg-muted/40 transition-colors border-border"
+                      >
+                        <TableCell className="py-2.5">
+                          <div className="font-semibold text-foreground font-mono text-xs">
+                            {tx.id}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">
+                            {tx.date}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-2.5">
+                          <div className="font-medium text-foreground text-xs">
+                            {tx.tenant}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground font-mono">
+                            {tx.gateway}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-2.5 font-semibold text-foreground text-xs">
+                          {formatCurrency(tx.gross, tx.currency)}
+                        </TableCell>
+                        <TableCell className="py-2.5 font-semibold text-primary text-xs">
+                          +{formatCurrency(tx.platformFee, tx.currency)}
+                        </TableCell>
+                        <TableCell className="py-2.5 font-semibold text-emerald-600 dark:text-emerald-400 text-xs">
+                          {formatCurrency(tx.tenantPayout, tx.currency)}
+                        </TableCell>
+                        <TableCell className="py-2.5">
+                          <span
+                            className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                              tx.status === "Settled"
+                                ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
+                                : "text-amber-600 dark:text-amber-400 bg-amber-500/10"
+                            }`}
+                          >
+                            <CheckCircle2 className="size-2.5" />
+                            {tx.status}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
             </div>
+
+            {/* Split Transactions Pagination */}
+            {totalTxPages > 1 && (
+              <div className="pt-3 flex flex-col sm:flex-row items-center justify-between gap-2 border-t border-border mt-3">
+                <span className="text-[11px] text-muted-foreground">
+                  Page {txPage} of {totalTxPages} ({transactions.length}{" "}
+                  transactions)
+                </span>
+                <Pagination className="mx-0 w-auto">
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (txPage > 1) setTxPage(txPage - 1);
+                        }}
+                        className={
+                          txPage <= 1
+                            ? "pointer-events-none opacity-50"
+                            : "cursor-pointer"
+                        }
+                      />
+                    </PaginationItem>
+                    {Array.from({ length: totalTxPages }, (_, i) => i + 1).map(
+                      (p) => (
+                        <PaginationItem key={p}>
+                          <PaginationLink
+                            href="#"
+                            isActive={txPage === p}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setTxPage(p);
+                            }}
+                            className="cursor-pointer text-xs"
+                          >
+                            {p}
+                          </PaginationLink>
+                        </PaginationItem>
+                      ),
+                    )}
+                    <PaginationItem>
+                      <PaginationNext
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (txPage < totalTxPages) setTxPage(txPage + 1);
+                        }}
+                        className={
+                          txPage >= totalTxPages
+                            ? "pointer-events-none opacity-50"
+                            : "cursor-pointer"
+                        }
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Bottom Section: Top Performing Multi-Tenant Stores */}
+      {/* Bottom Section: Multi-Tenant Stores from Database */}
       <div className="bg-card border border-border rounded-xl p-4 shadow-xs">
         <div className="flex items-center justify-between pb-3 border-b border-border">
           <div>
             <h4 className="text-sm font-bold font-secondary text-foreground">
               Multi-Tenant Storefront Directory
             </h4>
-            <span className="text-[11px] text-muted-foreground">
-              Live tenants routing through custom subdomains (*.localhost:3000 /
-              *.ecommerce-hub.com)
+            <span className="text-[10px] text-muted-foreground">
+              Active tenant storefronts with live merchandise volume and
+              database isolation
             </span>
           </div>
-          <Link href="/tenants">
-            <Button size="md" variant="outline" className="text-xs gap-1.5 h-8">
-              <span>View All 18 Stores</span>
+          <Link href="/core/tenants">
+            <Button
+              variant="outline"
+              size="md"
+              className="text-xs gap-1 h-7 cursor-pointer"
+            >
+              <span>Manage Stores</span>
               <ArrowRight className="size-3" />
             </Button>
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5 mt-3.5">
-          {recentTenants.map((tenant) => (
-            <div
-              key={tenant.id}
-              className="p-3.5 rounded-xl border border-border bg-card-gray/20 dark:bg-white/5 flex flex-col justify-between hover:border-primary/40 transition-all group"
-            >
-              <div>
-                <div className="flex items-center justify-between">
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] bg-primary/10 text-primary border-primary/30"
+        <div className="mt-3 overflow-hidden rounded-lg border border-border">
+          <Table>
+            <TableHeader className="bg-muted/40 border-b border-border">
+              <TableRow className="border-border hover:bg-transparent">
+                <TableHead className="py-2.5 text-xs font-semibold text-muted-foreground">
+                  Store & Subdomain
+                </TableHead>
+                <TableHead className="py-2.5 text-xs font-semibold text-muted-foreground">
+                  Category
+                </TableHead>
+                <TableHead className="py-2.5 text-xs font-semibold text-muted-foreground">
+                  Data Adapter
+                </TableHead>
+                <TableHead className="py-2.5 text-xs font-semibold text-muted-foreground">
+                  Payment Gateway
+                </TableHead>
+                <TableHead className="py-2.5 text-xs font-semibold text-muted-foreground">
+                  Orders / Catalog
+                </TableHead>
+                <TableHead className="py-2.5 text-xs font-semibold text-muted-foreground">
+                  Total Volume (GMV)
+                </TableHead>
+                <TableHead className="py-2.5 text-xs font-semibold text-muted-foreground">
+                  Status
+                </TableHead>
+                <TableHead className="py-2.5 text-xs font-semibold text-muted-foreground text-right">
+                  Actions
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <TableRow key={i} className="border-border">
+                    <TableCell className="py-3">
+                      <Skeleton className="h-4 w-28 mb-1" />
+                      <Skeleton className="h-3 w-36" />
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Skeleton className="h-4 w-20" />
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Skeleton className="h-5 w-20 rounded-full" />
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Skeleton className="h-4 w-24" />
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Skeleton className="h-4 w-20" />
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Skeleton className="h-4 w-20" />
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Skeleton className="h-5 w-16 rounded-full" />
+                    </TableCell>
+                    <TableCell className="py-3 text-right">
+                      <Skeleton className="h-7 w-12 ml-auto rounded-md" />
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : topTenants.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={8}
+                    className="py-8 text-center text-muted-foreground text-xs"
                   >
-                    {tenant.category}
-                  </Badge>
-                  <span className="text-[10px]  text-emerald-600 dark:text-emerald-400 font-semibold">
-                    {tenant.status}
-                  </span>
-                </div>
-
-                <h5 className="font-bold font-secondary text-sm text-foreground mt-2">
-                  {tenant.name}
-                </h5>
-                <p className="text-[11px]  text-muted-foreground mt-0.5 truncate">
-                  {tenant.slug}.ecommerce-hub.com
-                </p>
-              </div>
-
-              <div className="mt-3 pt-3 border-t border-border flex items-center justify-between text-xs">
-                <span className="text-muted-foreground font-medium">
-                  GMV:{" "}
-                  <strong className="text-foreground">{tenant.revenue}</strong>
-                </span>
-                <Link
-                  href={`/${tenant.slug}`}
-                  target="_blank"
-                  className="text-primary hover:text-primary-light flex items-center gap-1 text-[11px] font-semibold group-hover:underline"
-                >
-                  <span>Preview</span>
-                  <ExternalLink className="size-3" />
-                </Link>
-              </div>
-            </div>
-          ))}
+                    No tenant stores registered yet.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                paginatedTenants.map((t) => (
+                  <TableRow
+                    key={t.id}
+                    className="hover:bg-muted/40 transition-colors border-border"
+                  >
+                    <TableCell className="py-3">
+                      <div className="font-semibold text-foreground text-xs">
+                        {t.name}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground font-mono">
+                        {t.slug}.localhost:3000
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <span className="text-muted-foreground text-xs">
+                        {t.category || "General Retail"}
+                      </span>
+                    </TableCell>
+                    <TableCell className="py-3">
+                      {t.backend_type === "sanity" ? (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                          Sanity CMS
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                          Neon Postgres
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="py-3 text-muted-foreground capitalize text-xs">
+                      {t.default_gateway || "paystack"} Subaccount
+                    </TableCell>
+                    <TableCell className="py-3 text-foreground font-medium text-xs">
+                      {t.orders_count ?? 0} orders / {t.product_count ?? 0}{" "}
+                      items
+                    </TableCell>
+                    <TableCell className="py-3 font-semibold text-foreground text-xs">
+                      {formatCurrency(t.total_volume ?? 0, t.currency || "NGN")}
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <span
+                        className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                          t.is_active !== false
+                            ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
+                            : "text-rose-600 dark:text-rose-400 bg-rose-500/10"
+                        }`}
+                      >
+                        <CheckCircle2 className="size-2.5" />
+                        {t.is_active !== false ? "Active" : "Suspended"}
+                      </span>
+                    </TableCell>
+                    <TableCell className="py-3 text-right">
+                      <a
+                        href={getTenantSubdomainUrl(t.slug)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-primary font-medium hover:underline"
+                      >
+                        <span>Visit</span>
+                        <ExternalLink className="size-3" />
+                      </a>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
         </div>
+
+        {/* Storefronts Pagination */}
+        {totalStoresPages > 1 && (
+          <div className="pt-3 flex flex-col sm:flex-row items-center justify-between gap-2 border-t border-border mt-3">
+            <span className="text-[11px] text-muted-foreground">
+              Showing {(storesPage - 1) * storesPageSize + 1} to{" "}
+              {Math.min(storesPage * storesPageSize, topTenants.length)} of{" "}
+              {topTenants.length} stores
+            </span>
+            <Pagination className="mx-0 w-auto">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (storesPage > 1) setStoresPage(storesPage - 1);
+                    }}
+                    className={
+                      storesPage <= 1
+                        ? "pointer-events-none opacity-50"
+                        : "cursor-pointer"
+                    }
+                  />
+                </PaginationItem>
+                {Array.from({ length: totalStoresPages }, (_, i) => i + 1).map(
+                  (p) => (
+                    <PaginationItem key={p}>
+                      <PaginationLink
+                        href="#"
+                        isActive={storesPage === p}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setStoresPage(p);
+                        }}
+                        className="cursor-pointer text-xs"
+                      >
+                        {p}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ),
+                )}
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (storesPage < totalStoresPages)
+                        setStoresPage(storesPage + 1);
+                    }}
+                    className={
+                      storesPage >= totalStoresPages
+                        ? "pointer-events-none opacity-50"
+                        : "cursor-pointer"
+                    }
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
       </div>
     </div>
   );

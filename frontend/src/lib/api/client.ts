@@ -3,13 +3,11 @@ import {
   deleteSession,
   getSession,
   createSession,
+  isTokenExpired,
   ACCESS_TOKEN_MAX_AGE,
 } from "@/lib/session";
 import { getRefreshToken, clearAuthSession } from "@/lib/auth";
-import {
-  recordUserActivity,
-  isUserRecentlyActive,
-} from "@/lib/activity-tracker";
+import { recordUserActivity } from "@/lib/activity-tracker";
 import { APP_CONFIG } from "@/constants";
 
 interface ParsedData {
@@ -200,7 +198,31 @@ export const apiRequest = async <T = unknown>(
     recordUserActivity();
 
     const session = await getSession();
-    const accessToken = session?.accessToken;
+    let accessToken = session?.accessToken;
+    const refreshTokenValue = session?.refreshToken || getRefreshToken();
+
+    const isAuthEndpoint =
+      endpoint.includes("/login") ||
+      endpoint.includes("/register") ||
+      endpoint.includes("/forgot-password") ||
+      endpoint.includes("/reset-password") ||
+      endpoint.includes("/refresh-token");
+
+    // Proactively refresh access token if missing or expired while a refresh token exists
+    if (
+      !isAuthEndpoint &&
+      (!accessToken || isTokenExpired(accessToken)) &&
+      refreshTokenValue
+    ) {
+      try {
+        const refreshed = await executeTokenRefresh(refreshTokenValue);
+        if (refreshed) {
+          accessToken = refreshed;
+        }
+      } catch (err) {
+        console.warn("Proactive token refresh attempt failed:", err);
+      }
+    }
 
     const isFormData =
       typeof FormData !== "undefined" && options.body instanceof FormData;
@@ -313,22 +335,13 @@ export const apiRequest = async <T = unknown>(
       });
     }
 
-    // Check if this is an authentication endpoint (login, register, reset password, etc.)
-    const isAuthEndpoint =
-      endpoint.includes("/login") ||
-      endpoint.includes("/register") ||
-      endpoint.includes("/forgot-password") ||
-      endpoint.includes("/reset-password");
-
     // Handle token expiration (401 errors) ONLY for authenticated session requests, NOT for auth endpoints
     if (response.status === 401 && !isAuthEndpoint) {
       const isRefreshEndpoint = endpoint.includes("/refresh-token");
-      const refreshTokenValue = session?.refreshToken || getRefreshToken();
+      const currentRefresh = session?.refreshToken || getRefreshToken();
 
-      const hasRecentActivity = isUserRecentlyActive(12 * 60 * 60 * 1000);
-
-      if (!isRefreshEndpoint && refreshTokenValue && hasRecentActivity) {
-        const newAccessToken = await executeTokenRefresh(refreshTokenValue);
+      if (!isRefreshEndpoint && currentRefresh) {
+        const newAccessToken = await executeTokenRefresh(currentRefresh);
 
         if (newAccessToken) {
           // Retry original request with new Bearer token
@@ -446,7 +459,31 @@ export const apiFormDataRequest = async <T = unknown>(
 ): Promise<ApiResponse<T>> => {
   try {
     const session = await getSession();
-    const accessToken = session?.accessToken;
+    let accessToken = session?.accessToken;
+    const refreshTokenValue = session?.refreshToken || getRefreshToken();
+
+    const isAuthEndpoint =
+      endpoint.includes("/login") ||
+      endpoint.includes("/register") ||
+      endpoint.includes("/forgot-password") ||
+      endpoint.includes("/reset-password") ||
+      endpoint.includes("/refresh-token");
+
+    // Proactively refresh access token if missing or expired while a refresh token exists
+    if (
+      !isAuthEndpoint &&
+      (!accessToken || isTokenExpired(accessToken)) &&
+      refreshTokenValue
+    ) {
+      try {
+        const refreshed = await executeTokenRefresh(refreshTokenValue);
+        if (refreshed) {
+          accessToken = refreshed;
+        }
+      } catch (err) {
+        console.warn("Proactive token refresh attempt failed:", err);
+      }
+    }
 
     const headers: HeadersInit = {
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
@@ -485,19 +522,11 @@ export const apiFormDataRequest = async <T = unknown>(
       );
     }
 
-    const isAuthEndpoint =
-      endpoint.includes("/login") ||
-      endpoint.includes("/register") ||
-      endpoint.includes("/forgot-password") ||
-      endpoint.includes("/reset-password");
-
     if (response.status === 401 && !isAuthEndpoint) {
-      const refreshTokenValue = session?.refreshToken || getRefreshToken();
+      const currentRefresh = session?.refreshToken || getRefreshToken();
 
-      const hasRecentActivity = isUserRecentlyActive(12 * 60 * 60 * 1000);
-
-      if (refreshTokenValue && hasRecentActivity) {
-        const newAccessToken = await executeTokenRefresh(refreshTokenValue);
+      if (currentRefresh) {
+        const newAccessToken = await executeTokenRefresh(currentRefresh);
         if (newAccessToken) {
           const retryHeaders: HeadersInit = {
             ...headers,

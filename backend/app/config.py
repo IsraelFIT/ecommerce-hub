@@ -1,11 +1,15 @@
+import os
 from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+_ENV_FILE = os.path.abspath(os.path.join(_BASE_DIR, "../.env"))
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(".env", _ENV_FILE),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -47,6 +51,21 @@ class Settings(BaseSettings):
     AWS_ENDPOINT_URL_S3: Optional[str] = None
     AWS_REGION: str = "eu-central-1"
     NEON_STORAGE_BUCKET: str = "ecommerce-hub-media"
+
+    # Redis Caching (Upstash or Local)
+    REDIS_URL: Optional[str] = None
+    CACHE_ENABLED: bool = True
+    CACHE_TTL_DEFAULT: int = 300       # 5 minutes
+    CACHE_TTL_TENANT: int = 1800       # 30 minutes
+    CACHE_TTL_CATEGORIES: int = 1800   # 30 minutes
+    CACHE_TTL_PRODUCTS: int = 300      # 5 minutes
+
+    # Sentry Error Tracking & Real-Time Alerts
+    SENTRY_DSN: Optional[str] = None
+    SENTRY_ENVIRONMENT: str = "development"
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.2
+    SENTRY_PROFILES_SAMPLE_RATE: float = 0.1
+    SENTRY_SEND_DEFAULT_PII: bool = False
 
 
 settings = Settings()

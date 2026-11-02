@@ -5,6 +5,7 @@ from sqlalchemy import select, func, desc, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.core.redis import invalidate_tenant_metadata
 from app.models.tenant import Tenant
 from app.models.user import User
 from app.models.customization_request import CustomizationRequest
@@ -134,6 +135,7 @@ async def submit_landing_page_request(
     await db.commit()
     await db.refresh(cust_req)
     await db.refresh(tenant)
+    await invalidate_tenant_metadata(tenant.slug)
 
     return success_response(
         data=CustomizationRequestResponse.model_validate(cust_req).model_dump(
@@ -178,6 +180,7 @@ async def set_landing_page_type(
 
     await db.commit()
     await db.refresh(tenant)
+    await invalidate_tenant_metadata(tenant.slug)
 
     return success_response(
         data={
@@ -291,6 +294,8 @@ async def update_customization_request(
 
     await db.commit()
     await db.refresh(request_obj)
+    if payload.status and tenant:
+        await invalidate_tenant_metadata(tenant.slug)
 
     return success_response(
         data=CustomizationRequestResponse.model_validate(request_obj).model_dump(

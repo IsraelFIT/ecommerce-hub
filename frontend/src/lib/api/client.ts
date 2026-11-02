@@ -1,4 +1,5 @@
 import { ApiResponse } from "@/types/users";
+import * as Sentry from "@sentry/nextjs";
 import {
   deleteSession,
   getSession,
@@ -445,6 +446,25 @@ export const apiRequest = async <T = unknown>(
       endpoint,
       error: err.message,
     });
+
+    // Record breadcrumb and report server/network errors to Sentry
+    Sentry.addBreadcrumb({
+      category: "api",
+      message: `API error on ${endpoint}: ${err.message}`,
+      level: "error",
+      data: { endpoint },
+    });
+
+    if (
+      err.message.includes("500") ||
+      err.message.includes("Failed to fetch") ||
+      err.message.includes("NetworkError")
+    ) {
+      Sentry.captureException(err, {
+        tags: { endpoint, type: "api_failure" },
+      });
+    }
+
     throw err;
   }
 };

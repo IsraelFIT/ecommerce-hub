@@ -65,6 +65,11 @@ async def toggle_like(
     user_id = _extract_user_id(authorization, request)
     session_id = payload.session_id or request.headers.get("x-session-id")
 
+    # Acquire row-level lock on the target product to serialize concurrent likes
+    await db.execute(
+        select(Product.id).where(Product.id == payload.product_id).with_for_update()
+    )
+
     # Check existing like with row lock
     if user_id:
         existing_query = (

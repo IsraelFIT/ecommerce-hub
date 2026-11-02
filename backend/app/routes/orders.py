@@ -72,31 +72,28 @@ async def enrich_order_items_from_products(
     variant_to_prod: Dict[str, Product] = {}
     prod_by_title: Dict[str, Product] = {}
 
-    # 1. Look up products by ID directly from the Product table
+    # 1. Look up products & variants in a single pre-joined query
     if raw_ids:
-        p_res = await db.execute(select(Product).where(Product.id.in_(raw_ids)))
+        p_res = await db.execute(
+            select(Product)
+            .options(selectinload(Product.variants))
+            .where(
+                or_(
+                    Product.id.in_(raw_ids),
+                    Product.id.in_(
+                        select(ProductVariant.product_id).where(ProductVariant.id.in_(raw_ids))
+                    ),
+                )
+            )
+        )
         for p in p_res.scalars().all():
             prod_by_id[str(p.id)] = p
             if p.title:
                 prod_by_title[p.title.strip().lower()] = p
             if p.name:
                 prod_by_title[p.name.strip().lower()] = p
-
-        # 2. Check remaining candidate IDs against ProductVariant table joined with parent Product
-        remaining_ids = [uid for uid in raw_ids if str(uid) not in prod_by_id]
-        if remaining_ids:
-            pv_res = await db.execute(
-                select(ProductVariant, Product)
-                .join(Product, ProductVariant.product_id == Product.id)
-                .where(ProductVariant.id.in_(remaining_ids))
-            )
-            for v, parent_p in pv_res.all():
-                variant_to_prod[str(v.id)] = parent_p
-                prod_by_id[str(parent_p.id)] = parent_p
-                if parent_p.title:
-                    prod_by_title[parent_p.title.strip().lower()] = parent_p
-                if parent_p.name:
-                    prod_by_title[parent_p.name.strip().lower()] = parent_p
+            for v in (p.variants or []):
+                variant_to_prod[str(v.id)] = p
 
     # 3. Look up remaining items by title/name from Product table
     if raw_titles:
@@ -207,28 +204,26 @@ async def compute_server_pricing(
     prod_by_title: Dict[str, Product] = {}
 
     if raw_ids:
-        p_res = await db.execute(select(Product).where(Product.id.in_(raw_ids)))
+        p_res = await db.execute(
+            select(Product)
+            .options(selectinload(Product.variants))
+            .where(
+                or_(
+                    Product.id.in_(raw_ids),
+                    Product.id.in_(
+                        select(ProductVariant.product_id).where(ProductVariant.id.in_(raw_ids))
+                    ),
+                )
+            )
+        )
         for p in p_res.scalars().all():
             prod_by_id[str(p.id)] = p
             if p.title:
                 prod_by_title[p.title.strip().lower()] = p
             if p.name:
                 prod_by_title[p.name.strip().lower()] = p
-
-        remaining_ids = [uid for uid in raw_ids if str(uid) not in prod_by_id]
-        if remaining_ids:
-            pv_res = await db.execute(
-                select(ProductVariant, Product)
-                .join(Product, ProductVariant.product_id == Product.id)
-                .where(ProductVariant.id.in_(remaining_ids))
-            )
-            for v, parent_p in pv_res.all():
-                variant_to_prod[str(v.id)] = parent_p
-                prod_by_id[str(parent_p.id)] = parent_p
-                if parent_p.title:
-                    prod_by_title[parent_p.title.strip().lower()] = parent_p
-                if parent_p.name:
-                    prod_by_title[parent_p.name.strip().lower()] = parent_p
+            for v in (p.variants or []):
+                variant_to_prod[str(v.id)] = p
 
     if raw_titles:
         title_res = await db.execute(

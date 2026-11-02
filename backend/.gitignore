@@ -27,3 +27,4 @@ wheels/
 .coverage
 htmlcov/
 tests/
+static/uploads/

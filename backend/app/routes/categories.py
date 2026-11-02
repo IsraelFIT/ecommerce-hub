@@ -9,6 +9,12 @@ from app.models.user import User
 from app.models.product import Category, Product
 from app.schemas.category import CategoryCreate, CategoryUpdate, CategoryResponse
 from app.schemas.response import success_response, ApiResponse, ErrorResponse
+from app.config import settings
+from app.core.redis import (
+    cache,
+    build_tenant_key,
+    invalidate_tenant_categories,
+)
 
 router = APIRouter(
     prefix="/categories",
@@ -35,6 +41,14 @@ async def list_categories(
     tenant: Tenant = Depends(get_tenant_context),
     db: AsyncSession = Depends(get_rls_db_session),
 ) -> Dict[str, Any]:
+    cache_key = build_tenant_key(tenant.slug, "categories")
+    cached = await cache.get_json(cache_key)
+    if cached is not None:
+        return success_response(
+            data=cached,
+            message="Categories retrieved successfully",
+        )
+
     # Query categories and product counts
     subq = (
         select(Product.category_id, func.count(Product.id).label("prod_count"))
@@ -71,8 +85,11 @@ async def list_categories(
             )
         )
 
+    serialized = [item.model_dump(mode="json") for item in items]
+    await cache.set_json(cache_key, serialized, ttl=settings.CACHE_TTL_CATEGORIES)
+
     return success_response(
-        data=items,
+        data=serialized,
         message="Categories retrieved successfully",
     )
 
@@ -170,6 +187,7 @@ async def create_category(
     db.add(category)
     await db.commit()
     await db.refresh(category)
+    await invalidate_tenant_categories(tenant.slug)
 
     return success_response(
         data=CategoryResponse(
@@ -225,6 +243,7 @@ async def update_category(
             setattr(category, key, value)
 
     await db.commit()
+    await invalidate_tenant_categories(tenant.slug)
 
     query_refreshed = (
         select(Category, func.count(Product.id).label("product_count"))
@@ -292,6 +311,7 @@ async def delete_category(
     category.is_deleted = True
     category.deleted_at = func.now()
     await db.commit()
+    await invalidate_tenant_categories(tenant.slug)
 
     return success_response(
         data={},

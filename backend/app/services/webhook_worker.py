@@ -1,7 +1,7 @@
 import logging
 from typing import Dict, Any
 from datetime import datetime, timezone
-from sqlalchemy import select, update, func, or_
+from sqlalchemy import select, update, func, or_, String
 from sqlalchemy.exc import IntegrityError
 from app.database import AsyncSessionLocal
 from app.models.webhook import ProcessedWebhook
@@ -57,12 +57,23 @@ async def process_webhook_event_task(
                 order = res.scalar_one_or_none()
 
                 if not order:
-                    all_res = await session.execute(select(Order).with_for_update())
-                    for cand in all_res.scalars().all():
-                        cand_attempts = (cand.metadata_json or {}).get("payment_attempts", [])
-                        if any(a.get("reference") == reference for a in cand_attempts):
-                            order = cand
-                            break
+                    # Target single candidate row without locking the entire table
+                    cand_res = await session.execute(
+                        select(Order.id)
+                        .where(
+                            or_(
+                                Order.gateway_reference.ilike(f"%{reference}%"),
+                                func.cast(Order.metadata_json, String).contains(reference),
+                            )
+                        )
+                        .limit(1)
+                    )
+                    cand_id = cand_res.scalar_one_or_none()
+                    if cand_id:
+                        cand_lock = await session.execute(
+                            select(Order).where(Order.id == cand_id).with_for_update()
+                        )
+                        order = cand_lock.scalar_one_or_none()
 
                 if order:
                     meta = dict(order.metadata_json or {})

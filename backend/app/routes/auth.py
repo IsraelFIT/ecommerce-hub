@@ -469,6 +469,7 @@ async def reset_password(
             PasswordResetOTP.expires_at >= now,
         )
         .order_by(PasswordResetOTP.created_at.desc())
+        .with_for_update()
     )
     otp_record = otp_query.scalar_one_or_none()
 

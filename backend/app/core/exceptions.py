@@ -66,17 +66,25 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
 
 import traceback
 from app.config import settings
+from app.core.sentry import capture_exception_with_context
 
 
 async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """
-    Catches unhandled server exceptions and returns a clean 500 error envelope.
+    Catches unhandled server exceptions, logs to Sentry, and returns a clean 500 error envelope.
     """
     traceback.print_exc()
+
+    # Capture unhandled 500 exceptions in Sentry with request context
+    sentry_event_id = capture_exception_with_context(exc, request=request)
+
     content: Dict[str, Any] = {
         "status": "error",
         "message": f"An unexpected server error occurred: {str(exc)}" if settings.DEBUG else "An unexpected server error occurred. Please try again later.",
     }
+    if sentry_event_id:
+        content["sentry_id"] = sentry_event_id
+
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content=content,

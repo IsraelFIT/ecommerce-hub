@@ -3,7 +3,7 @@ import re
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, func, desc, or_
+from sqlalchemy import select, func, desc, or_, String
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -162,16 +162,23 @@ async def verify_payment(
     )
     order = result.scalar_one_or_none()
 
-    # 2. If not found by current gateway_reference, search inside previous payment_attempts
+    # 2. If not found by current gateway_reference, search inside previous payment_attempts without locking all rows
     if not order:
-        all_orders_res = await db.execute(
-            select(Order).where(Order.tenant_id == tenant.id).with_for_update()
+        cand_res = await db.execute(
+            select(Order.id).where(
+                Order.tenant_id == tenant.id,
+                or_(
+                    Order.gateway_reference.ilike(f"%{reference}%"),
+                    func.cast(Order.metadata_json, String).contains(reference),
+                ),
+            ).limit(1)
         )
-        for cand in all_orders_res.scalars().all():
-            cand_attempts = (cand.metadata_json or {}).get("payment_attempts", [])
-            if any(a.get("reference") == reference for a in cand_attempts):
-                order = cand
-                break
+        cand_id = cand_res.scalar_one_or_none()
+        if cand_id:
+            cand_lock = await db.execute(
+                select(Order).where(Order.id == cand_id).with_for_update()
+            )
+            order = cand_lock.scalar_one_or_none()
 
     if not order:
         raise HTTPException(

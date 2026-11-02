@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies import get_tenant_context, get_rls_db_session, get_current_tenant_admin
+from app.core.redis import cache, build_tenant_key
 from app.models.tenant import Tenant
 from app.models.user import User
 from app.models.product import ProductFilter
@@ -36,6 +37,14 @@ async def list_filters(
     tenant: Tenant = Depends(get_tenant_context),
     db: AsyncSession = Depends(get_rls_db_session),
 ) -> Dict[str, Any]:
+    cache_key = build_tenant_key(tenant.slug, f"filters:active_{active_only}")
+    cached = await cache.get_json(cache_key)
+    if cached is not None:
+        return success_response(
+            data=cached,
+            message="Product filters retrieved successfully",
+        )
+
     query = select(ProductFilter).where(
         ProductFilter.tenant_id == tenant.id,
         ProductFilter.is_deleted == False,
@@ -62,6 +71,9 @@ async def list_filters(
         )
         for f in filters
     ]
+
+    items_dump = [it.model_dump(mode="json") for it in items]
+    await cache.set_json(cache_key, items_dump, ttl=300)
 
     return success_response(
         data=items,
@@ -149,6 +161,7 @@ async def create_filter(
     db.add(product_filter)
     await db.commit()
     await db.refresh(product_filter)
+    await cache.delete_pattern(f"cache:tenant:{tenant.slug}:filters:*")
 
     return success_response(
         data=FilterResponse(
@@ -209,6 +222,7 @@ async def update_filter(
 
     await db.commit()
     await db.refresh(product_filter)
+    await cache.delete_pattern(f"cache:tenant:{tenant.slug}:filters:*")
 
     return success_response(
         data=FilterResponse(
@@ -258,6 +272,7 @@ async def delete_filter(
     product_filter.is_deleted = True
     product_filter.deleted_at = func.now()
     await db.commit()
+    await cache.delete_pattern(f"cache:tenant:{tenant.slug}:filters:*")
 
     return success_response(
         data={},

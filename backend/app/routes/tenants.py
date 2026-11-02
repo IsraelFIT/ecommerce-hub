@@ -14,6 +14,14 @@ from app.schemas.tenant import TenantCreate, TenantUpdate, TenantResponse
 from app.schemas.response import success_response, PaginationMeta, ApiResponse, PaginatedData, ErrorResponse
 from app.dependencies import get_current_user, get_current_super_admin
 from app.services.provisioning import provision_new_tenant
+from app.config import settings
+from app.core.redis import (
+    cache,
+    build_tenant_key,
+    build_global_key,
+    invalidate_tenant_metadata,
+    invalidate_all_tenant_cache,
+)
 
 router = APIRouter(
     prefix="/tenants",
@@ -53,6 +61,7 @@ async def create_tenant(
         )
 
     tenant = await provision_new_tenant(db, tenant_in)
+    await cache.delete_pattern("cache:global:tenants:*")
     return success_response(
         data=TenantResponse.model_validate(tenant).model_dump(mode="json"),
         message="Store provisioned successfully",
@@ -69,8 +78,17 @@ async def get_tenant_by_slug(
     slug: str,
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
+    slug_lower = slug.lower().strip()
+    cache_key = build_tenant_key(slug_lower, "by_slug")
+    cached = await cache.get_json(cache_key)
+    if cached:
+        return success_response(
+            data=cached,
+            message="Tenant details retrieved successfully",
+        )
+
     result = await db.execute(
-        select(Tenant).where(Tenant.slug == slug.lower())
+        select(Tenant).where(Tenant.slug == slug_lower)
     )
     tenant = result.scalar_one_or_none()
     if not tenant:
@@ -78,8 +96,10 @@ async def get_tenant_by_slug(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Tenant '{slug}' not found or does not exist",
         )
+    data = TenantResponse.model_validate(tenant).model_dump(mode="json")
+    await cache.set_json(cache_key, data, ttl=settings.CACHE_TTL_TENANT)
     return success_response(
-        data=TenantResponse.model_validate(tenant).model_dump(mode="json"),
+        data=data,
         message="Tenant details retrieved successfully",
     )
 
@@ -123,6 +143,8 @@ async def update_tenant_by_slug(
 
     await db.commit()
     await db.refresh(tenant)
+    await invalidate_tenant_metadata(tenant.slug)
+    await cache.delete_pattern("cache:global:tenants:*")
     return success_response(
         data=TenantResponse.model_validate(tenant).model_dump(mode="json"),
         message="Tenant settings updated successfully",
@@ -192,6 +214,8 @@ async def update_tenant(
 
     await db.commit()
     await db.refresh(tenant)
+    await invalidate_tenant_metadata(tenant.slug)
+    await cache.delete_pattern("cache:global:tenants:*")
     return success_response(
         data=TenantResponse.model_validate(tenant).model_dump(mode="json"),
         message="Tenant settings updated successfully",
@@ -215,6 +239,15 @@ async def list_tenants(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_super_admin),
 ) -> Dict[str, Any]:
+    cache_key = build_global_key("tenants", f"p{page}_l{per_page}_s{search or 'none'}")
+    cached = await cache.get_json(cache_key)
+    if cached is not None:
+        return success_response(
+            data=cached.get("data"),
+            pagination=PaginationMeta(**cached["pagination"]) if "pagination" in cached else None,
+            message="Tenants retrieved successfully",
+        )
+
     offset = (page - 1) * per_page
 
     query = select(Tenant).where(Tenant.is_deleted == False)
@@ -281,8 +314,15 @@ async def list_tenants(
         td["status"] = "Active" if t.is_active else "Suspended"
         items.append(td)
 
+    output_data = {"items": items}
+    await cache.set_json(
+        cache_key,
+        {"data": output_data, "pagination": pagination.model_dump(mode="json")},
+        ttl=60,
+    )
+
     return success_response(
-        data={"items": items},
+        data=output_data,
         pagination=pagination,
         message="Tenants retrieved successfully",
     )
@@ -297,6 +337,14 @@ async def get_tenant_seller_stats(
     slug_or_id: str,
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
+    cache_key = build_tenant_key(slug_or_id, "seller_stats")
+    cached = await cache.get_json(cache_key)
+    if cached:
+        return success_response(
+            data=cached,
+            message="Seller profile statistics retrieved successfully",
+        )
+
     tenant = None
     try:
         t_uuid = uuid.UUID(slug_or_id)
@@ -334,15 +382,19 @@ async def get_tenant_seller_stats(
     # 3. Member since year
     member_since = tenant.created_at.year if tenant.created_at else 2024
 
+    stats_data = {
+        "rating": round(float(avg_rating or 5.0), 1),
+        "review_count": int(total_reviews or 0),
+        "orders_fulfilled": int(orders_fulfilled or 0),
+        "member_since": member_since,
+    }
+    await cache.set_json(cache_key, stats_data, ttl=180)
+
     return success_response(
-        data={
-            "rating": round(float(avg_rating or 5.0), 1),
-            "review_count": int(total_reviews or 0),
-            "orders_fulfilled": int(orders_fulfilled or 0),
-            "member_since": member_since,
-        },
+        data=stats_data,
         message="Seller profile statistics retrieved successfully",
     )
+
 
 
 @router.get(

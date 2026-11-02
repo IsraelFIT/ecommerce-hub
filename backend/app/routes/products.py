@@ -5,12 +5,20 @@ from fastapi import APIRouter, Depends, HTTPException, Header, Query, Request, s
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
-from app.dependencies import get_product_adapter, get_current_tenant_admin
+from app.dependencies import get_product_adapter, get_current_tenant_admin, get_tenant_context
 from app.adapters.base import ProductRepositoryAdapter
 from app.core.security import decode_access_token
 from app.models.user import User
+from app.models.tenant import Tenant
 from app.models.review import Review
 from app.models.like import ProductLike
+from app.config import settings
+from app.core.redis import (
+    cache,
+    build_tenant_key,
+    invalidate_tenant_products,
+    invalidate_tenant_categories,
+)
 from app.schemas.product import (
     ProductCreate,
     ProductUpdate,
@@ -154,6 +162,7 @@ async def list_products(
     authorization: Optional[str] = Header(None, alias="Authorization"),
     x_session_id: Optional[str] = Header(None, alias="X-Session-ID"),
     session_id: Optional[str] = Query(None),
+    tenant: Tenant = Depends(get_tenant_context),
     adapter: ProductRepositoryAdapter = Depends(get_product_adapter),
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -202,6 +211,24 @@ async def list_products(
         if not is_authorized_admin:
             effective_published_only = True
 
+    active_session_id = x_session_id or session_id or request.headers.get("x-session-id")
+    is_public = (user_id is None) and (active_session_id is None) and effective_published_only and not parsed_filters
+
+    cache_key = build_tenant_key(
+        tenant.slug,
+        "products",
+        "list",
+        f"p{page}_l{per_page}_cat{category or 'all'}_avail{availability or 'all'}_s{search or 'none'}_cls{product_class or 'all'}_min{min_price}_max{max_price}_r{rating}",
+    )
+    if is_public:
+        cached = await cache.get_json(cache_key)
+        if cached is not None:
+            return success_response(
+                data=cached.get("data"),
+                pagination=PaginationMeta(**cached["pagination"]) if "pagination" in cached else None,
+                message="Products retrieved successfully",
+            )
+
     products = await adapter.list_products(
         skip=skip,
         limit=per_page,
@@ -215,8 +242,6 @@ async def list_products(
         product_class=product_class,
     )
     
-    active_session_id = x_session_id or session_id or request.headers.get("x-session-id")
-
     enriched_products = await enrich_products_metadata(
         products, db=db, user_id=user_id, session_id=active_session_id
     )
@@ -254,6 +279,16 @@ async def list_products(
         total=total,
     )
 
+    if is_public:
+        await cache.set_json(
+            cache_key,
+            {
+                "data": {"items": items},
+                "pagination": pagination.model_dump(mode="json"),
+            },
+            ttl=settings.CACHE_TTL_PRODUCTS,
+        )
+
     return success_response(
         data={"items": items},
         pagination=pagination,
@@ -272,22 +307,39 @@ async def get_product_by_slug(
     authorization: Optional[str] = Header(None, alias="Authorization"),
     x_session_id: Optional[str] = Header(None, alias="X-Session-ID"),
     session_id: Optional[str] = Query(None),
+    tenant: Tenant = Depends(get_tenant_context),
     adapter: ProductRepositoryAdapter = Depends(get_product_adapter),
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
+    user_id = _extract_user_id(authorization, request)
+    active_session_id = x_session_id or session_id
+
+    # For anonymous visitors without personalized likes/sessions, serve from cache
+    is_public = (user_id is None) and (active_session_id is None)
+    cache_key = build_tenant_key(tenant.slug, "product", "slug", slug)
+    if is_public:
+        cached = await cache.get_json(cache_key)
+        if cached:
+            return success_response(
+                data=cached,
+                message="Product details retrieved successfully",
+            )
+
     product = await adapter.get_by_slug(slug)
     if not product:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Product not found or does not exist",
         )
-    user_id = _extract_user_id(authorization, request)
-    active_session_id = x_session_id or session_id
     enriched = await enrich_products_metadata([product], db=db, user_id=user_id, session_id=active_session_id)
     product = enriched[0]
 
+    data = product.model_dump(mode="json") if hasattr(product, "model_dump") else product
+    if is_public:
+        await cache.set_json(cache_key, data, ttl=settings.CACHE_TTL_PRODUCTS)
+
     return success_response(
-        data=product.model_dump(mode="json") if hasattr(product, "model_dump") else product,
+        data=data,
         message="Product details retrieved successfully",
     )
 
@@ -303,22 +355,38 @@ async def get_product(
     authorization: Optional[str] = Header(None, alias="Authorization"),
     x_session_id: Optional[str] = Header(None, alias="X-Session-ID"),
     session_id: Optional[str] = Query(None),
+    tenant: Tenant = Depends(get_tenant_context),
     adapter: ProductRepositoryAdapter = Depends(get_product_adapter),
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
+    user_id = _extract_user_id(authorization, request)
+    active_session_id = x_session_id or session_id
+
+    is_public = (user_id is None) and (active_session_id is None)
+    cache_key = build_tenant_key(tenant.slug, "product", "id", str(product_id))
+    if is_public:
+        cached = await cache.get_json(cache_key)
+        if cached:
+            return success_response(
+                data=cached,
+                message="Product details retrieved successfully",
+            )
+
     product = await adapter.get_by_id(product_id)
     if not product:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Product not found or does not exist",
         )
-    user_id = _extract_user_id(authorization, request)
-    active_session_id = x_session_id or session_id
     enriched = await enrich_products_metadata([product], db=db, user_id=user_id, session_id=active_session_id)
     product = enriched[0]
 
+    data = product.model_dump(mode="json") if hasattr(product, "model_dump") else product
+    if is_public:
+        await cache.set_json(cache_key, data, ttl=settings.CACHE_TTL_PRODUCTS)
+
     return success_response(
-        data=product.model_dump(mode="json") if hasattr(product, "model_dump") else product,
+        data=data,
         message="Product details retrieved successfully",
     )
 
@@ -338,11 +406,18 @@ async def get_product(
 async def create_product(
     product_in: ProductCreate,
     current_user: User = Depends(get_current_tenant_admin),
+    tenant: Tenant = Depends(get_tenant_context),
     adapter: ProductRepositoryAdapter = Depends(get_product_adapter),
 ) -> Dict[str, Any]:
     if product_in.images:
         product_in.images = [await auto_resolve_image_url(img) for img in product_in.images]
     product = await adapter.create_product(product_in)
+
+    # Invalidate cached product listings and category counts for this tenant
+    target_slug = current_user.tenant.slug if current_user.tenant else tenant.slug
+    await invalidate_tenant_products(target_slug)
+    await invalidate_tenant_categories(target_slug)
+
     return success_response(
         data=product.model_dump(mode="json") if hasattr(product, "model_dump") else product,
         message="Product created successfully",
@@ -363,6 +438,7 @@ async def update_product(
     product_id: uuid.UUID,
     product_in: ProductUpdate,
     current_user: User = Depends(get_current_tenant_admin),
+    tenant: Tenant = Depends(get_tenant_context),
     adapter: ProductRepositoryAdapter = Depends(get_product_adapter),
 ) -> Dict[str, Any]:
     if product_in.images:
@@ -373,6 +449,12 @@ async def update_product(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Product not found or does not exist",
         )
+
+    # Invalidate cache for this tenant
+    target_slug = current_user.tenant.slug if current_user.tenant else tenant.slug
+    await invalidate_tenant_products(target_slug)
+    await invalidate_tenant_categories(target_slug)
+
     return success_response(
         data=product.model_dump(mode="json") if hasattr(product, "model_dump") else product,
         message="Product updated successfully",
@@ -387,6 +469,7 @@ async def update_product(
 async def delete_product(
     product_id: uuid.UUID,
     current_user: User = Depends(get_current_tenant_admin),
+    tenant: Tenant = Depends(get_tenant_context),
     adapter: ProductRepositoryAdapter = Depends(get_product_adapter),
 ) -> Dict[str, Any]:
     success = await adapter.delete_product(product_id)
@@ -395,7 +478,14 @@ async def delete_product(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Product not found or does not exist",
         )
+
+    # Invalidate cache for this tenant
+    target_slug = current_user.tenant.slug if current_user.tenant else tenant.slug
+    await invalidate_tenant_products(target_slug)
+    await invalidate_tenant_categories(target_slug)
+
     return success_response(
         data={},
         message="Product deleted successfully",
     )
+

@@ -24,13 +24,22 @@ from app.routes import (
     users_router,
 )
 
+from app.core.redis import cache
+from app.core.sentry import init_sentry
+
+# Initialize Sentry error tracking & APM
+init_sentry()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize database schema tables (with auto-fallback if needed)
     await init_db()
+    # Connect to Redis Cache (fail-open if unreachable)
+    await cache.connect()
     yield
-    # Cleanup engine resources
+    # Cleanup cache and engine resources
+    await cache.close()
     try:
         await engine.dispose()
     except Exception:

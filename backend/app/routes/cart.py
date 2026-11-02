@@ -1,7 +1,8 @@
 import uuid
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
+from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +11,7 @@ from app.dependencies import get_current_user
 from app.models.tenant import Tenant
 from app.models.user import User
 from app.models.cart import UserCart
+from app.models.product import Product, ProductVariant
 from app.schemas.cart import CartSyncRequest, CartMergeRequest, CartResponse
 from app.schemas.response import success_response, ApiResponse, ErrorResponse
 
@@ -126,6 +128,106 @@ def _get_cart_item_key(it: Dict[str, Any]) -> tuple:
     return (str(it.get("id")), opts_str)
 
 
+async def enrich_cart_items_with_db(
+    items: List[Dict[str, Any]],
+    db: AsyncSession,
+) -> List[Dict[str, Any]]:
+    """
+    Authoritative server verification of cart items:
+    1. Collects all product and variant UUIDs from cart items.
+    2. Queries live Product and ProductVariant models with a single JOIN query (no N+1).
+    3. Overwrites client-sent unit price, title, image, and stock strictly with live DB truth.
+    """
+    if not items:
+        return []
+
+    raw_ids = set()
+    for it in items:
+        p_id = it.get("product_id") or it.get("id")
+        if p_id:
+            try:
+                raw_ids.add(uuid.UUID(str(p_id)))
+            except Exception:
+                pass
+        item_id = it.get("id")
+        if item_id:
+            try:
+                raw_ids.add(uuid.UUID(str(item_id)))
+            except Exception:
+                pass
+
+    if not raw_ids:
+        return [sanitize_cart_item(it) for it in items]
+
+    res = await db.execute(
+        select(Product)
+        .options(selectinload(Product.variants))
+        .where(
+            or_(
+                Product.id.in_(raw_ids),
+                Product.id.in_(
+                    select(ProductVariant.product_id).where(ProductVariant.id.in_(raw_ids))
+                ),
+            ),
+            Product.is_deleted == False,
+        )
+    )
+    products = res.scalars().all()
+    prod_by_id = {str(p.id): p for p in products}
+    variant_by_id = {
+        str(v.id): (v, p)
+        for p in products
+        for v in (p.variants or [])
+    }
+
+    enriched = []
+    for it in items:
+        it_dict = dict(it)
+        cand_id = str(it_dict.get("id") or "")
+        parent_id = str(it_dict.get("product_id") or "")
+        matched_v = None
+        matched_p = None
+
+        if cand_id in variant_by_id:
+            matched_v, matched_p = variant_by_id[cand_id]
+        elif parent_id in prod_by_id:
+            matched_p = prod_by_id[parent_id]
+        elif cand_id in prod_by_id:
+            matched_p = prod_by_id[cand_id]
+
+        if not matched_v and matched_p:
+            opts = it_dict.get("options")
+            p_vars = matched_p.variants or []
+            if opts and isinstance(opts, dict):
+                for v in p_vars:
+                    if v.options == opts:
+                        matched_v = v
+                        break
+            if not matched_v and p_vars:
+                matched_v = p_vars[0]
+
+        # Overwrite verified price from DB (never trust browser price)
+        if matched_v and matched_v.price is not None:
+            it_dict["price"] = round(float(matched_v.price), 2)
+            it_dict["stock_quantity"] = matched_v.stock_quantity
+            it_dict["track_inventory"] = matched_v.track_inventory
+        elif matched_p and hasattr(matched_p, "price") and matched_p.price is not None:
+            it_dict["price"] = round(float(matched_p.price), 2)
+            it_dict["stock_quantity"] = getattr(matched_p, "inventory_count", 0)
+            it_dict["track_inventory"] = True
+
+        if matched_p:
+            db_name = matched_p.name or matched_p.title
+            if db_name:
+                it_dict["name"] = db_name
+            if matched_p.images and len(matched_p.images) > 0:
+                it_dict["image"] = matched_p.images[0]
+
+        enriched.append(sanitize_cart_item(it_dict))
+
+    return enriched
+
+
 @router.get(
     "/{tenant_slug}",
     response_model=ApiResponse[CartResponse],
@@ -159,7 +261,8 @@ async def get_cart(
     res = await db.execute(stmt)
     cart = res.scalar_one_or_none()
 
-    items = [sanitize_cart_item(it) for it in cart.items] if cart and cart.items else []
+    raw_items = [sanitize_cart_item(it) for it in cart.items] if cart and cart.items else []
+    items = await enrich_cart_items_with_db(raw_items, db)
     updated_at = cart.updated_at if cart else None
 
     return success_response(
@@ -218,16 +321,17 @@ async def sync_cart(
         sanitize_cart_item(item.model_dump(exclude_none=True))
         for item in payload.items
     ]
+    verified_items = await enrich_cart_items_with_db(serialized_items, db)
 
     if cart:
-        cart.items = serialized_items
+        cart.items = verified_items
         cart.updated_at = func.now()
         await db.commit()
     else:
         cart = UserCart(
             user_id=current_user.id,
             tenant_id=tenant_id,
-            items=serialized_items,
+            items=verified_items,
         )
         db.add(cart)
         try:
@@ -237,7 +341,7 @@ async def sync_cart(
             res = await db.execute(stmt)
             cart = res.scalar_one_or_none()
             if cart:
-                cart.items = serialized_items
+                cart.items = verified_items
                 cart.updated_at = func.now()
                 await db.commit()
 
@@ -326,16 +430,17 @@ async def merge_cart(
             merged_map[key] = dict(it)
 
     final_items = list(merged_map.values())
+    verified_final_items = await enrich_cart_items_with_db(final_items, db)
 
     if cart:
-        cart.items = final_items
+        cart.items = verified_final_items
         cart.updated_at = func.now()
         await db.commit()
     else:
         cart = UserCart(
             user_id=current_user.id,
             tenant_id=tenant_id,
-            items=final_items,
+            items=verified_final_items,
         )
         db.add(cart)
         try:
@@ -345,7 +450,7 @@ async def merge_cart(
             res = await db.execute(stmt)
             cart = res.scalar_one_or_none()
             if cart:
-                cart.items = final_items
+                cart.items = verified_final_items
                 cart.updated_at = func.now()
                 await db.commit()
 

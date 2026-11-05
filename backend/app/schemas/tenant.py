@@ -75,6 +75,8 @@ class BrandingConfig(BaseModel):
     contactPhone: Optional[str] = Field(default=None, description="Contact support phone")
     contactAddress: Optional[str] = Field(default=None, description="Store contact physical address")
     contactHours: Optional[str] = Field(default=None, description="Store contact operating hours")
+    contactButtonText: Optional[str] = Field(default=None, description="Contact section button text")
+    contactButtonLink: Optional[str] = Field(default=None, description="Contact section button target link")
 
     # Banner Content
     bannerBadge: Optional[str] = Field(default=None, description="Banner top badge")

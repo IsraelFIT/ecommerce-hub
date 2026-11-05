@@ -74,6 +74,8 @@ export interface BrandingConfig {
   contactPhone?: string | null;
   contactAddress?: string | null;
   contactHours?: string | null;
+  contactButtonText?: string | null;
+  contactButtonLink?: string | null;
 
   // Banner Content
   bannerBadge?: string | null;

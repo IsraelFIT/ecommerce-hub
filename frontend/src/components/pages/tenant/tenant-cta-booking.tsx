@@ -24,8 +24,10 @@ export function TenantCtaBooking({
   const contactSubheading =
     branding?.contactSubheading ||
     `Need custom volume orders, personalized modifications, or tailored corporate bundles from ${storeName}? Connect directly with our team for personalized quotes and expedited fulfilment.`;
-  const contactButtonText = (branding as any)?.contactButtonText || "Send Direct Inquiry";
-  const contactButtonLink = (branding as any)?.contactButtonLink || `/${tenantSlug}/contact`;
+  const contactButtonText =
+    branding?.contactButtonText || "Send Direct Inquiry";
+  const contactButtonLink =
+    branding?.contactButtonLink || `/${tenantSlug}/contact`;
   const bgImage = branding?.contactBackgroundUrl;
 
   return (

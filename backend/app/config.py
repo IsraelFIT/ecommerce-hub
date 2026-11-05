@@ -67,5 +67,17 @@ class Settings(BaseSettings):
     SENTRY_PROFILES_SAMPLE_RATE: float = 0.1
     SENTRY_SEND_DEFAULT_PII: bool = False
 
+    # Email Service (Free Tier: Resend / SMTP / Console)
+    EMAIL_PROVIDER: str = "auto"  # "resend", "smtp", "console", or "auto"
+    RESEND_API_KEY: Optional[str] = None
+    EMAIL_FROM_ADDRESS: str = "onboarding@resend.dev"
+    EMAIL_FROM_NAME: str = "Ecommerce Hub"
+    SMTP_HOST: Optional[str] = None
+    SMTP_PORT: int = 587
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    SMTP_USE_TLS: bool = True
+    FRONTEND_URL: str = "http://localhost:3000"
+
 
 settings = Settings()

@@ -57,6 +57,7 @@ export default function TenantSettingsPage({ params }: SettingsPageProps) {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>("store");
   const [tenantData, setTenantData] = useState<Tenant | null>(null);
 
   // Store profile & contact state
@@ -325,13 +326,6 @@ export default function TenantSettingsPage({ params }: SettingsPageProps) {
               name: storedAccountName,
             };
           }
-
-          if (t.paystack_subaccount_code || t.stripe_account_id) {
-            updateUser({
-              paystack_subaccount_code: t.paystack_subaccount_code || undefined,
-              stripe_account_id: t.stripe_account_id || undefined,
-            });
-          }
         }
       } catch {
         toast.error("Failed to load store settings");
@@ -343,14 +337,8 @@ export default function TenantSettingsPage({ params }: SettingsPageProps) {
     return () => {
       isMounted = false;
     };
-  }, [
-    tenantSlug,
-    user?.email,
-    user?.paystack_subaccount_code,
-    user?.stripe_account_id,
-    user?.tenant_branding,
-    updateUser,
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantSlug]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -434,7 +422,11 @@ export default function TenantSettingsPage({ params }: SettingsPageProps) {
         </p>
       </div>
 
-      <Tabs defaultValue="store" className="w-full flex flex-col gap-6">
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="w-full flex flex-col gap-6"
+      >
         <TabsList className="bg-muted/60 p-1 border border-border h-10 w-full sm:w-auto grid grid-cols-2 sm:inline-flex">
           <TabsTrigger
             value="store"

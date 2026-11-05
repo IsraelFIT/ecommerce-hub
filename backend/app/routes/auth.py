@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy import select, func, update
 from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +11,11 @@ from app.models.user import User
 from app.models.user_address import UserAddress
 from app.models.tenant import Tenant
 from app.models.otp import PasswordResetOTP
+from app.services.email import (
+    send_tenant_admin_welcome_email,
+    send_customer_welcome_email,
+    send_password_reset_email,
+)
 from app.core.security import (
     hash_password,
     verify_password,
@@ -92,6 +97,7 @@ def resolve_country_and_currency(country_input: Optional[str], currency_input: O
 )
 async def register(
     payload: RegisterRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     # 1. Check if user email already exists
@@ -173,6 +179,15 @@ async def register(
         },
     }
 
+    # 6. Dispatch welcome email asynchronously
+    background_tasks.add_task(
+        send_tenant_admin_welcome_email,
+        to_email=user.email,
+        admin_name=user.first_name,
+        store_name=tenant.name,
+        store_slug=tenant.slug,
+    )
+
     return success_response(
         data=user_data,
         message="Store registered and provisioned successfully",
@@ -188,6 +203,7 @@ async def register(
 )
 async def tenant_customer_register(
     payload: TenantCustomerRegisterRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     # 1. Fetch tenant by slug
@@ -250,6 +266,15 @@ async def tenant_customer_register(
             "expires_in": "1800",
         },
     }
+
+    # 5. Dispatch customer welcome email asynchronously
+    background_tasks.add_task(
+        send_customer_welcome_email,
+        to_email=user.email,
+        customer_name=user.first_name,
+        store_name=tenant.name,
+        store_slug=tenant.slug,
+    )
 
     return success_response(
         data=user_data,
@@ -414,6 +439,7 @@ async def refresh_token(
 )
 async def forgot_password(
     payload: ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     query = await db.execute(select(User).where(User.email == payload.email))
@@ -432,6 +458,15 @@ async def forgot_password(
         )
         db.add(otp_record)
         await db.commit()
+
+        # Dispatch OTP password reset email asynchronously
+        background_tasks.add_task(
+            send_password_reset_email,
+            to_email=user.email,
+            user_name=user.first_name,
+            otp_code=otp_code,
+            expires_in_minutes=10,
+        )
 
     return success_response(
         data={"dev_otp": otp_code} if otp_code else {},

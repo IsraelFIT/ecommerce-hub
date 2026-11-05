@@ -143,6 +143,8 @@ export interface ItemDetails {
   reviews_count?: number;
   is_liked?: boolean;
   likes_count?: number;
+  units_sold?: number;
+  sales?: number;
 }
 
 interface ItemDetailsClientProps {
@@ -218,6 +220,8 @@ export function ItemDetailsClient({
               sku: pVariants[0]?.sku || p.sku || undefined,
               stock_quantity:
                 pVariants[0]?.stock_quantity ?? p.inventory_count ?? 0,
+              units_sold: p.units_sold ?? p.sales ?? 0,
+              sales: p.sales ?? p.units_sold ?? 0,
               average_rating: p.average_rating,
               reviews_count: p.reviews_count,
               is_liked: p.is_liked,
@@ -706,7 +710,10 @@ export function ItemDetailsClient({
                 </span>
                 <span>•</span>
                 <span className="text-emerald-700 font-medium bg-emerald-50 px-2 py-0.5 rounded-full">
-                  Sold 500+
+                  Sold{" "}
+                  {(item.units_sold ?? item.sales ?? 0) >= 500
+                    ? `${(item.units_sold ?? item.sales ?? 0).toLocaleString()}+`
+                    : (item.units_sold ?? item.sales ?? 0).toLocaleString()}
                 </span>
                 <span>•</span>
                 <div className="flex items-center gap-1 text-amber-500 font-bold">

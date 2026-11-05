@@ -38,7 +38,7 @@ export function TenantBanner({ storeName, tenantSlug }: TenantBannerProps) {
         </p>
 
         <Link href={`/${tenantSlug}#collection`}>
-          <Button className="bg-white text-stone-950 font-bold tracking-wider transition-all uppercase h-12 px-8 cursor-pointer gap-2">
+          <Button className="uppercase font-bold px-6">
             <ShoppingCart className="h-4 w-4" />
             <span>Shop Now</span>
             <ArrowRight className="h-4 w-4" />

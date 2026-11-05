@@ -2,7 +2,7 @@ import secrets
 import re
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy import select, func, desc, or_, String
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,6 +26,8 @@ from app.schemas.payment import (
 from app.schemas.response import success_response, ApiResponse, ErrorResponse
 from app.payments.paystack import PaystackPaymentProvider
 from app.payments.stripe import StripePaymentProvider
+from app.services.email import send_order_confirmation_email
+from app.core.redis import invalidate_tenant_products
 
 router = APIRouter(
     prefix="/payments",
@@ -152,6 +154,7 @@ async def create_checkout_session(
 )
 async def verify_payment(
     reference: str,
+    background_tasks: BackgroundTasks,
     session_id: Optional[str] = None,
     db: AsyncSession = Depends(get_rls_db_session),
     tenant: Tenant = Depends(get_tenant_context),
@@ -255,8 +258,26 @@ async def verify_payment(
             older_meta["superseded_at"] = now_iso
             older.metadata_json = older_meta
 
+        if not meta.get("confirmation_email_sent"):
+            meta["confirmation_email_sent"] = True
+            order.metadata_json = meta
+            background_tasks.add_task(
+                send_order_confirmation_email,
+                to_email=order.customer_email,
+                customer_name=order.customer_name,
+                order_reference=order.gateway_reference,
+                store_name=tenant.name,
+                store_slug=tenant.slug,
+                items=order.items or [],
+                total_amount=float(order.total_amount),
+                currency=order.currency,
+                fulfillment_type=meta.get("fulfillment_type") or "pickup",
+                order_id=str(order.id),
+            )
+
         await db.commit()
         await db.refresh(order)
+        await invalidate_tenant_products(tenant.slug)
     else:
         attempt_status = res.get("status") or "failed"
         for a in attempts:
@@ -268,6 +289,7 @@ async def verify_payment(
         order.metadata_json = meta
         await db.commit()
         await db.refresh(order)
+        await invalidate_tenant_products(tenant.slug)
 
     return success_response(
         data={

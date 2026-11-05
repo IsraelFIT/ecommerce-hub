@@ -9,32 +9,41 @@ export async function getTenantServerData(
 ): Promise<Tenant | null> {
   if (!slug || slug === "core" || slug === "store") return null;
 
-  try {
-    const backendUrl =
-      process.env.INTERNAL_BACKEND_URL ||
-      process.env.NEXT_PUBLIC_BACKEND_URL ||
-      "http://127.0.0.1:8000";
+  const backendUrl = (
+    process.env.INTERNAL_BACKEND_URL ||
+    process.env.NEXT_PUBLIC_BACKEND_URL ||
+    "http://127.0.0.1:8000"
+  )
+    .replace(/\/+$/, "")
+    .replace("//localhost:", "//127.0.0.1:");
 
-    const cleanBase = backendUrl.replace(/\/+$/, "");
-    const res = await fetch(
-      `${cleanBase}/api/tenants/by-slug/${slug.toLowerCase()}`,
-      {
+  const targetUrl = `${backendUrl}/api/tenants/by-slug/${slug.toLowerCase()}`;
+
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const res = await fetch(targetUrl, {
         cache: "no-store",
-        signal: AbortSignal.timeout(4000),
-      },
-    );
+        signal: AbortSignal.timeout(9000),
+      });
 
-    if (!res.ok) return null;
+      if (!res.ok) return null;
 
-    const json = await res.json();
-    return (json.data as Tenant) || null;
-  } catch (err) {
-    console.warn(
-      `[getTenantServerData] Failed to fetch server tenant data for ${slug}:`,
-      err,
-    );
-    return null;
+      const json = await res.json();
+      return (json.data as Tenant) || null;
+    } catch (err) {
+      if (attempt === 1) {
+        // Brief 250ms pause before retry to allow serverless DB compute to finish waking up
+        await new Promise((r) => setTimeout(r, 250));
+        continue;
+      }
+      console.warn(
+        `[getTenantServerData] Failed to fetch server tenant data for ${slug} after 2 attempts:`,
+        err,
+      );
+      return null;
+    }
   }
+  return null;
 }
 
 /**

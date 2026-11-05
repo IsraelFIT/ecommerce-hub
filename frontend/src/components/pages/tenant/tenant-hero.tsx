@@ -18,8 +18,16 @@ export function TenantHero({ storeName, tenantSlug }: TenantHeroProps) {
 
   return (
     <section className="relative min-h-[90vh] flex items-end pb-16 overflow-hidden bg-stone-950 text-white">
-      {/* Background linear & Ambient Glows */}
-      <div className="absolute inset-0 z-0 bg-radial-[at_top_right] from-stone-800 via-stone-900 to-stone-950" />
+      {/* Background image & Ambient Glows */}
+      {branding.heroBackgroundUrl && (
+        <div
+          className="absolute inset-0 z-0 bg-cover bg-center transition-all duration-700"
+          style={{ backgroundImage: `url(${branding.heroBackgroundUrl})` }}
+        />
+      )}
+      <div
+        className={`absolute inset-0 z-0 ${branding.heroBackgroundUrl ? "bg-stone-950/80 backdrop-blur-xs" : "bg-radial-[at_top_right] from-stone-800 via-stone-900 to-stone-950"}`}
+      />
       <div
         className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-150 h-150 rounded-full blur-3xl pointer-events-none opacity-20 transition-colors duration-500"
         style={{ backgroundColor: branding.primaryColor || "var(--primary)" }}
@@ -46,19 +54,14 @@ export function TenantHero({ storeName, tenantSlug }: TenantHeroProps) {
         {/* Buttons container */}
         <div className="flex flex-wrap gap-4">
           <Link href={`/${tenantSlug}#collection`}>
-            <Button
-              className="text-white font-bold tracking-wider transition-all uppercase h-12 px-7 rounded-none cursor-pointer shadow-lg hover:opacity-90"
-              style={{
-                backgroundColor: branding.primaryColor || "var(--primary)",
-              }}
-            >
+            <Button className="text-white px-6 font-bold uppercase">
               Explore Collection
             </Button>
           </Link>
-          <Link href={`/${tenantSlug}#consultations`}>
+          <Link href={`/${tenantSlug}/contact`}>
             <Button
               variant="outline"
-              className="border-white/80 bg-transparent text-white font-bold tracking-wider hover:bg-white/10 transition-colors uppercase h-12 px-7 rounded-none cursor-pointer"
+              className="border-white/80 bg-transparent px-6 font-bold uppercase"
             >
               Custom Inquiries
             </Button>

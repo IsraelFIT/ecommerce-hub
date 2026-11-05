@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Dict, Any
 from datetime import datetime, timezone
@@ -6,6 +7,9 @@ from sqlalchemy.exc import IntegrityError
 from app.database import AsyncSessionLocal
 from app.models.webhook import ProcessedWebhook
 from app.models.order import Order, OrderStatus
+from app.models.tenant import Tenant
+from app.services.email import send_order_confirmation_email
+from app.core.redis import invalidate_tenant_products
 
 logger = logging.getLogger("webhook_worker")
 
@@ -124,7 +128,33 @@ async def process_webhook_event_task(
                             older_meta["superseded_at"] = now_iso
                             older.metadata_json = older_meta
 
+                        if not meta.get("confirmation_email_sent"):
+                            meta["confirmation_email_sent"] = True
+                            order.metadata_json = meta
+                            # Retrieve tenant metadata for store name & slug
+                            tenant_res = await session.execute(
+                                select(Tenant).where(Tenant.id == order.tenant_id)
+                            )
+                            t_record = tenant_res.scalar_one_or_none()
+                            store_name = t_record.name if t_record else "Store"
+                            store_slug = t_record.slug if t_record else "store"
+                            asyncio.create_task(
+                                send_order_confirmation_email(
+                                    to_email=order.customer_email,
+                                    customer_name=order.customer_name,
+                                    order_reference=order.gateway_reference,
+                                    store_name=store_name,
+                                    store_slug=store_slug,
+                                    items=order.items or [],
+                                    total_amount=float(order.total_amount),
+                                    currency=order.currency,
+                                    fulfillment_type=meta.get("fulfillment_type") or "pickup",
+                                    order_id=str(order.id),
+                                )
+                            )
+
                         await session.commit()
+                        await invalidate_tenant_products(store_slug)
                         logger.info(f"Successfully marked order [{order.id}] with reference [{reference}] as PAID via webhook")
 
                     elif status in ("declined", "failed", "abandoned") and order.status == OrderStatus.PENDING:

@@ -18,6 +18,16 @@ import {
   Send,
   Clock,
   FileCode2,
+  ImageIcon,
+  BookOpen,
+  MessageSquareText,
+  MapPin,
+  Phone,
+  Mail,
+  ShieldCheck,
+  Award,
+  HeartHandshake,
+  FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -93,6 +103,86 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
   );
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
+  // Background Media State
+  const [heroBackgroundUrl, setHeroBackgroundUrl] = useState<string | null>(
+    null,
+  );
+  const [aboutBackgroundUrl, setAboutBackgroundUrl] = useState<string | null>(
+    null,
+  );
+  const [contactBackgroundUrl, setContactBackgroundUrl] = useState<
+    string | null
+  >(null);
+
+  // About Content State
+  const [aboutBadge, setAboutBadge] = useState("Our Story & Standards");
+  const [aboutTitle, setAboutTitle] = useState(
+    "A devotion to craftsmanship & authentic quality",
+  );
+  const [aboutDescription, setAboutDescription] = useState(
+    `At ${formattedStoreName}, we believe exceptional products begin with intentional curation — uncompromising standards, premium raw materials, and genuine passion.`,
+  );
+  const [aboutSecondaryDescription, setAboutSecondaryDescription] = useState(
+    "Whether you are discovering something new or ordering a signature favorite, our store offers secure checkout, direct tracking, and dedicated client assistance.",
+  );
+  const [aboutMission, setAboutMission] = useState(
+    "To bring authentic excellence, artisanal beauty, and seamless digital commerce together in an experience built for discerning clients.",
+  );
+  const [aboutImageUrl, setAboutImageUrl] = useState<string | null>(null);
+  const [aboutCardBadge, setAboutCardBadge] = useState(
+    "Crafted With Precision",
+  );
+  const [aboutCardTitle, setAboutCardTitle] = useState(
+    "Designed For Discerning Clients",
+  );
+  const [aboutCardDescription, setAboutCardDescription] = useState(
+    `Enjoy seamless multi-currency checkout, tracked global fulfilment, and instant payment settlement on ${formattedStoreName}.`,
+  );
+  const [aboutFeature1Title, setAboutFeature1Title] = useState("Authentic");
+  const [aboutFeature1Desc, setAboutFeature1Desc] = useState("100% Verified");
+  const [aboutFeature2Title, setAboutFeature2Title] = useState("Guaranteed");
+  const [aboutFeature2Desc, setAboutFeature2Desc] =
+    useState("Top Craftsmanship");
+  const [aboutFeature3Title, setAboutFeature3Title] = useState("Bespoke");
+  const [aboutFeature3Desc, setAboutFeature3Desc] = useState(
+    "Care in Every Order",
+  );
+
+  // Contact Content State
+  const [contactBadge, setContactBadge] = useState("Custom Orders & Inquiries");
+  const [contactHeading, setContactHeading] = useState(
+    "Request Bespoke Customizations",
+  );
+  const [contactSubheading, setContactSubheading] = useState(
+    `Need custom volume orders, personalized modifications, or tailored corporate bundles from ${formattedStoreName}? Connect directly with our team for personalized quotes and expedited fulfilment.`,
+  );
+  const [storeContactEmail, setStoreContactEmail] = useState(
+    `hello@${tenantSlug}.com`,
+  );
+  const [storeContactPhone, setStoreContactPhone] = useState(
+    "+234 (0) 800 000 0000",
+  );
+  const [storeContactAddress, setStoreContactAddress] = useState(
+    "Flagship Atelier & Storefront • Central Business District",
+  );
+  const [storeContactHours, setStoreContactHours] = useState(
+    "Monday – Saturday: 9:00 AM – 7:00 PM",
+  );
+
+  // Active uploading field indicator & tab switchers
+  const [uploadingField, setUploadingField] = useState<string | null>(null);
+  const [contentTab, setContentTab] = useState<"hero" | "about" | "contact">(
+    "hero",
+  );
+  const [previewTab, setPreviewTab] = useState<"hero" | "about" | "contact">(
+    "hero",
+  );
+
+  const handleSwitchContentTab = (tab: "hero" | "about" | "contact") => {
+    setContentTab(tab);
+    setPreviewTab(tab);
+  };
+
   // Landing Page Mode State
   const [landingPageType, setLandingPageType] = useState<"default" | "custom">(
     "default",
@@ -103,6 +193,10 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
     useState<CustomizationRequest | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const heroBgInputRef = useRef<HTMLInputElement>(null);
+  const aboutBgInputRef = useRef<HTMLInputElement>(null);
+  const aboutImageInputRef = useRef<HTMLInputElement>(null);
+  const contactBgInputRef = useRef<HTMLInputElement>(null);
 
   // Load tenant details & active customization requests on mount
   useEffect(() => {
@@ -129,6 +223,51 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
           if (cfg.announcementText) setAnnouncementText(cfg.announcementText);
           if (cfg.logoUrl) setLogoUrl(cfg.logoUrl);
           if (cfg.landingPageType === "custom") setLandingPageType("custom");
+
+          if (cfg.heroBackgroundUrl)
+            setHeroBackgroundUrl(cfg.heroBackgroundUrl);
+          if (cfg.aboutBackgroundUrl)
+            setAboutBackgroundUrl(cfg.aboutBackgroundUrl);
+          if (cfg.contactBackgroundUrl)
+            setContactBackgroundUrl(cfg.contactBackgroundUrl);
+
+          if (cfg.aboutBadge) setAboutBadge(cfg.aboutBadge);
+          if (cfg.aboutTitle) setAboutTitle(cfg.aboutTitle);
+          if (cfg.aboutDescription) setAboutDescription(cfg.aboutDescription);
+          if (cfg.aboutSecondaryDescription)
+            setAboutSecondaryDescription(cfg.aboutSecondaryDescription);
+          if (cfg.aboutMission) setAboutMission(cfg.aboutMission);
+          if (cfg.aboutImageUrl) setAboutImageUrl(cfg.aboutImageUrl);
+          if (cfg.aboutCardBadge) setAboutCardBadge(cfg.aboutCardBadge);
+          if (cfg.aboutCardTitle) setAboutCardTitle(cfg.aboutCardTitle);
+          if (cfg.aboutCardDescription)
+            setAboutCardDescription(cfg.aboutCardDescription);
+          if (cfg.aboutFeature1Title)
+            setAboutFeature1Title(cfg.aboutFeature1Title);
+          if (cfg.aboutFeature1Desc)
+            setAboutFeature1Desc(cfg.aboutFeature1Desc);
+          if (cfg.aboutFeature2Title)
+            setAboutFeature2Title(cfg.aboutFeature2Title);
+          if (cfg.aboutFeature2Desc)
+            setAboutFeature2Desc(cfg.aboutFeature2Desc);
+          if (cfg.aboutFeature3Title)
+            setAboutFeature3Title(cfg.aboutFeature3Title);
+          if (cfg.aboutFeature3Desc)
+            setAboutFeature3Desc(cfg.aboutFeature3Desc);
+
+          if (cfg.contactBadge) setContactBadge(cfg.contactBadge);
+          if (cfg.contactHeading) setContactHeading(cfg.contactHeading);
+          if (cfg.contactSubheading)
+            setContactSubheading(cfg.contactSubheading);
+          if (cfg.contactEmail) setStoreContactEmail(cfg.contactEmail);
+          else if (t.store_email) setStoreContactEmail(t.store_email);
+          if (cfg.contactPhone) setStoreContactPhone(cfg.contactPhone);
+          else if (t.store_phone) setStoreContactPhone(t.store_phone);
+          if (cfg.contactAddress) setStoreContactAddress(cfg.contactAddress);
+          else if (t.store_address || t.pickup_address)
+            setStoreContactAddress(t.store_address || t.pickup_address || "");
+          if (cfg.contactHours) setStoreContactHours(cfg.contactHours);
+          else if (t.pickup_hours) setStoreContactHours(t.pickup_hours);
 
           // Apply to root immediately
           applyBranding(cfg);
@@ -204,6 +343,40 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
     setLogoUrl(null);
     applyBranding({ logoUrl: null });
     toast.info("Store logo removed");
+  };
+
+  // Reusable helper for uploading storefront images directly to Neon Object Storage
+  const handleGenericImageUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    fieldName: string,
+    onSuccess: (url: string | null) => void,
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload a valid image file (PNG, JPG, SVG, WebP)");
+      return;
+    }
+
+    try {
+      setUploadingField(fieldName);
+      const res = await uploadImage(file, tenantId || tenantSlug);
+      const uploadedUrl = res.data?.url;
+
+      if (uploadedUrl) {
+        onSuccess(uploadedUrl);
+        toast.success(`${fieldName} uploaded to Neon Object Storage!`);
+      } else {
+        throw new Error(res.message || `Failed to upload ${fieldName}`);
+      }
+    } catch (err: unknown) {
+      const error = err as Error;
+      toast.error(error.message || `Failed to upload ${fieldName}`);
+    } finally {
+      setUploadingField(null);
+      e.target.value = "";
+    }
   };
 
   const handleCopySubdomain = () => {
@@ -286,6 +459,34 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
         tagline: tagline,
         storeHeadline: storeHeadline,
         announcementText: announcementText,
+
+        heroBackgroundUrl: heroBackgroundUrl,
+        aboutBackgroundUrl: aboutBackgroundUrl,
+        contactBackgroundUrl: contactBackgroundUrl,
+
+        aboutBadge: aboutBadge,
+        aboutTitle: aboutTitle,
+        aboutDescription: aboutDescription,
+        aboutSecondaryDescription: aboutSecondaryDescription,
+        aboutMission: aboutMission,
+        aboutImageUrl: aboutImageUrl,
+        aboutCardBadge: aboutCardBadge,
+        aboutCardTitle: aboutCardTitle,
+        aboutCardDescription: aboutCardDescription,
+        aboutFeature1Title: aboutFeature1Title,
+        aboutFeature1Desc: aboutFeature1Desc,
+        aboutFeature2Title: aboutFeature2Title,
+        aboutFeature2Desc: aboutFeature2Desc,
+        aboutFeature3Title: aboutFeature3Title,
+        aboutFeature3Desc: aboutFeature3Desc,
+
+        contactBadge: contactBadge,
+        contactHeading: contactHeading,
+        contactSubheading: contactSubheading,
+        contactEmail: storeContactEmail,
+        contactPhone: storeContactPhone,
+        contactAddress: storeContactAddress,
+        contactHours: storeContactHours,
       };
 
       const res = await updateTenant(tenantId, {
@@ -821,62 +1022,6 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
             </div>
           </div>
 
-          {/* Copywriting & Storefront Messaging */}
-          <div className="rounded-2xl border border-border bg-card p-5 md:p-6 shadow-xs space-y-4">
-            <div className="flex items-center gap-2.5 pb-2 border-b border-border">
-              <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                <Sparkles className="size-4" />
-              </div>
-              <div>
-                <h5 className="font-bold text-foreground text-sm">
-                  Storefront Copy & Messaging
-                </h5>
-                <p className="text-xs text-muted-foreground">
-                  Customize the headline, mission statement, and top promotional
-                  announcement banner.
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-3.5 pt-1">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-foreground">
-                  Storefront Hero Headline
-                </Label>
-                <Input
-                  value={storeHeadline}
-                  onChange={(e) => setStoreHeadline(e.target.value)}
-                  placeholder="Official Online Store for ..."
-                  className="text-xs h-9 bg-background"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-foreground">
-                  Brand Tagline & Mission
-                </Label>
-                <Input
-                  value={tagline}
-                  onChange={(e) => setTagline(e.target.value)}
-                  placeholder="Handcrafted artisanal creations..."
-                  className="text-xs h-9 bg-background"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-foreground">
-                  Top Announcement Banner
-                </Label>
-                <Input
-                  value={announcementText}
-                  onChange={(e) => setAnnouncementText(e.target.value)}
-                  placeholder="Free standard shipping on all domestic orders..."
-                  className="text-xs h-9 bg-background"
-                />
-              </div>
-            </div>
-          </div>
-
           {/* Subdomain & Custom Domain */}
           <div className="rounded-2xl border border-border bg-card p-5 md:p-6 shadow-xs space-y-4">
             <div className="flex items-center gap-2.5 pb-2 border-b border-border">
@@ -946,9 +1091,729 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Right Column: Live Interactive Storefront Preview */}
+          {/* Page Specific Content */}
+          <div className="space-y-4 pt-1">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1">
+              <div>
+                <h5 className="font-bold text-foreground text-sm flex items-center gap-2">
+                  <FileText className="size-4 text-primary" />
+                  Page-Specific Content & Customization
+                </h5>
+                <p className="text-xs text-muted-foreground">
+                  Switch between pages below to configure custom copywriting, imagery, and contact information without scrolling through a long form.
+                </p>
+              </div>
+            </div>
+
+            {/* Page Content Switcher */}
+            <div className="flex items-center gap-1.5 p-1 bg-muted/60 rounded-xl border border-border text-xs">
+              <button
+                type="button"
+                onClick={() => handleSwitchContentTab("hero")}
+                className={`flex-1 py-2 px-3 rounded-lg font-semibold transition-all cursor-pointer text-center text-xs flex items-center justify-center gap-1.5 ${
+                  contentTab === "hero"
+                    ? "bg-card text-foreground shadow-xs border border-border/80 font-bold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Sparkles className="size-3.5 text-primary" />
+                <span>Hero / Landing</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSwitchContentTab("about")}
+                className={`flex-1 py-2 px-3 rounded-lg font-semibold transition-all cursor-pointer text-center text-xs flex items-center justify-center gap-1.5 ${
+                  contentTab === "about"
+                    ? "bg-card text-foreground shadow-xs border border-border/80 font-bold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <BookOpen className="size-3.5 text-primary" />
+                <span>About Page</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSwitchContentTab("contact")}
+                className={`flex-1 py-2 px-3 rounded-lg font-semibold transition-all cursor-pointer text-center text-xs flex items-center justify-center gap-1.5 ${
+                  contentTab === "contact"
+                    ? "bg-card text-foreground shadow-xs border border-border/80 font-bold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <MessageSquareText className="size-3.5 text-primary" />
+                <span>Contact Page</span>
+              </button>
+            </div>
+
+            {/* Storefront Hero & Background Media */}
+            {contentTab === "hero" && (
+              <div className="rounded-2xl border border-border bg-card p-5 md:p-6 shadow-xs space-y-4 animate-fadeIn">
+            <div className="flex items-center gap-2.5 pb-2 border-b border-border">
+              <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                <Sparkles className="size-4" />
+              </div>
+              <div>
+                <h5 className="font-bold text-foreground text-sm">
+                  Storefront Hero & Background Media
+                </h5>
+                <p className="text-xs text-muted-foreground">
+                  Customize your storefront hero typography and high-resolution
+                  background imagery.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4 pt-1">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-foreground">
+                  Storefront Hero Headline
+                </Label>
+                <Input
+                  value={storeHeadline}
+                  onChange={(e) => setStoreHeadline(e.target.value)}
+                  placeholder="Official Online Store for ..."
+                  className="text-xs h-9 bg-background"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-foreground">
+                  Brand Tagline & Mission
+                </Label>
+                <Input
+                  value={tagline}
+                  onChange={(e) => setTagline(e.target.value)}
+                  placeholder="Handcrafted artisanal creations..."
+                  className="text-xs h-9 bg-background"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-foreground">
+                  Top Announcement Banner
+                </Label>
+                <Input
+                  value={announcementText}
+                  onChange={(e) => setAnnouncementText(e.target.value)}
+                  placeholder="Free standard shipping on all domestic orders..."
+                  className="text-xs h-9 bg-background"
+                />
+              </div>
+
+              {/* Hero Background Image */}
+              <div className="pt-2 border-t border-border space-y-2">
+                <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <ImageIcon className="size-3.5 text-primary" />
+                  Hero Section Background Image
+                </Label>
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                  <div className="w-full sm:w-32 h-20 rounded-xl border border-border bg-muted/30 overflow-hidden relative group shrink-0">
+                    {heroBackgroundUrl ? (
+                      <Image
+                        src={heroBackgroundUrl}
+                        alt="Hero Background"
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    ) : (
+                      <div className="size-full flex flex-col items-center justify-center text-muted-foreground/50 text-[10px]">
+                        <ImageIcon className="size-5 mb-1" />
+                        <span>No image</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-1.5 w-full">
+                    <input
+                      type="file"
+                      ref={heroBgInputRef}
+                      onChange={(e) =>
+                        handleGenericImageUpload(
+                          e,
+                          "Hero Background",
+                          setHeroBackgroundUrl,
+                        )
+                      }
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        onClick={() => heroBgInputRef.current?.click()}
+                        disabled={uploadingField === "Hero Background"}
+                        variant="outline"
+                        size="md"
+                        className="h-8.5 text-xs gap-1.5 cursor-pointer"
+                      >
+                        {uploadingField === "Hero Background" ? (
+                          <>
+                            <Loader2 className="size-3.5 animate-spin" />
+                            <span>Uploading...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="size-3.5" />
+                            <span>Upload Hero Background</span>
+                          </>
+                        )}
+                      </Button>
+                      {heroBackgroundUrl && (
+                        <Button
+                          type="button"
+                          onClick={() => setHeroBackgroundUrl(null)}
+                          variant="outline"
+                          size="md"
+                          className="h-8.5 text-xs text-red-500 hover:text-red-600 hover:bg-red-500/10 cursor-pointer gap-1"
+                        >
+                          <Trash2 className="size-3" />
+                          <span>Remove</span>
+                        </Button>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Full-bleed image for the main landing page hero section.
+                      Recommended 1920x1080px.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* About Section & Page Content */}
+        {contentTab === "about" && (
+          <div className="rounded-2xl border border-border bg-card p-5 md:p-6 shadow-xs space-y-4 animate-fadeIn">
+            <div className="flex items-center gap-2.5 pb-2 border-b border-border">
+              <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                <BookOpen className="size-4" />
+              </div>
+              <div>
+                <h5 className="font-bold text-foreground text-sm">
+                  About Section & Dedicated Page Content
+                </h5>
+                <p className="text-xs text-muted-foreground">
+                  Update the story, craft philosophy, and showcase cards on your
+                  landing page and /{tenantSlug}/about page.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-foreground">
+                    Section Top Badge
+                  </Label>
+                  <Input
+                    value={aboutBadge}
+                    onChange={(e) => setAboutBadge(e.target.value)}
+                    placeholder="Our Story & Standards"
+                    className="text-xs h-9 bg-background"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-foreground">
+                    About Headline Title
+                  </Label>
+                  <Input
+                    value={aboutTitle}
+                    onChange={(e) => setAboutTitle(e.target.value)}
+                    placeholder="A devotion to craftsmanship..."
+                    className="text-xs h-9 bg-background"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-foreground">
+                  Primary Story Paragraph
+                </Label>
+                <Textarea
+                  value={aboutDescription}
+                  onChange={(e) => setAboutDescription(e.target.value)}
+                  placeholder="At our store, we believe exceptional products begin with intentional curation..."
+                  className="text-xs min-h-20 bg-background resize-y"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-foreground">
+                  Secondary Assurance Paragraph
+                </Label>
+                <Textarea
+                  value={aboutSecondaryDescription}
+                  onChange={(e) => setAboutSecondaryDescription(e.target.value)}
+                  placeholder="Whether you are discovering something new or ordering a signature favorite..."
+                  className="text-xs min-h-16 bg-background resize-y"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-foreground">
+                  Brand Mission Statement
+                </Label>
+                <Input
+                  value={aboutMission}
+                  onChange={(e) => setAboutMission(e.target.value)}
+                  placeholder="To bring authentic excellence and artisanal beauty together..."
+                  className="text-xs h-9 bg-background"
+                />
+              </div>
+
+              {/* Showcase Card Configuration & Image */}
+              <div className="p-4 rounded-xl border border-border bg-muted/20 space-y-3">
+                <Label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                  <Sparkles className="size-3.5 text-primary" />
+                  Showcase Card (Right Side of About Section)
+                </Label>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-medium text-foreground">
+                      Card Badge
+                    </Label>
+                    <Input
+                      value={aboutCardBadge}
+                      onChange={(e) => setAboutCardBadge(e.target.value)}
+                      placeholder="Crafted With Precision"
+                      className="text-xs h-8.5 bg-background"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-medium text-foreground">
+                      Card Title
+                    </Label>
+                    <Input
+                      value={aboutCardTitle}
+                      onChange={(e) => setAboutCardTitle(e.target.value)}
+                      placeholder="Designed For Discerning Clients"
+                      className="text-xs h-8.5 bg-background"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-medium text-foreground">
+                    Card Description
+                  </Label>
+                  <Textarea
+                    value={aboutCardDescription}
+                    onChange={(e) => setAboutCardDescription(e.target.value)}
+                    placeholder="Enjoy seamless checkout, tracked fulfilment, and instant payment settlement..."
+                    className="text-xs min-h-14 bg-background resize-y"
+                  />
+                </div>
+
+                {/* Showcase Card Image Upload */}
+                <div className="pt-2 border-t border-border flex flex-col sm:flex-row items-center gap-3">
+                  <div className="w-full sm:w-28 h-20 rounded-lg border border-border bg-muted/40 overflow-hidden relative shrink-0">
+                    {aboutImageUrl ? (
+                      <Image
+                        src={aboutImageUrl}
+                        alt="About Showcase"
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    ) : (
+                      <div className="size-full flex flex-col items-center justify-center text-muted-foreground/50 text-[10px]">
+                        <ImageIcon className="size-5 mb-1" />
+                        <span>No image</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <input
+                      type="file"
+                      ref={aboutImageInputRef}
+                      onChange={(e) =>
+                        handleGenericImageUpload(
+                          e,
+                          "About Showcase Image",
+                          setAboutImageUrl,
+                        )
+                      }
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        onClick={() => aboutImageInputRef.current?.click()}
+                        disabled={uploadingField === "About Showcase Image"}
+                        variant="outline"
+                        size="md"
+                        className="h-8 text-xs gap-1 cursor-pointer"
+                      >
+                        {uploadingField === "About Showcase Image" ? (
+                          <>
+                            <Loader2 className="size-3 animate-spin" />
+                            <span>Uploading...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="size-3" />
+                            <span>Upload Showcase Image</span>
+                          </>
+                        )}
+                      </Button>
+                      {aboutImageUrl && (
+                        <Button
+                          type="button"
+                          onClick={() => setAboutImageUrl(null)}
+                          variant="outline"
+                          size="md"
+                          className="h-8 text-xs text-red-500 hover:text-red-600 hover:bg-red-500/10 cursor-pointer"
+                        >
+                          <Trash2 className="size-3" />
+                        </Button>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      Photo displayed inside the About feature card on your
+                      storefront and about page.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3 Core Pillars */}
+              <div className="space-y-2 pt-2 border-t border-border">
+                <Label className="text-xs font-semibold text-foreground">
+                  Core Pillars / Standards Badges
+                </Label>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="p-3 rounded-lg border border-border bg-card space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+                      <ShieldCheck className="size-3.5 text-primary" />
+                      <span>Pillar 1</span>
+                    </div>
+                    <Input
+                      value={aboutFeature1Title}
+                      onChange={(e) => setAboutFeature1Title(e.target.value)}
+                      placeholder="Authentic"
+                      className="text-xs h-7.5 bg-background font-semibold"
+                    />
+                    <Input
+                      value={aboutFeature1Desc}
+                      onChange={(e) => setAboutFeature1Desc(e.target.value)}
+                      placeholder="100% Verified"
+                      className="text-[11px] h-7 bg-background text-muted-foreground"
+                    />
+                  </div>
+
+                  <div className="p-3 rounded-lg border border-border bg-card space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+                      <Award className="size-3.5 text-primary" />
+                      <span>Pillar 2</span>
+                    </div>
+                    <Input
+                      value={aboutFeature2Title}
+                      onChange={(e) => setAboutFeature2Title(e.target.value)}
+                      placeholder="Guaranteed"
+                      className="text-xs h-7.5 bg-background font-semibold"
+                    />
+                    <Input
+                      value={aboutFeature2Desc}
+                      onChange={(e) => setAboutFeature2Desc(e.target.value)}
+                      placeholder="Top Craftsmanship"
+                      className="text-[11px] h-7 bg-background text-muted-foreground"
+                    />
+                  </div>
+
+                  <div className="p-3 rounded-lg border border-border bg-card space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+                      <HeartHandshake className="size-3.5 text-primary" />
+                      <span>Pillar 3</span>
+                    </div>
+                    <Input
+                      value={aboutFeature3Title}
+                      onChange={(e) => setAboutFeature3Title(e.target.value)}
+                      placeholder="Bespoke"
+                      className="text-xs h-7.5 bg-background font-semibold"
+                    />
+                    <Input
+                      value={aboutFeature3Desc}
+                      onChange={(e) => setAboutFeature3Desc(e.target.value)}
+                      placeholder="Care in Every Order"
+                      className="text-[11px] h-7 bg-background text-muted-foreground"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* About Background Image */}
+              <div className="pt-2 border-t border-border space-y-2">
+                <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <ImageIcon className="size-3.5 text-primary" />
+                  About Section Ambient Background Image (Optional)
+                </Label>
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                  <div className="w-full sm:w-28 h-16 rounded-lg border border-border bg-muted/30 overflow-hidden relative shrink-0">
+                    {aboutBackgroundUrl ? (
+                      <Image
+                        src={aboutBackgroundUrl}
+                        alt="About Background"
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    ) : (
+                      <div className="size-full flex flex-col items-center justify-center text-muted-foreground/50 text-[10px]">
+                        <ImageIcon className="size-4 mb-0.5" />
+                        <span>No image</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-1 w-full">
+                    <input
+                      type="file"
+                      ref={aboutBgInputRef}
+                      onChange={(e) =>
+                        handleGenericImageUpload(
+                          e,
+                          "About Background",
+                          setAboutBackgroundUrl,
+                        )
+                      }
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        onClick={() => aboutBgInputRef.current?.click()}
+                        disabled={uploadingField === "About Background"}
+                        variant="outline"
+                        size="md"
+                        className="h-8 text-xs gap-1 cursor-pointer"
+                      >
+                        {uploadingField === "About Background" ? (
+                          <>
+                            <Loader2 className="size-3 animate-spin" />
+                            <span>Uploading...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="size-3" />
+                            <span>Upload Background</span>
+                          </>
+                        )}
+                      </Button>
+                      {aboutBackgroundUrl && (
+                        <Button
+                          type="button"
+                          onClick={() => setAboutBackgroundUrl(null)}
+                          variant="outline"
+                          size="md"
+                          className="h-8 text-xs text-red-500 hover:text-red-600 hover:bg-red-500/10 cursor-pointer"
+                        >
+                          <Trash2 className="size-3" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Contact Section & Page Content */}
+        {contentTab === "contact" && (
+          <div className="rounded-2xl border border-border bg-card p-5 md:p-6 shadow-xs space-y-4 animate-fadeIn">
+            <div className="flex items-center gap-2.5 pb-2 border-b border-border">
+              <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                <MessageSquareText className="size-4" />
+              </div>
+              <div>
+                <h5 className="font-bold text-foreground text-sm">
+                  Contact Section & Dedicated Page Content
+                </h5>
+                <p className="text-xs text-muted-foreground">
+                  Update your contact details, inquiry headlines, hours, and
+                  background imagery for /{tenantSlug}/contact and the
+                  storefront CTA banner.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-foreground">
+                    Section Top Badge
+                  </Label>
+                  <Input
+                    value={contactBadge}
+                    onChange={(e) => setContactBadge(e.target.value)}
+                    placeholder="Custom Orders & Inquiries"
+                    className="text-xs h-9 bg-background"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-foreground">
+                    Contact Main Headline
+                  </Label>
+                  <Input
+                    value={contactHeading}
+                    onChange={(e) => setContactHeading(e.target.value)}
+                    placeholder="Request Bespoke Customizations"
+                    className="text-xs h-9 bg-background"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-foreground">
+                  Contact Description / Subheading
+                </Label>
+                <Textarea
+                  value={contactSubheading}
+                  onChange={(e) => setContactSubheading(e.target.value)}
+                  placeholder="Need custom volume orders, personalized modifications, or tailored corporate bundles?..."
+                  className="text-xs min-h-20 bg-background resize-y"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <Mail className="size-3.5 text-primary" />
+                    Public Contact Email
+                  </Label>
+                  <Input
+                    type="email"
+                    value={storeContactEmail}
+                    onChange={(e) => setStoreContactEmail(e.target.value)}
+                    placeholder="hello@yourstore.com"
+                    className="text-xs h-9 bg-background"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <Phone className="size-3.5 text-primary" />
+                    Contact Phone / WhatsApp
+                  </Label>
+                  <Input
+                    value={storeContactPhone}
+                    onChange={(e) => setStoreContactPhone(e.target.value)}
+                    placeholder="+234 800 000 0000"
+                    className="text-xs h-9 bg-background"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <MapPin className="size-3.5 text-primary" />
+                    Physical Atelier / Address
+                  </Label>
+                  <Input
+                    value={storeContactAddress}
+                    onChange={(e) => setStoreContactAddress(e.target.value)}
+                    placeholder="123 Artisan Way, Lagos"
+                    className="text-xs h-9 bg-background"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <Clock className="size-3.5 text-primary" />
+                    Operating / Store Hours
+                  </Label>
+                  <Input
+                    value={storeContactHours}
+                    onChange={(e) => setStoreContactHours(e.target.value)}
+                    placeholder="Mon – Sat: 9:00 AM – 7:00 PM"
+                    className="text-xs h-9 bg-background"
+                  />
+                </div>
+              </div>
+
+              {/* Contact Background Image */}
+              <div className="pt-2 border-t border-border space-y-2">
+                <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <ImageIcon className="size-3.5 text-primary" />
+                  Contact Section Background Image (Optional)
+                </Label>
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                  <div className="w-full sm:w-28 h-16 rounded-lg border border-border bg-muted/30 overflow-hidden relative shrink-0">
+                    {contactBackgroundUrl ? (
+                      <Image
+                        src={contactBackgroundUrl}
+                        alt="Contact Background"
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    ) : (
+                      <div className="size-full flex flex-col items-center justify-center text-muted-foreground/50 text-[10px]">
+                        <ImageIcon className="size-4 mb-0.5" />
+                        <span>No image</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-1 w-full">
+                    <input
+                      type="file"
+                      ref={contactBgInputRef}
+                      onChange={(e) =>
+                        handleGenericImageUpload(
+                          e,
+                          "Contact Background",
+                          setContactBackgroundUrl,
+                        )
+                      }
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        onClick={() => contactBgInputRef.current?.click()}
+                        disabled={uploadingField === "Contact Background"}
+                        variant="outline"
+                        size="md"
+                        className="h-8 text-xs gap-1 cursor-pointer"
+                      >
+                        {uploadingField === "Contact Background" ? (
+                          <>
+                            <Loader2 className="size-3 animate-spin" />
+                            <span>Uploading...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="size-3" />
+                            <span>Upload Background</span>
+                          </>
+                        )}
+                      </Button>
+                      {contactBackgroundUrl && (
+                        <Button
+                          type="button"
+                          onClick={() => setContactBackgroundUrl(null)}
+                          variant="outline"
+                          size="md"
+                          className="h-8 text-xs text-red-500 hover:text-red-600 hover:bg-red-500/10 cursor-pointer"
+                        >
+                          <Trash2 className="size-3" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+
+    {/* Right Column: Live Interactive Storefront Preview */}
         <div className="lg:col-span-5 space-y-4">
           <div className="rounded-2xl border border-border bg-card p-5 space-y-4 sticky top-6 shadow-xs">
             <div className="flex items-center justify-between pb-2 border-b border-border">
@@ -967,6 +1832,43 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
                 <span>Open Live</span>
                 <ExternalLink className="size-3" />
               </a>
+            </div>
+
+            {/* Preview Section Switcher */}
+            <div className="flex items-center gap-1 p-1 bg-muted/60 rounded-lg border border-border text-xs">
+              <button
+                type="button"
+                onClick={() => setPreviewTab("hero")}
+                className={`flex-1 py-1.5 px-2 rounded-md font-semibold transition-all cursor-pointer text-center text-xs ${
+                  previewTab === "hero"
+                    ? "bg-card text-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Hero
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewTab("about")}
+                className={`flex-1 py-1.5 px-2 rounded-md font-semibold transition-all cursor-pointer text-center text-xs ${
+                  previewTab === "about"
+                    ? "bg-card text-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                About
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewTab("contact")}
+                className={`flex-1 py-1.5 px-2 rounded-md font-semibold transition-all cursor-pointer text-center text-xs ${
+                  previewTab === "contact"
+                    ? "bg-card text-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Contact
+              </button>
             </div>
 
             {/* Simulated Storefront Card */}
@@ -1010,56 +1912,167 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
                     className="size-2 rounded-full"
                     style={{ backgroundColor: accentColor }}
                   />
-                  <span className="text-sm text-muted-foreground  truncate max-w-28">
-                    {landingPageType === "custom" ? "Bespoke" : "Standard"}
+                  <span className="text-sm text-muted-foreground truncate max-w-28 capitalize">
+                    {previewTab} Mode
                   </span>
                 </div>
               </div>
 
-              {/* Simulated Hero Body */}
-              <div className="p-6 text-center space-y-3 bg-stone-950 text-white relative overflow-hidden">
-                <div
-                  className="absolute inset-0 opacity-20 blur-2xl pointer-events-none transition-colors"
-                  style={{ backgroundColor: brandColor }}
-                />
-                <div className="flex items-center justify-center gap-2 relative z-10">
-                  <span
-                    className="inline-block px-2.5 py-0.5 rounded-full text-sm font-semibold text-white shadow-xs"
+              {/* Simulated Tab Content */}
+              {previewTab === "hero" && (
+                <div className="p-6 text-center space-y-3 bg-stone-950 text-white relative overflow-hidden min-h-64 flex flex-col justify-center">
+                  {heroBackgroundUrl && (
+                    <div
+                      className="absolute inset-0 bg-cover bg-center transition-all"
+                      style={{ backgroundImage: `url(${heroBackgroundUrl})` }}
+                    />
+                  )}
+                  <div
+                    className={`absolute inset-0 ${heroBackgroundUrl ? "bg-stone-950/80 backdrop-blur-xs" : "bg-stone-950"}`}
+                  />
+                  <div
+                    className="absolute inset-0 opacity-20 blur-2xl pointer-events-none transition-colors"
                     style={{ backgroundColor: brandColor }}
-                  >
-                    Primary Accent
-                  </span>
-                  <span
-                    className="inline-block px-2.5 py-0.5 rounded-full text-sm font-semibold text-white shadow-xs"
-                    style={{ backgroundColor: accentColor }}
-                  >
-                    Secondary Accent
-                  </span>
-                </div>
+                  />
+                  <div className="flex items-center justify-center gap-2 relative z-10">
+                    <span
+                      className="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold text-white shadow-xs"
+                      style={{ backgroundColor: brandColor }}
+                    >
+                      Primary Accent
+                    </span>
+                    <span
+                      className="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold text-white shadow-xs"
+                      style={{ backgroundColor: accentColor }}
+                    >
+                      Secondary Accent
+                    </span>
+                  </div>
 
-                <h5 className="font-bold text-sm text-white relative z-10 leading-snug">
-                  {storeHeadline}
-                </h5>
-                <p className="text-[11px] text-stone-300 relative z-10 max-w-xs mx-auto font-light">
-                  {tagline}
-                </p>
-                <div className="pt-2 relative z-10 flex items-center justify-center gap-2">
-                  <button
-                    type="button"
-                    className="px-4 py-1.5 rounded-md text-[11px] font-bold text-white shadow-lg transition-transform hover:scale-105"
-                    style={{ backgroundColor: brandColor }}
-                  >
-                    Explore Catalog →
-                  </button>
-                  <button
-                    type="button"
-                    className="px-3 py-1.5 rounded-md text-[11px] font-semibold text-white border transition-colors"
-                    style={{ borderColor: accentColor }}
-                  >
-                    Lookbook
-                  </button>
+                  <h5 className="font-bold text-sm text-white relative z-10 leading-snug">
+                    {storeHeadline}
+                  </h5>
+                  <p className="text-[11px] text-stone-300 relative z-10 max-w-xs mx-auto font-light line-clamp-2">
+                    {tagline}
+                  </p>
+                  <div className="pt-2 relative z-10 flex items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      className="px-4 py-1.5 rounded-md text-[11px] font-bold text-white shadow-lg transition-transform hover:scale-105"
+                      style={{ backgroundColor: brandColor }}
+                    >
+                      Explore Catalog →
+                    </button>
+                    <button
+                      type="button"
+                      className="px-3 py-1.5 rounded-md text-[11px] font-semibold text-white border transition-colors"
+                      style={{ borderColor: accentColor }}
+                    >
+                      Custom Orders
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {previewTab === "about" && (
+                <div className="p-5 bg-stone-50 text-stone-900 space-y-3 relative overflow-hidden min-h-64">
+                  {aboutBackgroundUrl && (
+                    <div
+                      className="absolute inset-0 bg-cover bg-center opacity-15"
+                      style={{ backgroundImage: `url(${aboutBackgroundUrl})` }}
+                    />
+                  )}
+                  <div className="relative z-10 space-y-2">
+                    <div
+                      style={{ color: accentColor }}
+                      className="text-[10px] font-bold tracking-widest uppercase"
+                    >
+                      {aboutBadge}
+                    </div>
+                    <h5 className="font-bold text-xs text-stone-950 font-secondary line-clamp-2">
+                      {aboutTitle}
+                    </h5>
+                    <p className="text-[11px] text-stone-600 line-clamp-2 font-light leading-relaxed">
+                      {aboutDescription}
+                    </p>
+
+                    {/* Mini Showcase Card */}
+                    <div className="p-3 rounded-xl bg-stone-900 text-white relative overflow-hidden border border-stone-800 space-y-1">
+                      {aboutImageUrl && (
+                        <div
+                          className="absolute inset-0 bg-cover bg-center opacity-30"
+                          style={{ backgroundImage: `url(${aboutImageUrl})` }}
+                        />
+                      )}
+                      <div className="relative z-10">
+                        <span
+                          style={{
+                            backgroundColor: `${brandColor}40`,
+                            color: "#ffffff",
+                          }}
+                          className="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase"
+                        >
+                          {aboutCardBadge}
+                        </span>
+                        <div className="text-[11px] font-bold mt-1 text-white">
+                          {aboutCardTitle}
+                        </div>
+                        <p className="text-[10px] text-stone-300 line-clamp-1">
+                          {aboutCardDescription}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-1 pt-1 text-[10px] text-stone-700 font-semibold border-t border-stone-200">
+                      <div className="truncate">✓ {aboutFeature1Title}</div>
+                      <div className="truncate">✓ {aboutFeature2Title}</div>
+                      <div className="truncate">✓ {aboutFeature3Title}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {previewTab === "contact" && (
+                <div className="p-5 bg-stone-950 text-white space-y-3 relative overflow-hidden min-h-64 flex flex-col justify-center">
+                  {contactBackgroundUrl && (
+                    <div
+                      className="absolute inset-0 bg-cover bg-center opacity-25"
+                      style={{
+                        backgroundImage: `url(${contactBackgroundUrl})`,
+                      }}
+                    />
+                  )}
+                  <div className="relative z-10 space-y-2 text-center">
+                    <div
+                      style={{ color: accentColor }}
+                      className="text-[10px] font-bold tracking-widest uppercase"
+                    >
+                      {contactBadge}
+                    </div>
+                    <h5 className="font-bold text-xs text-white font-secondary">
+                      {contactHeading}
+                    </h5>
+                    <p className="text-[11px] text-stone-300 max-w-xs mx-auto line-clamp-2 font-light">
+                      {contactSubheading}
+                    </p>
+
+                    <div className="p-3 rounded-xl bg-stone-900/90 border border-stone-800 text-left space-y-1.5 text-[11px] text-stone-300 mt-2">
+                      <div className="flex items-center gap-2 truncate">
+                        <Mail className="size-3 text-primary shrink-0" />
+                        <span className="truncate">{storeContactEmail}</span>
+                      </div>
+                      <div className="flex items-center gap-2 truncate">
+                        <Phone className="size-3 text-primary shrink-0" />
+                        <span className="truncate">{storeContactPhone}</span>
+                      </div>
+                      <div className="flex items-center gap-2 truncate">
+                        <MapPin className="size-3 text-primary shrink-0" />
+                        <span className="truncate">{storeContactAddress}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Color & Mode Summary Pill */}

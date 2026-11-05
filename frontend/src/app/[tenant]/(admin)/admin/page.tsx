@@ -366,13 +366,6 @@ export default function TenantOverviewPage({ params }: AdminPageProps) {
                 Real-time payment settlements through subaccounts
               </p>
             </div>
-            <Link
-              href={getTenantRoute(tenantSlug, "/orders")}
-              className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
-            >
-              <span>View all orders</span>
-              <ChevronRight className="h-3.5 w-3.5" />
-            </Link>
           </div>
 
           <Table>
@@ -522,7 +515,7 @@ export default function TenantOverviewPage({ params }: AdminPageProps) {
           <div className="p-3.5 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
             <span className="text-[11px]">
               Showing {orders.length === 0 ? 0 : latestOrders.length} of{" "}
-              {orders.length} orders (latest 5)
+              {orders.length} orders
             </span>
             <Link
               href={getTenantRoute(tenantSlug, "/orders")}

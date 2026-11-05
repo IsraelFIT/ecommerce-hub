@@ -117,6 +117,7 @@ export interface Product {
   reviews_count?: number;
   is_liked?: boolean;
   likes_count?: number;
+  units_sold?: number;
 }
 
 export interface CreateProductInput {

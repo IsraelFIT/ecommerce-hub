@@ -186,7 +186,9 @@ class ProductResponse(BaseModel):
     average_rating: Optional[float] = 0.0
     reviews_count: Optional[int] = 0
     is_liked: Optional[bool] = False
+    units_sold: Optional[int] = 0
     likes_count: Optional[int] = 0
+    units_sold: Optional[int] = 0
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -217,6 +219,7 @@ class ProductMenuSummaryResponse(BaseModel):
     average_rating: Optional[float] = 0.0
     reviews_count: Optional[int] = 0
     is_liked: Optional[bool] = False
+    units_sold: Optional[int] = 0
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -241,7 +244,9 @@ class ProductSummaryResponse(BaseModel):
     average_rating: Optional[float] = 0.0
     reviews_count: Optional[int] = 0
     is_liked: Optional[bool] = False
+    units_sold: Optional[int] = 0
     likes_count: Optional[int] = 0
+    units_sold: Optional[int] = 0
 
     model_config = ConfigDict(from_attributes=True)
 

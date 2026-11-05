@@ -61,8 +61,8 @@ export function StoreHeader() {
     { label: "Home", href: getTenantRoute(tenant, "/") },
     { label: "Menu", href: getTenantRoute(tenant, "/menu") },
     { label: "Track", href: getTenantRoute(tenant, "/track") },
-    { label: "About", href: getTenantRoute(tenant, "/#about") },
-    { label: "Contact", href: getTenantRoute(tenant, "/#consultations") },
+    { label: "About", href: getTenantRoute(tenant, "/about") },
+    { label: "Contact", href: getTenantRoute(tenant, "/contact") },
   ];
 
   const formattedStoreName = tenant

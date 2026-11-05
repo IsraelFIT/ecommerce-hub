@@ -127,6 +127,7 @@ export default async function MenuItemPage({ params }: PageProps) {
     sku: primaryVariant?.sku || product.sku || undefined,
     stock_quantity:
       primaryVariant?.stock_quantity ?? product.inventory_count ?? 0,
+    units_sold: product.units_sold ?? product.sales ?? 0,
   };
 
   return (

@@ -43,6 +43,37 @@ export interface BrandingConfig {
   settlementBankName?: string | null;
   settlementAccount?: string | null;
   settlementAccountName?: string | null;
+
+  // Hero & Background Images
+  heroBackgroundUrl?: string | null;
+  aboutBackgroundUrl?: string | null;
+  contactBackgroundUrl?: string | null;
+
+  // About Content
+  aboutBadge?: string | null;
+  aboutTitle?: string | null;
+  aboutDescription?: string | null;
+  aboutSecondaryDescription?: string | null;
+  aboutMission?: string | null;
+  aboutImageUrl?: string | null;
+  aboutCardBadge?: string | null;
+  aboutCardTitle?: string | null;
+  aboutCardDescription?: string | null;
+  aboutFeature1Title?: string | null;
+  aboutFeature1Desc?: string | null;
+  aboutFeature2Title?: string | null;
+  aboutFeature2Desc?: string | null;
+  aboutFeature3Title?: string | null;
+  aboutFeature3Desc?: string | null;
+
+  // Contact Content
+  contactBadge?: string | null;
+  contactHeading?: string | null;
+  contactSubheading?: string | null;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+  contactAddress?: string | null;
+  contactHours?: string | null;
 }
 
 export interface CustomizationRequest {

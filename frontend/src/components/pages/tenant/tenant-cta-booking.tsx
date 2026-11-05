@@ -18,13 +18,29 @@ export function TenantCtaBooking({
   const primaryColor = branding?.primaryColor || "#059669";
   const secondaryColor = branding?.secondaryColor || branding?.accentColor;
 
+  const contactBadge = branding?.contactBadge || "Custom Orders & Inquiries";
+  const contactHeading =
+    branding?.contactHeading || "Request Bespoke Customizations";
+  const contactSubheading =
+    branding?.contactSubheading ||
+    `Need custom volume orders, personalized modifications, or tailored corporate bundles from ${storeName}? Connect directly with our team for personalized quotes and expedited fulfilment.`;
+  const bgImage = branding?.contactBackgroundUrl;
+
   return (
     <section
       id="consultations"
       className="relative py-24 md:py-32 flex items-center justify-center overflow-hidden bg-stone-950 text-white"
     >
-      {/* Background Ambient Decor */}
-      <div className="absolute inset-0 bg-radial-[at_center] from-stone-800 via-stone-900 to-stone-950" />
+      {/* Background Ambient Decor & Optional Image */}
+      {bgImage && (
+        <div
+          className="absolute inset-0 z-0 bg-cover bg-center transition-all duration-700"
+          style={{ backgroundImage: `url(${bgImage})` }}
+        />
+      )}
+      <div
+        className={`absolute inset-0 z-0 ${bgImage ? "bg-stone-950/85 backdrop-blur-xs" : "bg-radial-[at_center] from-stone-800 via-stone-900 to-stone-950"}`}
+      />
       <div
         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-175 h-125 rounded-full blur-3xl pointer-events-none opacity-20 transition-colors duration-500"
         style={{ backgroundColor: primaryColor }}
@@ -47,24 +63,19 @@ export function TenantCtaBooking({
           style={{ color: primaryColor }}
           className="inline-flex items-center gap-1.5 text-xs font-bold tracking-[0.25em] uppercase mb-2"
         >
-          <span>Custom Orders & Inquiries</span>
+          <span>{contactBadge}</span>
         </div>
 
         <h3 className="font-semibold uppercase mb-4 text-stone-950">
-          Request Bespoke Customizations
+          {contactHeading}
         </h3>
 
-        <p className="mb-10 max-w-xl mx-auto text-stone-600 font-light text-sm md:text-base leading-relaxed">
-          Need custom volume orders, personalized modifications, or tailored
-          corporate bundles from {storeName}? Connect directly with our team for
-          personalized quotes and expedited fulfilment.
+        <p className="mb-10 max-w-xl mx-auto text-stone-600 font-light text-sm md:text-base leading-relaxed whitespace-pre-line">
+          {contactSubheading}
         </p>
 
-        <Link href={`/${tenantSlug}#contact`}>
-          <Button
-            className="text-white font-bold tracking-wider transition-all uppercase h-12 px-8 cursor-pointer shadow-lg gap-2 hover:opacity-90 active:scale-95"
-            style={{ backgroundColor: primaryColor }}
-          >
+        <Link href={`/${tenantSlug}/contact`}>
+          <Button className="px-6 font-bold uppercase">
             <MessageSquare className="h-4 w-4" />
             <span>Send Direct Inquiry</span>
             <ArrowRight className="h-4 w-4" />

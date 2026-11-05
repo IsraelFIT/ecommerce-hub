@@ -38,3 +38,31 @@ export const BESPOKE_STOREFRONTS: Record<
 export function hasBespokeStorefront(tenantSlug: string): boolean {
   return Boolean(BESPOKE_STOREFRONTS[tenantSlug.toLowerCase()]);
 }
+
+/**
+ * Registry of Bespoke Custom About Pages per tenant slug.
+ */
+export const BESPOKE_ABOUT_PAGES: Record<
+  string,
+  ComponentType<BespokeStorefrontProps>
+> = {
+  // If a bespoke tenant implements a custom about page, it can be registered here.
+};
+
+export function hasBespokeAbout(tenantSlug: string): boolean {
+  return Boolean(BESPOKE_ABOUT_PAGES[tenantSlug.toLowerCase()]);
+}
+
+/**
+ * Registry of Bespoke Custom Contact Pages per tenant slug.
+ */
+export const BESPOKE_CONTACT_PAGES: Record<
+  string,
+  ComponentType<BespokeStorefrontProps>
+> = {
+  // If a bespoke tenant implements a custom contact page, it can be registered here.
+};
+
+export function hasBespokeContact(tenantSlug: string): boolean {
+  return Boolean(BESPOKE_CONTACT_PAGES[tenantSlug.toLowerCase()]);
+}

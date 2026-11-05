@@ -110,7 +110,7 @@ export function MenuCard({
       : (raw.image as string)
     : "";
 
-  const categoryBadge = raw.category || "Signature";
+  // const categoryBadge = raw.category || "Signature";
   const currency = raw.currency || tenantCurrency;
 
   // Variants & Pricing in Core + JSONB + Variant architecture
@@ -280,7 +280,7 @@ export function MenuCard({
               >
                 {stockBadgeText}
               </Badge>
-              <Badge
+              {/* <Badge
                 variant="outline"
                 style={{
                   backgroundColor: "rgba(255, 255, 255, 0.85)",
@@ -290,7 +290,7 @@ export function MenuCard({
                 className="text-[10px] font-semibold uppercase tracking-wider backdrop-blur-xs shadow-xs rounded-md px-2 py-0.5"
               >
                 {categoryBadge}
-              </Badge>
+              </Badge> */}
             </div>
 
             {/* Favorite / Heart Button */}

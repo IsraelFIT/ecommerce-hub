@@ -45,6 +45,37 @@ class BrandingConfig(BaseModel):
     settlementAccount: Optional[str] = Field(default=None, description="NUBAN settlement account number")
     settlementAccountName: Optional[str] = Field(default=None, description="Verified account holder name")
 
+    # Hero & Background images
+    heroBackgroundUrl: Optional[str] = Field(default=None, description="Hero background image URL")
+    aboutBackgroundUrl: Optional[str] = Field(default=None, description="About section background image URL")
+    contactBackgroundUrl: Optional[str] = Field(default=None, description="Contact section background image URL")
+
+    # About Content
+    aboutBadge: Optional[str] = Field(default=None, description="About section top badge")
+    aboutTitle: Optional[str] = Field(default=None, description="About section main title")
+    aboutDescription: Optional[str] = Field(default=None, description="About section main description / story")
+    aboutSecondaryDescription: Optional[str] = Field(default=None, description="About section secondary story paragraph")
+    aboutMission: Optional[str] = Field(default=None, description="About mission statement")
+    aboutImageUrl: Optional[str] = Field(default=None, description="About showcase card image URL")
+    aboutCardBadge: Optional[str] = Field(default=None, description="Showcase card badge")
+    aboutCardTitle: Optional[str] = Field(default=None, description="Showcase card title")
+    aboutCardDescription: Optional[str] = Field(default=None, description="Showcase card description")
+    aboutFeature1Title: Optional[str] = Field(default=None, description="Feature 1 Title")
+    aboutFeature1Desc: Optional[str] = Field(default=None, description="Feature 1 Description")
+    aboutFeature2Title: Optional[str] = Field(default=None, description="Feature 2 Title")
+    aboutFeature2Desc: Optional[str] = Field(default=None, description="Feature 2 Description")
+    aboutFeature3Title: Optional[str] = Field(default=None, description="Feature 3 Title")
+    aboutFeature3Desc: Optional[str] = Field(default=None, description="Feature 3 Description")
+
+    # Contact Content
+    contactBadge: Optional[str] = Field(default=None, description="Contact section top badge")
+    contactHeading: Optional[str] = Field(default=None, description="Contact section heading")
+    contactSubheading: Optional[str] = Field(default=None, description="Contact section description / subheading")
+    contactEmail: Optional[str] = Field(default=None, description="Contact support email")
+    contactPhone: Optional[str] = Field(default=None, description="Contact support phone")
+    contactAddress: Optional[str] = Field(default=None, description="Store contact physical address")
+    contactHours: Optional[str] = Field(default=None, description="Store contact operating hours")
+
 
 class TenantBase(BaseModel):
     name: str = Field(..., min_length=2, max_length=255, description="Tenant organization name")

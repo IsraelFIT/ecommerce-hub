@@ -12,6 +12,7 @@ from app.models.user import User
 from app.models.tenant import Tenant
 from app.models.review import Review
 from app.models.like import ProductLike
+from app.models.product import ProductVariant
 from app.config import settings
 from app.core.redis import (
     cache,
@@ -124,12 +125,48 @@ async def enrich_products_metadata(
     except Exception:
         pass
 
+    # 3. Fetch total units sold per product across confirmed/paid orders
+    units_sold_map: Dict[uuid.UUID, int] = {}
+    try:
+        from sqlalchemy import text
+        # Resolve all variant IDs belonging to these products so orders containing either product_id or variant_id are counted
+        v_res = await db.execute(
+            select(ProductVariant.id, ProductVariant.product_id).where(
+                ProductVariant.product_id.in_(product_ids)
+            )
+        )
+        id_to_product_map: Dict[str, uuid.UUID] = {str(pid): pid for pid in product_ids}
+        for vid, parent_pid in v_res.all():
+            id_to_product_map[str(vid)] = parent_pid
+
+        target_ids = list(id_to_product_map.keys())
+        sold_stmt = text("""
+            SELECT 
+                item->>'product_id' AS target_id,
+                SUM(COALESCE((item->>'quantity')::int, 1)) AS total_sold
+            FROM orders,
+            json_array_elements(CASE WHEN json_typeof(items) = 'array' THEN items ELSE '[]'::json END) AS item
+            WHERE is_deleted = false
+              AND LOWER(status::text) IN ('paid', 'delivered', 'accepted', 'processing', 'shipped', 'fulfilled')
+              AND item->>'product_id' = ANY(:target_ids)
+            GROUP BY item->>'product_id'
+        """)
+        sold_res = await db.execute(sold_stmt, {"target_ids": target_ids})
+        for row in sold_res.all():
+            parent_pid = id_to_product_map.get(str(row[0]))
+            if parent_pid:
+                units_sold_map[parent_pid] = units_sold_map.get(parent_pid, 0) + int(row[1] or 0)
+    except Exception:
+        pass
+
     # 4. Attach to each ProductResponse
     for p in products:
         p.average_rating = rating_map.get(p.id, 0.0)
         p.reviews_count = reviews_count_map.get(p.id, 0)
         p.is_liked = p.id in liked_product_ids
         p.likes_count = likes_count_map.get(p.id, 0)
+        spec_sold = (p.specifications or {}).get("units_sold") if hasattr(p, "specifications") else None
+        p.units_sold = units_sold_map.get(p.id, int(spec_sold) if spec_sold is not None else 0)
 
     return products
 

@@ -8,6 +8,7 @@ export interface TenantSellerStats {
   rating: number;
   review_count: number;
   orders_fulfilled: number;
+  total_products?: number;
   member_since: number;
 }
 

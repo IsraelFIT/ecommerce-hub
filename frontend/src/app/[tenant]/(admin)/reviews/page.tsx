@@ -35,6 +35,7 @@ import {
   getReviews,
   getReviewStats,
   updateReviewStatus,
+  toggleReviewFeatured,
   deleteReview,
   type ReviewItem,
   type ReviewStats,
@@ -144,6 +145,46 @@ export default function TenantReviewsAdminPage() {
     }
   };
 
+  const handleToggleFeatured = async (
+    reviewId: string,
+    currentFeatured: boolean,
+  ) => {
+    const nextFeatured = !currentFeatured;
+    const currentlyFeaturedCount = reviews.filter((r) => r.is_featured).length;
+    if (nextFeatured && currentlyFeaturedCount >= 3) {
+      toast.error(
+        "A maximum of 3 reviews can be featured on your storefront. Please unfeature another review first.",
+      );
+      return;
+    }
+    try {
+      const res = await toggleReviewFeatured(
+        reviewId,
+        nextFeatured,
+        activeTenantSlug,
+      );
+      if (res.status === "success") {
+        toast.success(
+          nextFeatured
+            ? "Review featured on storefront (max 3)"
+            : "Review unfeatured from storefront",
+        );
+        setReviews((prev) =>
+          prev.map((r) =>
+            r.id === reviewId ? { ...r, is_featured: nextFeatured } : r,
+          ),
+        );
+      } else {
+        toast.error(res.message || "Failed to update featured status");
+      }
+    } catch (err: unknown) {
+      console.error(err);
+      const msg =
+        err instanceof Error ? err.message : "Failed to update featured status";
+      toast.error(msg);
+    }
+  };
+
   const handleDelete = (reviewId: string) => {
     confirmToast({
       title: "Delete Review?",
@@ -200,6 +241,15 @@ export default function TenantReviewsAdminPage() {
             </h4>
             <Badge variant="outline" className="text-xs">
               {activeTenantSlug}
+            </Badge>
+            <Badge
+              variant="secondary"
+              className="text-xs gap-1 bg-amber-500/10 text-amber-600 border border-amber-300 dark:border-amber-700/50"
+            >
+              <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
+              <span>
+                Featured: {reviews.filter((r) => r.is_featured).length}/3
+              </span>
             </Badge>
           </div>
         </div>
@@ -281,6 +331,9 @@ export default function TenantReviewsAdminPage() {
               <TableHead className="text-xs font-bold text-foreground">
                 Status
               </TableHead>
+              <TableHead className="text-xs font-bold text-foreground text-center">
+                Featured (Max 3)
+              </TableHead>
               <TableHead className="text-xs font-bold text-foreground text-right">
                 Actions
               </TableHead>
@@ -317,6 +370,9 @@ export default function TenantReviewsAdminPage() {
                   <TableCell className="py-3">
                     <Skeleton className="h-5 w-16 rounded-full" />
                   </TableCell>
+                  <TableCell className="py-3 text-center">
+                    <Skeleton className="h-6 w-16 rounded-full mx-auto" />
+                  </TableCell>
                   <TableCell className="py-3 text-right">
                     <div className="flex items-center justify-end gap-1.5">
                       <Skeleton className="h-7 w-16 rounded-md" />
@@ -328,7 +384,7 @@ export default function TenantReviewsAdminPage() {
             ) : paginatedReviews.length === 0 ? (
               <TableRow className="border-border">
                 <TableCell
-                  colSpan={6}
+                  colSpan={7}
                   className="h-32 text-center text-xs text-muted-foreground"
                 >
                   No reviews found matching the criteria.
@@ -402,6 +458,34 @@ export default function TenantReviewsAdminPage() {
                         }`}
                       >
                         {r.status.charAt(0).toUpperCase() + r.status.slice(1)}
+                      </button>
+                    </TableCell>
+
+                    <TableCell className="text-center">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleToggleFeatured(r.id, !!r.is_featured)
+                        }
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all cursor-pointer ${
+                          r.is_featured
+                            ? "bg-amber-500/15 text-amber-600 border-amber-300 dark:border-amber-700/50 hover:bg-amber-500/25"
+                            : "bg-muted text-muted-foreground border-border hover:bg-accent hover:text-foreground"
+                        }`}
+                        title={
+                          r.is_featured
+                            ? "Click to unfeature"
+                            : "Feature on storefront (max 3)"
+                        }
+                      >
+                        <Star
+                          className={`h-3 w-3 ${
+                            r.is_featured
+                              ? "fill-amber-500 text-amber-500"
+                              : ""
+                          }`}
+                        />
+                        <span>{r.is_featured ? "Featured" : "Feature"}</span>
                       </button>
                     </TableCell>
 

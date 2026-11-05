@@ -94,6 +94,7 @@ export interface Product {
   description?: string | null;
   product_class?: ProductClass;
   is_published?: boolean;
+  is_featured?: boolean;
   specifications?: Record<string, unknown>; // Flexible JSONB metadata: { "author": "Tolkien", "brand": "Sony" }
   filters?: Record<string, string[]>; // Dynamic assigned filter values: { "dietary": ["Vegan", "Gluten-Free"], "occasion": ["Birthday"] }
   category_id?: string | null;
@@ -133,6 +134,7 @@ export interface CreateProductInput {
   images?: string[];
   availability?: "available" | "preorder" | string;
   is_published?: boolean;
+  is_featured?: boolean;
   variants?: ProductVariantInput[];
 
   // Fallbacks
@@ -155,6 +157,7 @@ export interface UpdateProductInput {
   images?: string[];
   availability?: "available" | "preorder" | string;
   is_published?: boolean;
+  is_featured?: boolean;
   variants?: ProductVariantInput[];
 
   // Fallbacks

@@ -14,6 +14,7 @@ from app.models.user import User
 from app.schemas.review import (
     ReviewCreate,
     ReviewUpdateStatus,
+    ReviewUpdateFeatured,
     ReviewResponse,
     ReviewStatsResponse,
 )
@@ -81,6 +82,7 @@ async def resolve_tenant_flexible(
 async def list_reviews(
     product_id: Optional[uuid.UUID] = None,
     status_filter: Optional[str] = Query(None, alias="status"),
+    featured_only: Optional[bool] = Query(None, alias="is_featured"),
     search: Optional[str] = Query(None),
     rating: Optional[int] = Query(None),
     page: int = 1,
@@ -108,6 +110,9 @@ async def list_reviews(
     if status_filter and status_filter.lower() != "all":
         query = query.where(Review.status == status_filter.lower())
 
+    if featured_only is not None:
+        query = query.where(Review.is_featured == featured_only)
+
     if rating is not None and rating > 0:
         query = query.where(Review.rating == rating)
 
@@ -128,6 +133,8 @@ async def list_reviews(
         count_query = count_query.where(Review.product_id == product_id)
     if status_filter and status_filter.lower() != "all":
         count_query = count_query.where(Review.status == status_filter.lower())
+    if featured_only is not None:
+        count_query = count_query.where(Review.is_featured == featured_only)
     if rating is not None and rating > 0:
         count_query = count_query.where(Review.rating == rating)
     if search and search.strip():
@@ -312,6 +319,66 @@ async def update_review_status(
     return success_response(
         data=resp.model_dump(mode="json"),
         message=f"Review status updated to {payload.status}",
+    )
+
+
+@router.patch(
+    "/{review_id}/featured",
+    response_model=ApiResponse[ReviewResponse],
+    summary="Toggle review featured status (max 3)",
+)
+async def toggle_review_featured(
+    review_id: uuid.UUID,
+    payload: ReviewUpdateFeatured,
+    tenant: Tenant = Depends(get_tenant_context),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_tenant_admin),
+) -> Dict[str, Any]:
+    result = await db.execute(
+        select(Review)
+        .where(
+            Review.id == review_id,
+            Review.tenant_id == tenant.id,
+            Review.is_deleted == False,
+        )
+        .options(selectinload(Review.product))
+        .with_for_update()
+    )
+    review = result.scalar_one_or_none()
+    if not review:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Review not found",
+        )
+
+    if payload.is_featured and not review.is_featured:
+        # Check current count of featured reviews for this tenant
+        count_res = await db.execute(
+            select(func.count(Review.id)).where(
+                Review.tenant_id == tenant.id,
+                Review.is_featured == True,
+                Review.is_deleted == False,
+                Review.id != review_id,
+            )
+        )
+        current_featured = count_res.scalar() or 0
+        if current_featured >= 3:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="A maximum of 3 reviews can be featured. Please unfeature another review first.",
+            )
+
+    review.is_featured = payload.is_featured
+    await db.commit()
+    await db.refresh(review)
+
+    resp = ReviewResponse.model_validate(review)
+    if review.product:
+        resp.product_name = review.product.name or review.product.title
+
+    return success_response(
+        data=resp.model_dump(mode="json"),
+        message="Review featured status updated successfully",
     )
 
 

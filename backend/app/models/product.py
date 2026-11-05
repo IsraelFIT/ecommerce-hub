@@ -95,6 +95,7 @@ class Product(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
 
     # Product Availability: "available" | "preorder"
     availability: Mapped[Optional[str]] = mapped_column(String(50), default="available", nullable=True)
+    is_featured: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Legacy category name fallback
     category_name: Mapped[Optional[str]] = mapped_column(String(100), default="General", nullable=True)

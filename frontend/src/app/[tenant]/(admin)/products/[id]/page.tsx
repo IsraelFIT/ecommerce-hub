@@ -10,6 +10,7 @@ import {
   Save,
   Trash2,
   Globe,
+  Star,
   UploadCloud,
   Sparkles,
   Layers,
@@ -131,6 +132,7 @@ export default function TenantProductDetailPage({
     }
   }, [tenant?.currency]);
   const [isPublished, setIsPublished] = useState(true);
+  const [isFeatured, setIsFeatured] = useState(false);
   const [images, setImages] = useState<string[]>([]);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
   const [customImageUrl, setCustomImageUrl] = useState("");
@@ -273,6 +275,7 @@ export default function TenantProductDetailPage({
           p.currency || tenant?.currency || user?.tenant_currency || "NGN",
         );
         setIsPublished(p.is_published ?? true);
+        setIsFeatured(p.is_featured ?? false);
         const rawImages =
           p.images && p.images.length > 0 ? p.images.slice(0, 5) : [];
         setImages(rawImages);
@@ -769,6 +772,7 @@ export default function TenantProductDetailPage({
         images: images.slice(0, 5),
         availability,
         is_published: isPublished,
+        is_featured: isFeatured,
         // Legacy fallbacks
         sku: primaryVariant.sku,
         price: primaryVariant.price,
@@ -1082,6 +1086,30 @@ export default function TenantProductDetailPage({
         </div>
 
         <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant={isFeatured ? "default" : "outline"}
+            size="sm"
+            onClick={() => {
+              setIsFeatured((prev) => !prev);
+              toast.info(
+                !isFeatured
+                  ? "Product will be featured on the storefront collection"
+                  : "Product removed from featured collection",
+              );
+            }}
+            className={`text-xs h-8 gap-1.5 transition-colors ${
+              isFeatured
+                ? "bg-amber-500 hover:bg-amber-600 text-white border-amber-600 font-semibold"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Star
+              className={`h-3.5 w-3.5 ${isFeatured ? "fill-white text-white" : ""}`}
+            />
+            <span>{isFeatured ? "Featured Product" : "Feature Product"}</span>
+          </Button>
+
           <Button
             variant="outline"
             size="sm"

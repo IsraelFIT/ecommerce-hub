@@ -74,6 +74,25 @@ export interface BrandingConfig {
   contactPhone?: string | null;
   contactAddress?: string | null;
   contactHours?: string | null;
+
+  // Banner Content
+  bannerBadge?: string | null;
+  bannerHeadline?: string | null;
+  bannerDescription?: string | null;
+  bannerButtonText?: string | null;
+  bannerButtonLink?: string | null;
+
+  // Stats Strip (Pick up to 4 stats)
+  statsConfig?: StatConfigItem[] | null;
+}
+
+export interface StatConfigItem {
+  id: string;
+  type: "satisfaction" | "orders" | "products" | "custom";
+  label: string;
+  value?: string;
+  customValue?: string;
+  enabled?: boolean;
 }
 
 export interface CustomizationRequest {

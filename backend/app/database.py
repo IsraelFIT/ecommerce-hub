@@ -77,6 +77,8 @@ async def init_db():
                     await conn.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS category VARCHAR(100) DEFAULT 'General';"))
                     await conn.execute(text("UPDATE products SET category_name = category WHERE category_name IS NULL AND category IS NOT NULL;"))
                     await conn.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS availability VARCHAR(50) DEFAULT 'available';"))
+                    await conn.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT FALSE;"))
+                    await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_products_is_featured ON products (is_featured);"))
                     await conn.execute(text("ALTER TABLE categories ADD COLUMN IF NOT EXISTS description TEXT;"))
                     await conn.execute(text("ALTER TABLE categories ADD COLUMN IF NOT EXISTS icon VARCHAR(100);"))
                     await conn.execute(text("ALTER TABLE categories ADD COLUMN IF NOT EXISTS display_order INTEGER DEFAULT 0;"))
@@ -117,6 +119,8 @@ async def init_db():
                     await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_reviews_tenant_id ON reviews (tenant_id);"))
                     await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_reviews_product_id ON reviews (product_id);"))
                     await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_reviews_status ON reviews (status);"))
+                    await conn.execute(text("ALTER TABLE reviews ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT FALSE;"))
+                    await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_reviews_is_featured ON reviews (is_featured);"))
 
                     await conn.execute(text("""
                         CREATE TABLE IF NOT EXISTS product_likes (

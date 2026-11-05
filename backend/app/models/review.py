@@ -1,6 +1,6 @@
 import uuid
 from typing import Optional
-from sqlalchemy import String, Text, Integer, ForeignKey
+from sqlalchemy import String, Text, Integer, ForeignKey, Boolean
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
@@ -35,6 +35,7 @@ class Review(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
     customer_name: Mapped[str] = mapped_column(String(100), default="Verified Buyer", nullable=False)
     customer_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(50), default="approved", nullable=False)  # approved, pending, rejected
+    is_featured: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     tenant = relationship("Tenant", back_populates="reviews")
     product = relationship("Product", back_populates="reviews")

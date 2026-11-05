@@ -194,6 +194,7 @@ async def list_products(
     rating: Optional[float] = Query(None, description="Minimum average rating filter"),
     availability: Optional[str] = Query(None, description="Availability filter ('available', 'preorder', 'schedule')"),
     product_class: Optional[str] = Query(None, description="Product class filter ('physical', 'digital', 'service')"),
+    featured_only: Optional[bool] = Query(None, alias="is_featured", description="Filter by featured status"),
     search: Optional[str] = Query(None, description="Search keyword filter"),
     filters: Optional[str] = Query(None, description="JSON-encoded dynamic filters dictionary"),
     authorization: Optional[str] = Header(None, alias="Authorization"),
@@ -255,7 +256,7 @@ async def list_products(
         tenant.slug,
         "products",
         "list",
-        f"p{page}_l{per_page}_cat{category or 'all'}_avail{availability or 'all'}_s{search or 'none'}_cls{product_class or 'all'}_min{min_price}_max{max_price}_r{rating}",
+        f"p{page}_l{per_page}_cat{category or 'all'}_avail{availability or 'all'}_feat{featured_only}_s{search or 'none'}_cls{product_class or 'all'}_min{min_price}_max{max_price}_r{rating}",
     )
     if is_public:
         cached = await cache.get_json(cache_key)
@@ -277,6 +278,7 @@ async def list_products(
         search=search,
         filters=parsed_filters or None,
         product_class=product_class,
+        is_featured=featured_only,
     )
     
     enriched_products = await enrich_products_metadata(
@@ -306,6 +308,7 @@ async def list_products(
         search=search,
         filters=parsed_filters or None,
         product_class=product_class,
+        is_featured=featured_only,
     )
 
     last_page = max(1, (total + per_page - 1) // per_page)

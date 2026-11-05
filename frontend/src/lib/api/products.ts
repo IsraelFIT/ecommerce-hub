@@ -21,6 +21,7 @@ export interface GetProductsOptions {
   max_price?: number;
   rating?: number;
   availability?: string;
+  is_featured?: boolean;
   search?: string;
   filters?: Record<string, string[]>;
 }
@@ -42,6 +43,7 @@ export async function getProducts(
     max_price,
     rating,
     availability,
+    is_featured,
     search,
     filters,
   } = options || {};
@@ -51,6 +53,10 @@ export async function getProducts(
     per_page: per_page.toString(),
     published_only: published_only.toString(),
   });
+
+  if (is_featured !== undefined && is_featured !== null) {
+    queryParams.set("is_featured", is_featured.toString());
+  }
 
   if (category && category.trim() && category.toUpperCase() !== "ALL") {
     queryParams.set("category", category.trim());

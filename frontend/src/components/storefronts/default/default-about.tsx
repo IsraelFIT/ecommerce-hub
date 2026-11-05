@@ -65,19 +65,24 @@ export function DefaultAbout({
     <div className="flex min-h-screen flex-col bg-stone-50 text-stone-900 selection:bg-stone-950 selection:text-white">
       {/* Hero Header */}
       <section className="relative py-20 md:py-28 overflow-hidden bg-stone-950 text-white">
-        {heroBg && (
-          <div
-            className="absolute inset-0 z-0 bg-cover bg-center transition-all duration-700"
-            style={{ backgroundImage: `url(${heroBg})` }}
-          />
+        {heroBg ? (
+          <>
+            <div
+              className="absolute inset-0 z-0 bg-cover bg-center transition-all duration-700"
+              style={{ backgroundImage: `url(${heroBg})` }}
+            />
+            <div className="absolute inset-0 bg-black/40 z-10" />
+          </>
+        ) : (
+          <>
+            <div className="absolute inset-0 z-0 bg-radial-[at_top_right] from-stone-800 via-stone-900 to-stone-950" />
+            <div
+              className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-120 h-120 rounded-full blur-3xl pointer-events-none opacity-20 transition-colors duration-500"
+              style={{ backgroundColor: primaryColor }}
+            />
+            <div className="absolute inset-0 bg-black/40 z-10" />
+          </>
         )}
-        <div
-          className={`absolute inset-0 z-0 ${heroBg ? "bg-stone-950/85 backdrop-blur-xs" : "bg-radial-[at_top_right] from-stone-800 via-stone-900 to-stone-950"}`}
-        />
-        <div
-          className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-120 h-120 rounded-full blur-3xl pointer-events-none opacity-20 transition-colors duration-500"
-          style={{ backgroundColor: primaryColor }}
-        />
 
         <div className="container relative z-10 flex-col gap-0 items-center">
           {/* Breadcrumb */}

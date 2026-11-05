@@ -28,7 +28,11 @@ import {
   Award,
   HeartHandshake,
   FileText,
+  BarChart3,
+  Megaphone,
+  Plus,
 } from "lucide-react";
+import type { StatConfigItem } from "@/types";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -169,16 +173,64 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
     "Monday – Saturday: 9:00 AM – 7:00 PM",
   );
 
+  // Banner Content State
+  const [bannerBadge, setBannerBadge] = useState("Elevate Your Collection");
+  const [bannerHeadline, setBannerHeadline] = useState(
+    `Experience Excellence at ${formattedStoreName}`,
+  );
+  const [bannerDescription, setBannerDescription] = useState(
+    "Discover exclusive collections, enjoy secure multi-currency payment checkout, and have authentic goods delivered right to your doorstep.",
+  );
+  const [bannerButtonText, setBannerButtonText] = useState("Shop Now");
+  const [bannerButtonLink, setBannerButtonLink] = useState(
+    `/${tenantSlug}#collection`,
+  );
+  const [bannerUrl, setBannerUrl] = useState("");
+
+  // Stats Strip Configuration State (max 4)
+  const [statsList, setStatsList] = useState<StatConfigItem[]>([
+    {
+      id: "satisfaction",
+      type: "satisfaction",
+      label: "Satisfaction Rate",
+      enabled: true,
+    },
+    {
+      id: "orders",
+      type: "orders",
+      label: "Orders Delivered",
+      enabled: true,
+    },
+    {
+      id: "authentic",
+      type: "custom",
+      label: "Authentic Materials",
+      value: "100%",
+      customValue: "100%",
+      enabled: true,
+    },
+    {
+      id: "support",
+      type: "custom",
+      label: "Client Support",
+      value: "24/7",
+      customValue: "24/7",
+      enabled: true,
+    },
+  ]);
+
   // Active uploading field indicator & tab switchers
   const [uploadingField, setUploadingField] = useState<string | null>(null);
-  const [contentTab, setContentTab] = useState<"hero" | "about" | "contact">(
-    "hero",
-  );
-  const [previewTab, setPreviewTab] = useState<"hero" | "about" | "contact">(
-    "hero",
-  );
+  const [contentTab, setContentTab] = useState<
+    "hero" | "about" | "stats" | "banner" | "contact"
+  >("hero");
+  const [previewTab, setPreviewTab] = useState<
+    "hero" | "about" | "stats" | "banner" | "contact"
+  >("hero");
 
-  const handleSwitchContentTab = (tab: "hero" | "about" | "contact") => {
+  const handleSwitchContentTab = (
+    tab: "hero" | "about" | "stats" | "banner" | "contact",
+  ) => {
     setContentTab(tab);
     setPreviewTab(tab);
   };
@@ -197,6 +249,7 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
   const aboutBgInputRef = useRef<HTMLInputElement>(null);
   const aboutImageInputRef = useRef<HTMLInputElement>(null);
   const contactBgInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
 
   // Load tenant details & active customization requests on mount
   useEffect(() => {
@@ -268,6 +321,21 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
             setStoreContactAddress(t.store_address || t.pickup_address || "");
           if (cfg.contactHours) setStoreContactHours(cfg.contactHours);
           else if (t.pickup_hours) setStoreContactHours(t.pickup_hours);
+
+          if (cfg.bannerBadge) setBannerBadge(cfg.bannerBadge);
+          if (cfg.bannerHeadline) setBannerHeadline(cfg.bannerHeadline);
+          if (cfg.bannerDescription) setBannerDescription(cfg.bannerDescription);
+          if (cfg.bannerButtonText) setBannerButtonText(cfg.bannerButtonText);
+          if (cfg.bannerButtonLink) setBannerButtonLink(cfg.bannerButtonLink);
+          if (cfg.bannerUrl) setBannerUrl(cfg.bannerUrl);
+
+          if (
+            cfg.statsConfig &&
+            Array.isArray(cfg.statsConfig) &&
+            cfg.statsConfig.length > 0
+          ) {
+            setStatsList(cfg.statsConfig);
+          }
 
           // Apply to root immediately
           applyBranding(cfg);
@@ -487,6 +555,14 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
         contactPhone: storeContactPhone,
         contactAddress: storeContactAddress,
         contactHours: storeContactHours,
+
+        bannerBadge: bannerBadge,
+        bannerHeadline: bannerHeadline,
+        bannerDescription: bannerDescription,
+        bannerButtonText: bannerButtonText,
+        bannerButtonLink: bannerButtonLink,
+        bannerUrl: bannerUrl,
+        statsConfig: statsList,
       };
 
       const res = await updateTenant(tenantId, {
@@ -1107,42 +1183,66 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
             </div>
 
             {/* Page Content Switcher */}
-            <div className="flex items-center gap-1.5 p-1 bg-muted/60 rounded-xl border border-border text-xs">
+            <div className="flex items-center gap-1 p-1 bg-muted/60 rounded-xl border border-border text-xs flex-wrap sm:flex-nowrap">
               <button
                 type="button"
                 onClick={() => handleSwitchContentTab("hero")}
-                className={`flex-1 py-2 px-3 rounded-lg font-semibold transition-all cursor-pointer text-center text-xs flex items-center justify-center gap-1.5 ${
+                className={`flex-1 py-1.5 px-2.5 rounded-lg font-semibold transition-all cursor-pointer text-center text-xs flex items-center justify-center gap-1.5 ${
                   contentTab === "hero"
                     ? "bg-card text-foreground shadow-xs border border-border/80 font-bold"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 <Sparkles className="size-3.5 text-primary" />
-                <span>Hero / Landing</span>
+                <span>Hero</span>
               </button>
               <button
                 type="button"
                 onClick={() => handleSwitchContentTab("about")}
-                className={`flex-1 py-2 px-3 rounded-lg font-semibold transition-all cursor-pointer text-center text-xs flex items-center justify-center gap-1.5 ${
+                className={`flex-1 py-1.5 px-2.5 rounded-lg font-semibold transition-all cursor-pointer text-center text-xs flex items-center justify-center gap-1.5 ${
                   contentTab === "about"
                     ? "bg-card text-foreground shadow-xs border border-border/80 font-bold"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 <BookOpen className="size-3.5 text-primary" />
-                <span>About Page</span>
+                <span>About</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSwitchContentTab("stats")}
+                className={`flex-1 py-1.5 px-2.5 rounded-lg font-semibold transition-all cursor-pointer text-center text-xs flex items-center justify-center gap-1.5 ${
+                  contentTab === "stats"
+                    ? "bg-card text-foreground shadow-xs border border-border/80 font-bold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <BarChart3 className="size-3.5 text-primary" />
+                <span>Stats</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSwitchContentTab("banner")}
+                className={`flex-1 py-1.5 px-2.5 rounded-lg font-semibold transition-all cursor-pointer text-center text-xs flex items-center justify-center gap-1.5 ${
+                  contentTab === "banner"
+                    ? "bg-card text-foreground shadow-xs border border-border/80 font-bold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Megaphone className="size-3.5 text-primary" />
+                <span>Banner</span>
               </button>
               <button
                 type="button"
                 onClick={() => handleSwitchContentTab("contact")}
-                className={`flex-1 py-2 px-3 rounded-lg font-semibold transition-all cursor-pointer text-center text-xs flex items-center justify-center gap-1.5 ${
+                className={`flex-1 py-1.5 px-2.5 rounded-lg font-semibold transition-all cursor-pointer text-center text-xs flex items-center justify-center gap-1.5 ${
                   contentTab === "contact"
                     ? "bg-card text-foreground shadow-xs border border-border/80 font-bold"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 <MessageSquareText className="size-3.5 text-primary" />
-                <span>Contact Page</span>
+                <span>Contact</span>
               </button>
             </div>
 
@@ -1810,6 +1910,345 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
             </div>
           </div>
         )}
+
+        {/* Stats Strip Content */}
+        {contentTab === "stats" && (
+          <div className="rounded-2xl border border-border bg-card p-5 md:p-6 shadow-xs space-y-4 animate-fadeIn">
+            <div className="flex items-center justify-between pb-2 border-b border-border">
+              <div className="flex items-center gap-2.5">
+                <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                  <BarChart3 className="size-4" />
+                </div>
+                <div>
+                  <h5 className="font-bold text-foreground text-sm">
+                    Stats & Credibility Strip
+                  </h5>
+                  <p className="text-xs text-muted-foreground">
+                    Configure up to 4 trust statistics displayed across your storefront.
+                  </p>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-xs">
+                {statsList.filter((s) => s.enabled !== false).length} / 4 Active
+              </Badge>
+            </div>
+
+            <div className="space-y-3">
+              {statsList.map((stat, idx) => (
+                <div
+                  key={stat.id || idx}
+                  className="p-3.5 rounded-xl border border-border bg-background space-y-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-foreground">
+                      Metric #{idx + 1}
+                    </span>
+                    <div className="flex items-center gap-3">
+                      <label className="text-[11px] text-muted-foreground flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={stat.enabled !== false}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setStatsList((prev) =>
+                              prev.map((s, i) =>
+                                i === idx ? { ...s, enabled: checked } : s,
+                              ),
+                            );
+                          }}
+                          className="rounded text-primary focus:ring-primary size-3.5"
+                        />
+                        <span>Visible</span>
+                      </label>
+                      {statsList.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setStatsList((prev) =>
+                              prev.filter((_, i) => i !== idx),
+                            );
+                          }}
+                          className="text-xs text-rose-500 hover:text-rose-600 p-1"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <div className="space-y-1">
+                      <Label className="text-[11px] font-semibold text-muted-foreground">
+                        Metric Type
+                      </Label>
+                      <select
+                        value={stat.type}
+                        onChange={(e) => {
+                          const newType = e.target.value as StatConfigItem["type"];
+                          let defaultLabel = stat.label;
+                          if (newType === "satisfaction")
+                            defaultLabel = "Satisfaction Rate";
+                          else if (newType === "orders")
+                            defaultLabel = "Orders Delivered";
+                          else if (newType === "products")
+                            defaultLabel = "Curated Products";
+                          else if (newType === "custom" && !defaultLabel)
+                            defaultLabel = "Authentic Materials";
+
+                          setStatsList((prev) =>
+                            prev.map((s, i) =>
+                              i === idx
+                                ? { ...s, type: newType, label: defaultLabel }
+                                : s,
+                            ),
+                          );
+                        }}
+                        className="w-full text-xs h-8 px-2 rounded-md border border-border bg-background text-foreground"
+                      >
+                        <option value="satisfaction">Satisfaction Rate (Live DB)</option>
+                        <option value="orders">Orders Delivered (Live DB)</option>
+                        <option value="products">Curated Products (Live DB)</option>
+                        <option value="custom">Custom Metric (Manual)</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-[11px] font-semibold text-muted-foreground">
+                        Label Text
+                      </Label>
+                      <Input
+                        value={stat.label}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setStatsList((prev) =>
+                            prev.map((s, i) =>
+                              i === idx ? { ...s, label: val } : s,
+                            ),
+                          );
+                        }}
+                        placeholder="e.g. Satisfaction Rate"
+                        className="text-xs h-8 bg-background"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-[11px] font-semibold text-muted-foreground">
+                        Display Value
+                      </Label>
+                      {stat.type === "custom" ? (
+                        <Input
+                          value={stat.customValue || stat.value || ""}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setStatsList((prev) =>
+                              prev.map((s, i) =>
+                                i === idx
+                                  ? { ...s, value: val, customValue: val }
+                                  : s,
+                              ),
+                            );
+                          }}
+                          placeholder="e.g. 100%, 24/7, 10+"
+                          className="text-xs h-8 bg-background"
+                        />
+                      ) : (
+                        <div className="h-8 px-2.5 rounded-md border border-dashed border-border bg-muted/30 flex items-center text-[11px] text-muted-foreground font-mono">
+                          ⚡ Calculated from DB
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {statsList.length < 4 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (statsList.length >= 4) {
+                      toast.error("Maximum of 4 stats can be displayed.");
+                      return;
+                    }
+                    setStatsList((prev) => [
+                      ...prev,
+                      {
+                        id: `custom-${Date.now()}`,
+                        type: "custom",
+                        label: "Custom Metric",
+                        value: "100%",
+                        customValue: "100%",
+                        enabled: true,
+                      },
+                    ]);
+                  }}
+                  className="w-full text-xs h-8 gap-1 border-dashed"
+                >
+                  <Plus className="size-3.5" />
+                  <span>Add Credibility Metric ({statsList.length}/4)</span>
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Banner Section Content */}
+        {contentTab === "banner" && (
+          <div className="rounded-2xl border border-border bg-card p-5 md:p-6 shadow-xs space-y-4 animate-fadeIn">
+            <div className="flex items-center gap-2.5 pb-2 border-b border-border">
+              <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                <Megaphone className="size-4" />
+              </div>
+              <div>
+                <h5 className="font-bold text-foreground text-sm">
+                  Storefront Banner Section
+                </h5>
+                <p className="text-xs text-muted-foreground">
+                  Customize the promotional call-to-action banner displayed above the storefront footer.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-foreground">
+                    Banner Top Badge
+                  </Label>
+                  <Input
+                    value={bannerBadge}
+                    onChange={(e) => setBannerBadge(e.target.value)}
+                    placeholder="Elevate Your Collection"
+                    className="text-xs h-9 bg-background"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-foreground">
+                    Button Label
+                  </Label>
+                  <Input
+                    value={bannerButtonText}
+                    onChange={(e) => setBannerButtonText(e.target.value)}
+                    placeholder="Shop Now"
+                    className="text-xs h-9 bg-background"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-foreground">
+                  Banner Main Title / Headline
+                </Label>
+                <Input
+                  value={bannerHeadline}
+                  onChange={(e) => setBannerHeadline(e.target.value)}
+                  placeholder={`Experience Excellence at ${formattedStoreName}`}
+                  className="text-xs h-9 bg-background"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-foreground">
+                  Banner Narrative / Description
+                </Label>
+                <Textarea
+                  value={bannerDescription}
+                  onChange={(e) => setBannerDescription(e.target.value)}
+                  placeholder="Discover exclusive collections, enjoy secure multi-currency payment checkout..."
+                  className="text-xs min-h-20 bg-background resize-y"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-foreground">
+                  Button Target URL / Link
+                </Label>
+                <Input
+                  value={bannerButtonLink}
+                  onChange={(e) => setBannerButtonLink(e.target.value)}
+                  placeholder={`/${tenantSlug}#collection`}
+                  className="text-xs h-9 bg-background font-mono text-[11px]"
+                />
+              </div>
+
+              {/* Banner Background Image */}
+              <div className="pt-2 border-t border-border space-y-2">
+                <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <ImageIcon className="size-3.5 text-primary" />
+                  Banner Background Image (Optional)
+                </Label>
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                  <div className="w-full sm:w-28 h-16 rounded-lg border border-border bg-muted/30 overflow-hidden relative shrink-0">
+                    {bannerUrl ? (
+                      <Image
+                        src={bannerUrl}
+                        alt="Banner Background"
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    ) : (
+                      <div className="size-full flex flex-col items-center justify-center text-muted-foreground/50 text-[10px]">
+                        <ImageIcon className="size-4 mb-0.5" />
+                        <span>No image</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-1 w-full">
+                    <input
+                      type="file"
+                      ref={bannerInputRef}
+                      onChange={(e) =>
+                        handleGenericImageUpload(
+                          e,
+                          "Banner Background",
+                          (url) => setBannerUrl(url || ""),
+                        )
+                      }
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        onClick={() => bannerInputRef.current?.click()}
+                        disabled={uploadingField === "Banner Background"}
+                        variant="outline"
+                        size="md"
+                        className="h-8 text-xs gap-1 cursor-pointer"
+                      >
+                        {uploadingField === "Banner Background" ? (
+                          <>
+                            <Loader2 className="size-3 animate-spin" />
+                            <span>Uploading...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="size-3" />
+                            <span>Upload Banner Image</span>
+                          </>
+                        )}
+                      </Button>
+                      {bannerUrl && (
+                        <Button
+                          type="button"
+                          onClick={() => setBannerUrl("")}
+                          variant="outline"
+                          size="md"
+                          className="h-8 text-xs text-red-500 hover:text-red-600 hover:bg-red-500/10 cursor-pointer"
+                        >
+                          <Trash2 className="size-3" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
 
@@ -1835,13 +2274,13 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
             </div>
 
             {/* Preview Section Switcher */}
-            <div className="flex items-center gap-1 p-1 bg-muted/60 rounded-lg border border-border text-xs">
+            <div className="flex items-center gap-1 p-1 bg-muted/60 rounded-lg border border-border text-xs flex-wrap">
               <button
                 type="button"
                 onClick={() => setPreviewTab("hero")}
                 className={`flex-1 py-1.5 px-2 rounded-md font-semibold transition-all cursor-pointer text-center text-xs ${
                   previewTab === "hero"
-                    ? "bg-card text-foreground shadow-xs"
+                    ? "bg-card text-foreground shadow-xs font-bold"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
@@ -1852,7 +2291,7 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
                 onClick={() => setPreviewTab("about")}
                 className={`flex-1 py-1.5 px-2 rounded-md font-semibold transition-all cursor-pointer text-center text-xs ${
                   previewTab === "about"
-                    ? "bg-card text-foreground shadow-xs"
+                    ? "bg-card text-foreground shadow-xs font-bold"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
@@ -1860,10 +2299,32 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
               </button>
               <button
                 type="button"
+                onClick={() => setPreviewTab("stats")}
+                className={`flex-1 py-1.5 px-2 rounded-md font-semibold transition-all cursor-pointer text-center text-xs ${
+                  previewTab === "stats"
+                    ? "bg-card text-foreground shadow-xs font-bold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Stats
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewTab("banner")}
+                className={`flex-1 py-1.5 px-2 rounded-md font-semibold transition-all cursor-pointer text-center text-xs ${
+                  previewTab === "banner"
+                    ? "bg-card text-foreground shadow-xs font-bold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Banner
+              </button>
+              <button
+                type="button"
                 onClick={() => setPreviewTab("contact")}
                 className={`flex-1 py-1.5 px-2 rounded-md font-semibold transition-all cursor-pointer text-center text-xs ${
                   previewTab === "contact"
-                    ? "bg-card text-foreground shadow-xs"
+                    ? "bg-card text-foreground shadow-xs font-bold"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
@@ -2069,6 +2530,85 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
                         <MapPin className="size-3 text-primary shrink-0" />
                         <span className="truncate">{storeContactAddress}</span>
                       </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {previewTab === "stats" && (
+                <div className="p-6 bg-stone-900 text-stone-100 min-h-64 flex flex-col justify-center border-y border-stone-800">
+                  <div className="text-center mb-4">
+                    <span
+                      style={{ color: accentColor }}
+                      className="text-[9px] font-bold tracking-widest uppercase block"
+                    >
+                      Store Trust & Numbers
+                    </span>
+                    <h5 className="font-bold text-xs text-white font-secondary">
+                      Credibility Strip
+                    </h5>
+                  </div>
+                  <div
+                    className={`grid ${
+                      statsList.filter((s) => s.enabled !== false).length <= 2
+                        ? "grid-cols-2"
+                        : "grid-cols-2"
+                    } gap-2.5 text-center`}
+                  >
+                    {statsList
+                      .filter((s) => s.enabled !== false)
+                      .slice(0, 4)
+                      .map((s, idx) => (
+                        <div
+                          key={s.id || idx}
+                          className="p-2.5 rounded-lg bg-stone-800/80 border border-stone-700/60"
+                        >
+                          <div className="text-lg font-bold text-white font-secondary leading-tight">
+                            {s.type === "satisfaction"
+                              ? "99.8%"
+                              : s.type === "orders"
+                                ? "5k+"
+                                : s.type === "products"
+                                  ? "24+"
+                                  : s.customValue || s.value || "100%"}
+                          </div>
+                          <div className="text-[9px] uppercase tracking-wider text-stone-400 mt-1 truncate">
+                            {s.label}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {previewTab === "banner" && (
+                <div className="p-6 bg-stone-950 text-white min-h-64 flex flex-col justify-center text-center relative overflow-hidden">
+                  {bannerUrl && (
+                    <div
+                      className="absolute inset-0 bg-cover bg-center opacity-30"
+                      style={{ backgroundImage: `url(${bannerUrl})` }}
+                    />
+                  )}
+                  <div className="relative z-10 space-y-2 max-w-xs mx-auto">
+                    <div
+                      style={{ color: accentColor }}
+                      className="text-[9px] font-bold tracking-widest uppercase"
+                    >
+                      {bannerBadge}
+                    </div>
+                    <h5 className="font-bold text-xs text-white font-secondary leading-snug">
+                      {bannerHeadline}
+                    </h5>
+                    <p className="text-[10px] text-stone-300 line-clamp-3 font-light leading-relaxed">
+                      {bannerDescription}
+                    </p>
+                    <div className="pt-2">
+                      <span
+                        style={{ backgroundColor: brandColor }}
+                        className="inline-block px-3.5 py-1 rounded-md text-white font-bold text-[11px] shadow-xs"
+                      >
+                        {bannerButtonText}
+                      </span>
                     </div>
                   </div>
                 </div>

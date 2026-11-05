@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { ChevronLeft, ChevronRight, PackageOpen } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useTenantTheme } from "@/components/providers/tenant-theme-provider";
 import { getProducts } from "@/lib/api/products";
 import { MenuCard } from "@/components/pages/menu/menu-card";
@@ -30,89 +30,40 @@ export function TenantCollection({
     if (!tenantSlug) return;
     try {
       setIsLoading(true);
-      const res = await getProducts({
+      // 1. First attempt to fetch featured products
+      const featuredRes = await getProducts({
         tenantSlug,
         published_only: true,
+        is_featured: true,
         per_page: 20,
       });
 
-      if (res?.data?.items && res.data.items.length > 0) {
-        setProducts(res.data.items);
+      if (featuredRes?.data?.items && featuredRes.data.items.length > 0) {
+        setProducts(featuredRes.data.items);
+        return;
+      }
+
+      // 2. If no featured products, fall back to 5 most recently added products
+      const recentRes = await getProducts({
+        tenantSlug,
+        published_only: true,
+        per_page: 5,
+      });
+
+      if (recentRes?.data?.items && recentRes.data.items.length > 0) {
+        setProducts(recentRes.data.items);
       } else {
-        // Fallback sample catalog if tenant has not created products yet
-        setProducts([
-          {
-            id: "prod-sample-1",
-            title: "Signature Artisan Reserve",
-            price: 145.0,
-            currency: fallbackCurrency,
-            category: "Bespoke Collection",
-            description:
-              "Handcrafted with premium materials, immaculate finishing, and timeless aesthetic design.",
-            images: [
-              "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=800&q=80",
-            ],
-            inventory_count: 12,
-            is_published: true,
-            slug: "signature-artisan-reserve",
-          },
-          {
-            id: "prod-sample-2",
-            title: "Heritage Masterpiece Selection",
-            price: 195.0,
-            currency: fallbackCurrency,
-            category: "Limited Reserve",
-            description:
-              "Engineered for excellence. Impeccable attention to detail and durable craftsmanship.",
-            images: [
-              "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=800&q=80",
-            ],
-            inventory_count: 8,
-            is_published: true,
-            slug: "heritage-masterpiece-selection",
-          },
-          {
-            id: "prod-sample-3",
-            title: "Minimalist Studio Series",
-            price: 89.0,
-            currency: fallbackCurrency,
-            category: "Daily Essentials",
-            description:
-              "Sophisticated minimalism combined with superior functionality and understated elegance.",
-            images: [
-              "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=800&q=80",
-            ],
-            inventory_count: 25,
-            is_published: true,
-            slug: "minimalist-studio-series",
-          },
-          {
-            id: "prod-sample-4",
-            title: "Premier Noir Custom Edition",
-            price: 260.0,
-            currency: fallbackCurrency,
-            category: "Ultra Luxury",
-            description:
-              "Our highest tier offering, curated in limited batches for discerning connoisseurs.",
-            images: [
-              "https://images.unsplash.com/photo-1588195538326-c5b1e9f80a1b?w=800&q=80",
-            ],
-            inventory_count: 5,
-            is_published: true,
-            slug: "premier-noir-custom-edition",
-          },
-        ]);
+        setProducts([]);
       }
     } catch (err) {
       console.error("Failed to load tenant products:", err);
+      setProducts([]);
     } finally {
       setIsLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantSlug]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadTenantProducts();
   }, [loadTenantProducts]);
 
@@ -130,6 +81,11 @@ export function TenantCollection({
       });
     }
   };
+
+  // If loading finished and tenant has no products, hide the entire section
+  if (!isLoading && products.length === 0) {
+    return null;
+  }
 
   return (
     <section
@@ -171,16 +127,6 @@ export function TenantCollection({
                 </div>
               </div>
             ))}
-          </div>
-        ) : products.length === 0 ? (
-          <div className="py-16 text-center rounded-2xl border border-dashed border-stone-300 bg-white p-8">
-            <PackageOpen className="size-12 mx-auto text-stone-400 mb-3" />
-            <h3 className="font-semibold text-lg text-stone-800">
-              No products found in this collection
-            </h3>
-            <p className="text-stone-500 text-sm mt-1">
-              Check back soon as {storeName} publishes new items!
-            </p>
           </div>
         ) : (
           /* Carousel Content */

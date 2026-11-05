@@ -74,6 +74,7 @@ class PostgresAdapter(ProductRepositoryAdapter):
             images=product.images or [],
             availability=avail,
             is_published=product.is_published,
+            is_featured=getattr(product, "is_featured", False),
             variants=variants_list,
             sku=sku,
             price=price,
@@ -114,6 +115,7 @@ class PostgresAdapter(ProductRepositoryAdapter):
             images=images,
             availability=avail,
             is_published=product.is_published,
+            is_featured=getattr(product, "is_featured", False),
             price=price,
             currency=prod_currency,
             inventory_count=inventory_count,
@@ -264,6 +266,11 @@ class PostgresAdapter(ProductRepositoryAdapter):
             except ValueError:
                 pass
 
+        # 7. Featured Filter
+        is_featured = kwargs.get("is_featured")
+        if is_featured is not None:
+            query = query.where(Product.is_featured == is_featured)
+
         query = query.offset(skip).limit(limit)
 
         result = await self.session.execute(query)
@@ -367,6 +374,10 @@ class PostgresAdapter(ProductRepositoryAdapter):
             except ValueError:
                 pass
 
+        is_featured = kwargs.get("is_featured")
+        if is_featured is not None:
+            query = query.where(Product.is_featured == is_featured)
+
         result = await self.session.execute(query)
         return int(result.scalar() or 0)
 
@@ -399,6 +410,7 @@ class PostgresAdapter(ProductRepositoryAdapter):
             images=(product_in.images or [])[:5],
             availability=product_in.availability or "available",
             is_published=product_in.is_published,
+            is_featured=getattr(product_in, "is_featured", False),
             category_id=product_in.category_id,
             category_name=category_name,
             currency=prod_currency,

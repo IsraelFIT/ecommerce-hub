@@ -17,6 +17,10 @@ class ReviewUpdateStatus(BaseModel):
     status: str = Field(..., description="Status: 'approved', 'pending', or 'rejected'")
 
 
+class ReviewUpdateFeatured(BaseModel):
+    is_featured: bool = Field(..., description="Whether this review is featured on storefront (max 3)")
+
+
 class ReviewResponse(BaseModel):
     id: uuid.UUID
     tenant_id: uuid.UUID
@@ -30,6 +34,7 @@ class ReviewResponse(BaseModel):
     customer_email: Optional[str] = None
     customer_avatar_url: Optional[str] = None
     status: str
+    is_featured: bool = False
     created_at: datetime
     updated_at: datetime
 

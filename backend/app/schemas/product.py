@@ -58,6 +58,7 @@ class ProductBase(BaseModel):
     images: List[str] = Field(default_factory=list, max_length=5, description="Product image URLs (max 5)")
     availability: Optional[str] = Field(default="available", description="Product availability: 'available' or 'preorder'")
     is_published: bool = Field(default=True, description="Publish status")
+    is_featured: bool = Field(default=False, description="Whether product is featured in storefront collection")
 
     @field_validator("images")
     @classmethod
@@ -80,6 +81,7 @@ class ProductCreate(BaseModel):
     images: List[str] = Field(default_factory=list, max_length=5, description="Product image URLs (max 5)")
     availability: Optional[str] = "available"
     is_published: bool = True
+    is_featured: bool = False
     variants: List[ProductVariantCreate] = Field(default_factory=list)
 
     @field_validator("images")
@@ -139,6 +141,7 @@ class ProductUpdate(BaseModel):
     images: Optional[List[str]] = Field(default=None, max_length=5, description="Product image URLs (max 5)")
     availability: Optional[str] = None
     is_published: Optional[bool] = None
+    is_featured: Optional[bool] = None
     variants: Optional[List[ProductVariantUpdate]] = None
 
     @field_validator("images")
@@ -172,6 +175,7 @@ class ProductResponse(BaseModel):
     images: List[str] = Field(default_factory=list, max_length=5, description="Product image URLs (max 5)")
     availability: Optional[str] = "available"
     is_published: bool = True
+    is_featured: bool = False
     variants: List[ProductVariantResponse] = Field(default_factory=list)
 
     # Computed legacy fields
@@ -214,6 +218,7 @@ class ProductMenuSummaryResponse(BaseModel):
     price: Optional[float] = None
     currency: Optional[str] = "NGN"
     inventory_count: Optional[int] = None
+    is_featured: bool = False
 
     # Ratings and Likes
     average_rating: Optional[float] = 0.0
@@ -235,6 +240,7 @@ class ProductSummaryResponse(BaseModel):
     images: List[str] = Field(default_factory=list, description="Product image URLs")
     availability: Optional[str] = "available"
     is_published: bool = True
+    is_featured: bool = False
     filters: Dict[str, List[str]] = Field(default_factory=dict)
     price: Optional[float] = None
     currency: Optional[str] = "NGN"

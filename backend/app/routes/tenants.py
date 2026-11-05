@@ -379,13 +379,23 @@ async def get_tenant_seller_stats(
     o_res = await db.execute(order_query)
     orders_fulfilled = o_res.scalar() or 0
 
-    # 3. Member since year
+    # 3. Total active catalog products
+    prod_query = select(func.count(Product.id)).where(
+        Product.tenant_id == tenant.id,
+        Product.is_deleted == False,
+        Product.is_published == True,
+    )
+    p_res = await db.execute(prod_query)
+    total_products = p_res.scalar() or 0
+
+    # 4. Member since year
     member_since = tenant.created_at.year if tenant.created_at else 2024
 
     stats_data = {
         "rating": round(float(avg_rating or 5.0), 1),
         "review_count": int(total_reviews or 0),
         "orders_fulfilled": int(orders_fulfilled or 0),
+        "total_products": int(total_products or 0),
         "member_since": member_since,
     }
     await cache.set_json(cache_key, stats_data, ttl=180)

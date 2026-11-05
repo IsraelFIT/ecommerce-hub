@@ -18,21 +18,27 @@ export function TenantHero({ storeName, tenantSlug }: TenantHeroProps) {
 
   return (
     <section className="relative min-h-[90vh] flex items-end pb-16 overflow-hidden bg-stone-950 text-white">
-      {/* Background image & Ambient Glows */}
-      {branding.heroBackgroundUrl && (
-        <div
-          className="absolute inset-0 z-0 bg-cover bg-center transition-all duration-700"
-          style={{ backgroundImage: `url(${branding.heroBackgroundUrl})` }}
-        />
+      {/* Background image or Ambient Glows */}
+      {branding.heroBackgroundUrl ? (
+        <>
+          <div
+            className="absolute inset-0 z-0 bg-cover bg-center transition-all duration-700"
+            style={{ backgroundImage: `url(${branding.heroBackgroundUrl})` }}
+          />
+          <div className="absolute inset-0 bg-black/40 z-10" />
+        </>
+      ) : (
+        <>
+          <div className="absolute inset-0 z-0 bg-radial-[at_top_right] from-stone-800 via-stone-900 to-stone-950" />
+          <div
+            className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-150 h-150 rounded-full blur-3xl pointer-events-none opacity-20 transition-colors duration-500"
+            style={{
+              backgroundColor: branding.primaryColor || "var(--primary)",
+            }}
+          />
+          <div className="absolute inset-0 bg-black/40 z-10" />
+        </>
       )}
-      <div
-        className={`absolute inset-0 z-0 ${branding.heroBackgroundUrl ? "bg-stone-950/80 backdrop-blur-xs" : "bg-radial-[at_top_right] from-stone-800 via-stone-900 to-stone-950"}`}
-      />
-      <div
-        className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-150 h-150 rounded-full blur-3xl pointer-events-none opacity-20 transition-colors duration-500"
-        style={{ backgroundColor: branding.primaryColor || "var(--primary)" }}
-      />
-      <div className="absolute inset-0 bg-black/40 z-10" />
 
       <div className="container relative z-20 flex flex-col items-start justify-end gap-6 px-4 md:px-8">
         {/* Store Badge */}

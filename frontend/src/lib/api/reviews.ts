@@ -14,6 +14,7 @@ export interface ReviewItem {
   customer_email?: string | null;
   customer_avatar_url?: string | null;
   status: "approved" | "pending" | "rejected";
+  is_featured?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -32,6 +33,7 @@ export async function getReviews(options?: {
   tenantSlug?: string;
   productId?: string;
   status?: string;
+  is_featured?: boolean;
   search?: string;
   rating?: number;
   page?: number;
@@ -41,6 +43,7 @@ export async function getReviews(options?: {
     tenantSlug,
     productId,
     status,
+    is_featured,
     search,
     rating,
     page = 1,
@@ -52,6 +55,8 @@ export async function getReviews(options?: {
   });
   if (productId) queryParams.set("product_id", productId);
   if (status && status !== "all") queryParams.set("status", status);
+  if (is_featured !== undefined && is_featured !== null)
+    queryParams.set("is_featured", is_featured.toString());
   if (search && search.trim()) queryParams.set("search", search.trim());
   if (rating !== undefined && rating > 0)
     queryParams.set("rating", rating.toString());
@@ -119,6 +124,21 @@ export async function updateReviewStatus(
     method: "PATCH",
     headers,
     body: JSON.stringify({ status }),
+  });
+}
+
+export async function toggleReviewFeatured(
+  reviewId: string,
+  is_featured: boolean,
+  tenantSlug?: string,
+): Promise<ApiResponse<ReviewItem>> {
+  const headers: HeadersInit = {};
+  if (tenantSlug) headers["X-Tenant-Slug"] = tenantSlug;
+
+  return apiRequest<ReviewItem>(`/reviews/${reviewId}/featured`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify({ is_featured }),
   });
 }
 

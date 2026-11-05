@@ -1,5 +1,5 @@
 import uuid
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 from app.models.tenant import BackendType
@@ -75,6 +75,19 @@ class BrandingConfig(BaseModel):
     contactPhone: Optional[str] = Field(default=None, description="Contact support phone")
     contactAddress: Optional[str] = Field(default=None, description="Store contact physical address")
     contactHours: Optional[str] = Field(default=None, description="Store contact operating hours")
+
+    # Banner Content
+    bannerBadge: Optional[str] = Field(default=None, description="Banner top badge")
+    bannerHeadline: Optional[str] = Field(default=None, description="Banner main headline")
+    bannerDescription: Optional[str] = Field(default=None, description="Banner description")
+    bannerButtonText: Optional[str] = Field(default=None, description="Banner button label")
+    bannerButtonLink: Optional[str] = Field(default=None, description="Banner button target URL")
+
+    # Stats Strip (Pick up to 4 stats: satisfaction, orders, products, custom)
+    statsConfig: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="List of up to 4 configured stats [{id, type, label, value, enabled}]",
+    )
 
 
 class TenantBase(BaseModel):

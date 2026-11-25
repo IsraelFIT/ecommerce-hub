@@ -18,10 +18,21 @@ const excludedPaths = [
   "/api/auth/",
 ];
 
+const RESERVED_SUBDOMAINS = new Set([
+  "www",
+  "app",
+  "core",
+  "api",
+  "staging",
+  "staging-api",
+]);
+
 export async function proxy(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
   const hostname = request.headers.get("host") || "";
-  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || "ecommerce-hub.com";
+  const rootDomain = (
+    process.env.NEXT_PUBLIC_ROOT_DOMAIN || "kiyostores.space"
+  ).toLowerCase();
 
   // 1. Skip static assets, public files with extensions, and internal paths
   if (
@@ -38,14 +49,18 @@ export async function proxy(request: NextRequest) {
   let tenantSlug: string | null = null;
 
   if (currentHost.endsWith(".localhost") && currentHost !== "localhost") {
-    tenantSlug = currentHost.replace(".localhost", "");
+    const sub = currentHost.replace(".localhost", "");
+    if (sub && !RESERVED_SUBDOMAINS.has(sub)) {
+      tenantSlug = sub;
+    }
   } else if (
     currentHost.endsWith(`.${rootDomain}`) &&
-    currentHost !== rootDomain &&
-    currentHost !== `www.${rootDomain}` &&
-    currentHost !== `app.${rootDomain}`
+    currentHost !== rootDomain
   ) {
-    tenantSlug = currentHost.replace(`.${rootDomain}`, "");
+    const sub = currentHost.replace(`.${rootDomain}`, "");
+    if (sub && !RESERVED_SUBDOMAINS.has(sub)) {
+      tenantSlug = sub;
+    }
   }
 
   // 3. Proxy API routes & static uploads directly to FastAPI backend
@@ -155,7 +170,7 @@ export async function proxy(request: NextRequest) {
     const response = NextResponse.redirect(cleanUrl);
     const hostname = request.nextUrl.hostname.toLowerCase();
     const rootDomain = (
-      process.env.NEXT_PUBLIC_ROOT_DOMAIN || "ecommerce-hub.com"
+      process.env.NEXT_PUBLIC_ROOT_DOMAIN || "kiyostores.space"
     ).toLowerCase();
     const cookieDomain =
       !hostname.endsWith("localhost") &&

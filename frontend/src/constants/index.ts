@@ -2,12 +2,14 @@ export * from "./enums";
 export * from "./menu";
 
 export const APP_CONFIG = {
-  name: "EcommerceHub",
+  name: "Kiyo",
   description:
     "Next-generation multi-tenant e-commerce platform & boutique storefronts",
   version: "1.0.0",
-  rootDomain: process.env.NEXT_PUBLIC_ROOT_DOMAIN || "ecommerce-hub.com",
+  rootDomain: process.env.NEXT_PUBLIC_ROOT_DOMAIN || "kiyostores.space",
   apiUrl: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000",
+  supportEmail:
+    process.env.NEXT_PUBLIC_SUPPORT_EMAIL || "help@kiyostores.space",
   sessionCookieName: "auth_session",
   roleCookieName: "userRole",
 };

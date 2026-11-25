@@ -244,7 +244,7 @@ export function UserProfileSettingsCard({
           </h5>
           <p className="text-muted-foreground truncate flex items-center justify-center sm:justify-start gap-1">
             <Mail className="h-3 w-3 shrink-0" />
-            <span>{email || "user@ecommerce-hub.com"}</span>
+            <span>{email || "help@kiyostores.space"}</span>
           </p>
           <div className="pt-1 flex flex-wrap items-center justify-center sm:justify-start gap-2">
             <span className="text-xs text-muted-foreground">

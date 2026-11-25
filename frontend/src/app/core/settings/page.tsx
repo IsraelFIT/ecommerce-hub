@@ -14,8 +14,8 @@ export default function CoreSettingsPage() {
   const tenantSlug = (params?.tenant as string) || "core";
 
   const [platformFee, setPlatformFee] = useState("2.5");
-  const [platformName, setPlatformName] = useState("EcommerceHub");
-  const [rootDomain, setRootDomain] = useState("ecommerce-hub.com");
+  const [platformName, setPlatformName] = useState("Kiyo");
+  const [rootDomain, setRootDomain] = useState("kiyostores.space");
   const [defaultGateway, setDefaultGateway] = useState("paystack");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -95,8 +95,8 @@ export default function CoreSettingsPage() {
                   className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground  focus:outline-none focus:border-primary"
                 />
                 <span className="text-[10px] text-muted-foreground mt-1 block">
-                  Used for multi-tenant subdomains: *.ecommerce-hub.com and
-                  core.ecommerce-hub.com
+                  Used for multi-tenant subdomains: *.kiyostores.space and
+                  core.kiyostores.space
                 </span>
               </div>
             </div>

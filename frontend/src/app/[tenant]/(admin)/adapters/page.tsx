@@ -88,7 +88,7 @@ export default function TenantAdaptersPage({ params }: AdaptersPageProps) {
         }
         await new Promise((r) => setTimeout(r, 800));
         toast.success(
-          `Sanity CMS Connection Verified: Connected to ${sanityMode === "managed" ? "EcommerceHub Managed dataset" : "Custom Project " + sanityProjectId} (${sanityDataset}).`,
+          `Sanity CMS Connection Verified: Connected to ${sanityMode === "managed" ? "Kiyo Managed dataset" : "Custom Project " + sanityProjectId} (${sanityDataset}).`,
         );
       }
     } catch (err: unknown) {
@@ -338,7 +338,7 @@ export default function TenantAdaptersPage({ params }: AdaptersPageProps) {
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                EcommerceHub Managed
+                Kiyo Managed
               </button>
               <button
                 type="button"

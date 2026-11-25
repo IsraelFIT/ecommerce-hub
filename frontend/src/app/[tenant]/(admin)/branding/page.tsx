@@ -324,7 +324,8 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
 
           if (cfg.bannerBadge) setBannerBadge(cfg.bannerBadge);
           if (cfg.bannerHeadline) setBannerHeadline(cfg.bannerHeadline);
-          if (cfg.bannerDescription) setBannerDescription(cfg.bannerDescription);
+          if (cfg.bannerDescription)
+            setBannerDescription(cfg.bannerDescription);
           if (cfg.bannerButtonText) setBannerButtonText(cfg.bannerButtonText);
           if (cfg.bannerButtonLink) setBannerButtonLink(cfg.bannerButtonLink);
           if (cfg.bannerUrl) setBannerUrl(cfg.bannerUrl);
@@ -1161,7 +1162,7 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
                 <p className="text-[11px] text-muted-foreground">
                   Point your DNS CNAME record to{" "}
                   <code className="bg-muted px-1.5 py-0.5 rounded text-foreground text-xs">
-                    cname.ecommerce-hub.com
+                    cname.kiyostores.space
                   </code>
                 </p>
               </div>
@@ -1177,7 +1178,9 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
                   Page-Specific Content & Customization
                 </h5>
                 <p className="text-xs text-muted-foreground">
-                  Switch between pages below to configure custom copywriting, imagery, and contact information without scrolling through a long form.
+                  Switch between pages below to configure custom copywriting,
+                  imagery, and contact information without scrolling through a
+                  long form.
                 </p>
               </div>
             </div>
@@ -1249,1010 +1252,1036 @@ export default function TenantBrandingPage({ params }: BrandingPageProps) {
             {/* Storefront Hero & Background Media */}
             {contentTab === "hero" && (
               <div className="rounded-2xl border border-border bg-card p-5 md:p-6 shadow-xs space-y-4 animate-fadeIn">
-            <div className="flex items-center gap-2.5 pb-2 border-b border-border">
-              <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                <Sparkles className="size-4" />
-              </div>
-              <div>
-                <h5 className="font-bold text-foreground text-sm">
-                  Storefront Hero & Background Media
-                </h5>
-                <p className="text-xs text-muted-foreground">
-                  Customize your storefront hero typography and high-resolution
-                  background imagery.
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-4 pt-1">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-foreground">
-                  Storefront Hero Headline
-                </Label>
-                <Input
-                  value={storeHeadline}
-                  onChange={(e) => setStoreHeadline(e.target.value)}
-                  placeholder="Official Online Store for ..."
-                  className="text-xs h-9 bg-background"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-foreground">
-                  Brand Tagline & Mission
-                </Label>
-                <Input
-                  value={tagline}
-                  onChange={(e) => setTagline(e.target.value)}
-                  placeholder="Handcrafted artisanal creations..."
-                  className="text-xs h-9 bg-background"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-foreground">
-                  Top Announcement Banner
-                </Label>
-                <Input
-                  value={announcementText}
-                  onChange={(e) => setAnnouncementText(e.target.value)}
-                  placeholder="Free standard shipping on all domestic orders..."
-                  className="text-xs h-9 bg-background"
-                />
-              </div>
-
-              {/* Hero Background Image */}
-              <div className="pt-2 border-t border-border space-y-2">
-                <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                  <ImageIcon className="size-3.5 text-primary" />
-                  Hero Section Background Image
-                </Label>
-                <div className="flex flex-col sm:flex-row items-center gap-3">
-                  <div className="w-full sm:w-32 h-20 rounded-xl border border-border bg-muted/30 overflow-hidden relative group shrink-0">
-                    {heroBackgroundUrl ? (
-                      <Image
-                        src={heroBackgroundUrl}
-                        alt="Hero Background"
-                        fill
-                        className="object-cover"
-                        unoptimized
-                      />
-                    ) : (
-                      <div className="size-full flex flex-col items-center justify-center text-muted-foreground/50 text-[10px]">
-                        <ImageIcon className="size-5 mb-1" />
-                        <span>No image</span>
-                      </div>
-                    )}
+                <div className="flex items-center gap-2.5 pb-2 border-b border-border">
+                  <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                    <Sparkles className="size-4" />
                   </div>
-                  <div className="flex-1 space-y-1.5 w-full">
-                    <input
-                      type="file"
-                      ref={heroBgInputRef}
-                      onChange={(e) =>
-                        handleGenericImageUpload(
-                          e,
-                          "Hero Background",
-                          setHeroBackgroundUrl,
-                        )
-                      }
-                      accept="image/*"
-                      className="hidden"
-                    />
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        onClick={() => heroBgInputRef.current?.click()}
-                        disabled={uploadingField === "Hero Background"}
-                        variant="outline"
-                        size="md"
-                        className="h-8.5 text-xs gap-1.5 cursor-pointer"
-                      >
-                        {uploadingField === "Hero Background" ? (
-                          <>
-                            <Loader2 className="size-3.5 animate-spin" />
-                            <span>Uploading...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Upload className="size-3.5" />
-                            <span>Upload Hero Background</span>
-                          </>
-                        )}
-                      </Button>
-                      {heroBackgroundUrl && (
-                        <Button
-                          type="button"
-                          onClick={() => setHeroBackgroundUrl(null)}
-                          variant="outline"
-                          size="md"
-                          className="h-8.5 text-xs text-red-500 hover:text-red-600 hover:bg-red-500/10 cursor-pointer gap-1"
-                        >
-                          <Trash2 className="size-3" />
-                          <span>Remove</span>
-                        </Button>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-muted-foreground">
-                      Full-bleed image for the main landing page hero section.
-                      Recommended 1920x1080px.
+                  <div>
+                    <h5 className="font-bold text-foreground text-sm">
+                      Storefront Hero & Background Media
+                    </h5>
+                    <p className="text-xs text-muted-foreground">
+                      Customize your storefront hero typography and
+                      high-resolution background imagery.
                     </p>
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
-        )}
 
-        {/* About Section & Page Content */}
-        {contentTab === "about" && (
-          <div className="rounded-2xl border border-border bg-card p-5 md:p-6 shadow-xs space-y-4 animate-fadeIn">
-            <div className="flex items-center gap-2.5 pb-2 border-b border-border">
-              <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                <BookOpen className="size-4" />
-              </div>
-              <div>
-                <h5 className="font-bold text-foreground text-sm">
-                  About Section & Dedicated Page Content
-                </h5>
-                <p className="text-xs text-muted-foreground">
-                  Update the story, craft philosophy, and showcase cards on your
-                  landing page and /{tenantSlug}/about page.
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-4 pt-1">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-foreground">
-                    Section Top Badge
-                  </Label>
-                  <Input
-                    value={aboutBadge}
-                    onChange={(e) => setAboutBadge(e.target.value)}
-                    placeholder="Our Story & Standards"
-                    className="text-xs h-9 bg-background"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-foreground">
-                    About Headline Title
-                  </Label>
-                  <Input
-                    value={aboutTitle}
-                    onChange={(e) => setAboutTitle(e.target.value)}
-                    placeholder="A devotion to craftsmanship..."
-                    className="text-xs h-9 bg-background"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-foreground">
-                  Primary Story Paragraph
-                </Label>
-                <Textarea
-                  value={aboutDescription}
-                  onChange={(e) => setAboutDescription(e.target.value)}
-                  placeholder="At our store, we believe exceptional products begin with intentional curation..."
-                  className="text-xs min-h-20 bg-background resize-y"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-foreground">
-                  Secondary Assurance Paragraph
-                </Label>
-                <Textarea
-                  value={aboutSecondaryDescription}
-                  onChange={(e) => setAboutSecondaryDescription(e.target.value)}
-                  placeholder="Whether you are discovering something new or ordering a signature favorite..."
-                  className="text-xs min-h-16 bg-background resize-y"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-foreground">
-                  Brand Mission Statement
-                </Label>
-                <Input
-                  value={aboutMission}
-                  onChange={(e) => setAboutMission(e.target.value)}
-                  placeholder="To bring authentic excellence and artisanal beauty together..."
-                  className="text-xs h-9 bg-background"
-                />
-              </div>
-
-              {/* Showcase Card Configuration & Image */}
-              <div className="p-4 rounded-xl border border-border bg-muted/20 space-y-3">
-                <Label className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                  <Sparkles className="size-3.5 text-primary" />
-                  Showcase Card (Right Side of About Section)
-                </Label>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-[11px] font-medium text-foreground">
-                      Card Badge
+                <div className="space-y-4 pt-1">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-foreground">
+                      Storefront Hero Headline
                     </Label>
                     <Input
-                      value={aboutCardBadge}
-                      onChange={(e) => setAboutCardBadge(e.target.value)}
-                      placeholder="Crafted With Precision"
-                      className="text-xs h-8.5 bg-background"
+                      value={storeHeadline}
+                      onChange={(e) => setStoreHeadline(e.target.value)}
+                      placeholder="Official Online Store for ..."
+                      className="text-xs h-9 bg-background"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-[11px] font-medium text-foreground">
-                      Card Title
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-foreground">
+                      Brand Tagline & Mission
                     </Label>
                     <Input
-                      value={aboutCardTitle}
-                      onChange={(e) => setAboutCardTitle(e.target.value)}
-                      placeholder="Designed For Discerning Clients"
-                      className="text-xs h-8.5 bg-background"
+                      value={tagline}
+                      onChange={(e) => setTagline(e.target.value)}
+                      placeholder="Handcrafted artisanal creations..."
+                      className="text-xs h-9 bg-background"
                     />
                   </div>
-                </div>
 
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-medium text-foreground">
-                    Card Description
-                  </Label>
-                  <Textarea
-                    value={aboutCardDescription}
-                    onChange={(e) => setAboutCardDescription(e.target.value)}
-                    placeholder="Enjoy seamless checkout, tracked fulfilment, and instant payment settlement..."
-                    className="text-xs min-h-14 bg-background resize-y"
-                  />
-                </div>
-
-                {/* Showcase Card Image Upload */}
-                <div className="pt-2 border-t border-border flex flex-col sm:flex-row items-center gap-3">
-                  <div className="w-full sm:w-28 h-20 rounded-lg border border-border bg-muted/40 overflow-hidden relative shrink-0">
-                    {aboutImageUrl ? (
-                      <Image
-                        src={aboutImageUrl}
-                        alt="About Showcase"
-                        fill
-                        className="object-cover"
-                        unoptimized
-                      />
-                    ) : (
-                      <div className="size-full flex flex-col items-center justify-center text-muted-foreground/50 text-[10px]">
-                        <ImageIcon className="size-5 mb-1" />
-                        <span>No image</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 space-y-1">
-                    <input
-                      type="file"
-                      ref={aboutImageInputRef}
-                      onChange={(e) =>
-                        handleGenericImageUpload(
-                          e,
-                          "About Showcase Image",
-                          setAboutImageUrl,
-                        )
-                      }
-                      accept="image/*"
-                      className="hidden"
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-foreground">
+                      Top Announcement Banner
+                    </Label>
+                    <Input
+                      value={announcementText}
+                      onChange={(e) => setAnnouncementText(e.target.value)}
+                      placeholder="Free standard shipping on all domestic orders..."
+                      className="text-xs h-9 bg-background"
                     />
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        onClick={() => aboutImageInputRef.current?.click()}
-                        disabled={uploadingField === "About Showcase Image"}
-                        variant="outline"
-                        size="md"
-                        className="h-8 text-xs gap-1 cursor-pointer"
-                      >
-                        {uploadingField === "About Showcase Image" ? (
-                          <>
-                            <Loader2 className="size-3 animate-spin" />
-                            <span>Uploading...</span>
-                          </>
+                  </div>
+
+                  {/* Hero Background Image */}
+                  <div className="pt-2 border-t border-border space-y-2">
+                    <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                      <ImageIcon className="size-3.5 text-primary" />
+                      Hero Section Background Image
+                    </Label>
+                    <div className="flex flex-col sm:flex-row items-center gap-3">
+                      <div className="w-full sm:w-32 h-20 rounded-xl border border-border bg-muted/30 overflow-hidden relative group shrink-0">
+                        {heroBackgroundUrl ? (
+                          <Image
+                            src={heroBackgroundUrl}
+                            alt="Hero Background"
+                            fill
+                            className="object-cover"
+                            unoptimized
+                          />
                         ) : (
-                          <>
-                            <Upload className="size-3" />
-                            <span>Upload Showcase Image</span>
-                          </>
+                          <div className="size-full flex flex-col items-center justify-center text-muted-foreground/50 text-[10px]">
+                            <ImageIcon className="size-5 mb-1" />
+                            <span>No image</span>
+                          </div>
                         )}
-                      </Button>
-                      {aboutImageUrl && (
-                        <Button
-                          type="button"
-                          onClick={() => setAboutImageUrl(null)}
-                          variant="outline"
-                          size="md"
-                          className="h-8 text-xs text-red-500 hover:text-red-600 hover:bg-red-500/10 cursor-pointer"
-                        >
-                          <Trash2 className="size-3" />
-                        </Button>
-                      )}
-                    </div>
-                    <p className="text-[10px] text-muted-foreground">
-                      Photo displayed inside the About feature card on your
-                      storefront and about page.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* 3 Core Pillars */}
-              <div className="space-y-2 pt-2 border-t border-border">
-                <Label className="text-xs font-semibold text-foreground">
-                  Core Pillars / Standards Badges
-                </Label>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div className="p-3 rounded-lg border border-border bg-card space-y-1.5">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
-                      <ShieldCheck className="size-3.5 text-primary" />
-                      <span>Pillar 1</span>
-                    </div>
-                    <Input
-                      value={aboutFeature1Title}
-                      onChange={(e) => setAboutFeature1Title(e.target.value)}
-                      placeholder="Authentic"
-                      className="text-xs h-7.5 bg-background font-semibold"
-                    />
-                    <Input
-                      value={aboutFeature1Desc}
-                      onChange={(e) => setAboutFeature1Desc(e.target.value)}
-                      placeholder="100% Verified"
-                      className="text-[11px] h-7 bg-background text-muted-foreground"
-                    />
-                  </div>
-
-                  <div className="p-3 rounded-lg border border-border bg-card space-y-1.5">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
-                      <Award className="size-3.5 text-primary" />
-                      <span>Pillar 2</span>
-                    </div>
-                    <Input
-                      value={aboutFeature2Title}
-                      onChange={(e) => setAboutFeature2Title(e.target.value)}
-                      placeholder="Guaranteed"
-                      className="text-xs h-7.5 bg-background font-semibold"
-                    />
-                    <Input
-                      value={aboutFeature2Desc}
-                      onChange={(e) => setAboutFeature2Desc(e.target.value)}
-                      placeholder="Top Craftsmanship"
-                      className="text-[11px] h-7 bg-background text-muted-foreground"
-                    />
-                  </div>
-
-                  <div className="p-3 rounded-lg border border-border bg-card space-y-1.5">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
-                      <HeartHandshake className="size-3.5 text-primary" />
-                      <span>Pillar 3</span>
-                    </div>
-                    <Input
-                      value={aboutFeature3Title}
-                      onChange={(e) => setAboutFeature3Title(e.target.value)}
-                      placeholder="Bespoke"
-                      className="text-xs h-7.5 bg-background font-semibold"
-                    />
-                    <Input
-                      value={aboutFeature3Desc}
-                      onChange={(e) => setAboutFeature3Desc(e.target.value)}
-                      placeholder="Care in Every Order"
-                      className="text-[11px] h-7 bg-background text-muted-foreground"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* About Background Image */}
-              <div className="pt-2 border-t border-border space-y-2">
-                <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                  <ImageIcon className="size-3.5 text-primary" />
-                  About Section Ambient Background Image (Optional)
-                </Label>
-                <div className="flex flex-col sm:flex-row items-center gap-3">
-                  <div className="w-full sm:w-28 h-16 rounded-lg border border-border bg-muted/30 overflow-hidden relative shrink-0">
-                    {aboutBackgroundUrl ? (
-                      <Image
-                        src={aboutBackgroundUrl}
-                        alt="About Background"
-                        fill
-                        className="object-cover"
-                        unoptimized
-                      />
-                    ) : (
-                      <div className="size-full flex flex-col items-center justify-center text-muted-foreground/50 text-[10px]">
-                        <ImageIcon className="size-4 mb-0.5" />
-                        <span>No image</span>
                       </div>
-                    )}
-                  </div>
-                  <div className="flex-1 space-y-1 w-full">
-                    <input
-                      type="file"
-                      ref={aboutBgInputRef}
-                      onChange={(e) =>
-                        handleGenericImageUpload(
-                          e,
-                          "About Background",
-                          setAboutBackgroundUrl,
-                        )
-                      }
-                      accept="image/*"
-                      className="hidden"
-                    />
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        onClick={() => aboutBgInputRef.current?.click()}
-                        disabled={uploadingField === "About Background"}
-                        variant="outline"
-                        size="md"
-                        className="h-8 text-xs gap-1 cursor-pointer"
-                      >
-                        {uploadingField === "About Background" ? (
-                          <>
-                            <Loader2 className="size-3 animate-spin" />
-                            <span>Uploading...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Upload className="size-3" />
-                            <span>Upload Background</span>
-                          </>
-                        )}
-                      </Button>
-                      {aboutBackgroundUrl && (
-                        <Button
-                          type="button"
-                          onClick={() => setAboutBackgroundUrl(null)}
-                          variant="outline"
-                          size="md"
-                          className="h-8 text-xs text-red-500 hover:text-red-600 hover:bg-red-500/10 cursor-pointer"
-                        >
-                          <Trash2 className="size-3" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Contact Section & Page Content */}
-        {contentTab === "contact" && (
-          <div className="rounded-2xl border border-border bg-card p-5 md:p-6 shadow-xs space-y-4 animate-fadeIn">
-            <div className="flex items-center gap-2.5 pb-2 border-b border-border">
-              <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                <MessageSquareText className="size-4" />
-              </div>
-              <div>
-                <h5 className="font-bold text-foreground text-sm">
-                  Contact Section & Dedicated Page Content
-                </h5>
-                <p className="text-xs text-muted-foreground">
-                  Update your contact details, inquiry headlines, hours, and
-                  background imagery for /{tenantSlug}/contact and the
-                  storefront CTA banner.
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-4 pt-1">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-foreground">
-                    Section Top Badge
-                  </Label>
-                  <Input
-                    value={contactBadge}
-                    onChange={(e) => setContactBadge(e.target.value)}
-                    placeholder="Custom Orders & Inquiries"
-                    className="text-xs h-9 bg-background"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-foreground">
-                    Contact Main Headline
-                  </Label>
-                  <Input
-                    value={contactHeading}
-                    onChange={(e) => setContactHeading(e.target.value)}
-                    placeholder="Request Bespoke Customizations"
-                    className="text-xs h-9 bg-background"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-foreground">
-                  Contact Description / Subheading
-                </Label>
-                <Textarea
-                  value={contactSubheading}
-                  onChange={(e) => setContactSubheading(e.target.value)}
-                  placeholder="Need custom volume orders, personalized modifications, or tailored corporate bundles?..."
-                  className="text-xs min-h-20 bg-background resize-y"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    <Mail className="size-3.5 text-primary" />
-                    Public Contact Email
-                  </Label>
-                  <Input
-                    type="email"
-                    value={storeContactEmail}
-                    onChange={(e) => setStoreContactEmail(e.target.value)}
-                    placeholder="hello@yourstore.com"
-                    className="text-xs h-9 bg-background"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    <Phone className="size-3.5 text-primary" />
-                    Contact Phone / WhatsApp
-                  </Label>
-                  <Input
-                    value={storeContactPhone}
-                    onChange={(e) => setStoreContactPhone(e.target.value)}
-                    placeholder="+234 800 000 0000"
-                    className="text-xs h-9 bg-background"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    <MapPin className="size-3.5 text-primary" />
-                    Physical Atelier / Address
-                  </Label>
-                  <Input
-                    value={storeContactAddress}
-                    onChange={(e) => setStoreContactAddress(e.target.value)}
-                    placeholder="123 Artisan Way, Lagos"
-                    className="text-xs h-9 bg-background"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    <Clock className="size-3.5 text-primary" />
-                    Operating / Store Hours
-                  </Label>
-                  <Input
-                    value={storeContactHours}
-                    onChange={(e) => setStoreContactHours(e.target.value)}
-                    placeholder="Mon – Sat: 9:00 AM – 7:00 PM"
-                    className="text-xs h-9 bg-background"
-                  />
-                </div>
-              </div>
-
-              {/* Contact Background Image */}
-              <div className="pt-2 border-t border-border space-y-2">
-                <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                  <ImageIcon className="size-3.5 text-primary" />
-                  Contact Section Background Image (Optional)
-                </Label>
-                <div className="flex flex-col sm:flex-row items-center gap-3">
-                  <div className="w-full sm:w-28 h-16 rounded-lg border border-border bg-muted/30 overflow-hidden relative shrink-0">
-                    {contactBackgroundUrl ? (
-                      <Image
-                        src={contactBackgroundUrl}
-                        alt="Contact Background"
-                        fill
-                        className="object-cover"
-                        unoptimized
-                      />
-                    ) : (
-                      <div className="size-full flex flex-col items-center justify-center text-muted-foreground/50 text-[10px]">
-                        <ImageIcon className="size-4 mb-0.5" />
-                        <span>No image</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 space-y-1 w-full">
-                    <input
-                      type="file"
-                      ref={contactBgInputRef}
-                      onChange={(e) =>
-                        handleGenericImageUpload(
-                          e,
-                          "Contact Background",
-                          setContactBackgroundUrl,
-                        )
-                      }
-                      accept="image/*"
-                      className="hidden"
-                    />
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        onClick={() => contactBgInputRef.current?.click()}
-                        disabled={uploadingField === "Contact Background"}
-                        variant="outline"
-                        size="md"
-                        className="h-8 text-xs gap-1 cursor-pointer"
-                      >
-                        {uploadingField === "Contact Background" ? (
-                          <>
-                            <Loader2 className="size-3 animate-spin" />
-                            <span>Uploading...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Upload className="size-3" />
-                            <span>Upload Background</span>
-                          </>
-                        )}
-                      </Button>
-                      {contactBackgroundUrl && (
-                        <Button
-                          type="button"
-                          onClick={() => setContactBackgroundUrl(null)}
-                          variant="outline"
-                          size="md"
-                          className="h-8 text-xs text-red-500 hover:text-red-600 hover:bg-red-500/10 cursor-pointer"
-                        >
-                          <Trash2 className="size-3" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Stats Strip Content */}
-        {contentTab === "stats" && (
-          <div className="rounded-2xl border border-border bg-card p-5 md:p-6 shadow-xs space-y-4 animate-fadeIn">
-            <div className="flex items-center justify-between pb-2 border-b border-border">
-              <div className="flex items-center gap-2.5">
-                <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                  <BarChart3 className="size-4" />
-                </div>
-                <div>
-                  <h5 className="font-bold text-foreground text-sm">
-                    Stats & Credibility Strip
-                  </h5>
-                  <p className="text-xs text-muted-foreground">
-                    Configure up to 4 trust statistics displayed across your storefront.
-                  </p>
-                </div>
-              </div>
-              <Badge variant="outline" className="text-xs">
-                {statsList.filter((s) => s.enabled !== false).length} / 4 Active
-              </Badge>
-            </div>
-
-            <div className="space-y-3">
-              {statsList.map((stat, idx) => (
-                <div
-                  key={stat.id || idx}
-                  className="p-3.5 rounded-xl border border-border bg-background space-y-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-foreground">
-                      Metric #{idx + 1}
-                    </span>
-                    <div className="flex items-center gap-3">
-                      <label className="text-[11px] text-muted-foreground flex items-center gap-1.5 cursor-pointer">
+                      <div className="flex-1 space-y-1.5 w-full">
                         <input
-                          type="checkbox"
-                          checked={stat.enabled !== false}
-                          onChange={(e) => {
-                            const checked = e.target.checked;
-                            setStatsList((prev) =>
-                              prev.map((s, i) =>
-                                i === idx ? { ...s, enabled: checked } : s,
-                              ),
-                            );
-                          }}
-                          className="rounded text-primary focus:ring-primary size-3.5"
+                          type="file"
+                          ref={heroBgInputRef}
+                          onChange={(e) =>
+                            handleGenericImageUpload(
+                              e,
+                              "Hero Background",
+                              setHeroBackgroundUrl,
+                            )
+                          }
+                          accept="image/*"
+                          className="hidden"
                         />
-                        <span>Visible</span>
-                      </label>
-                      {statsList.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setStatsList((prev) =>
-                              prev.filter((_, i) => i !== idx),
-                            );
-                          }}
-                          className="text-xs text-rose-500 hover:text-rose-600 p-1"
-                        >
-                          <Trash2 className="size-3.5" />
-                        </button>
-                      )}
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            onClick={() => heroBgInputRef.current?.click()}
+                            disabled={uploadingField === "Hero Background"}
+                            variant="outline"
+                            size="md"
+                            className="h-8.5 text-xs gap-1.5 cursor-pointer"
+                          >
+                            {uploadingField === "Hero Background" ? (
+                              <>
+                                <Loader2 className="size-3.5 animate-spin" />
+                                <span>Uploading...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="size-3.5" />
+                                <span>Upload Hero Background</span>
+                              </>
+                            )}
+                          </Button>
+                          {heroBackgroundUrl && (
+                            <Button
+                              type="button"
+                              onClick={() => setHeroBackgroundUrl(null)}
+                              variant="outline"
+                              size="md"
+                              className="h-8.5 text-xs text-red-500 hover:text-red-600 hover:bg-red-500/10 cursor-pointer gap-1"
+                            >
+                              <Trash2 className="size-3" />
+                              <span>Remove</span>
+                            </Button>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          Full-bleed image for the main landing page hero
+                          section. Recommended 1920x1080px.
+                        </p>
+                      </div>
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                    <div className="space-y-1">
-                      <Label className="text-[11px] font-semibold text-muted-foreground">
-                        Metric Type
-                      </Label>
-                      <select
-                        value={stat.type}
-                        onChange={(e) => {
-                          const newType = e.target.value as StatConfigItem["type"];
-                          let defaultLabel = stat.label;
-                          if (newType === "satisfaction")
-                            defaultLabel = "Satisfaction Rate";
-                          else if (newType === "orders")
-                            defaultLabel = "Orders Delivered";
-                          else if (newType === "products")
-                            defaultLabel = "Curated Products";
-                          else if (newType === "custom" && !defaultLabel)
-                            defaultLabel = "Authentic Materials";
+            {/* About Section & Page Content */}
+            {contentTab === "about" && (
+              <div className="rounded-2xl border border-border bg-card p-5 md:p-6 shadow-xs space-y-4 animate-fadeIn">
+                <div className="flex items-center gap-2.5 pb-2 border-b border-border">
+                  <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                    <BookOpen className="size-4" />
+                  </div>
+                  <div>
+                    <h5 className="font-bold text-foreground text-sm">
+                      About Section & Dedicated Page Content
+                    </h5>
+                    <p className="text-xs text-muted-foreground">
+                      Update the story, craft philosophy, and showcase cards on
+                      your landing page and /{tenantSlug}/about page.
+                    </p>
+                  </div>
+                </div>
 
-                          setStatsList((prev) =>
-                            prev.map((s, i) =>
-                              i === idx
-                                ? { ...s, type: newType, label: defaultLabel }
-                                : s,
-                            ),
-                          );
-                        }}
-                        className="w-full text-xs h-8 px-2 rounded-md border border-border bg-background text-foreground"
-                      >
-                        <option value="satisfaction">Satisfaction Rate (Live DB)</option>
-                        <option value="orders">Orders Delivered (Live DB)</option>
-                        <option value="products">Curated Products (Live DB)</option>
-                        <option value="custom">Custom Metric (Manual)</option>
-                      </select>
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label className="text-[11px] font-semibold text-muted-foreground">
-                        Label Text
+                <div className="space-y-4 pt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold text-foreground">
+                        Section Top Badge
                       </Label>
                       <Input
-                        value={stat.label}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setStatsList((prev) =>
-                            prev.map((s, i) =>
-                              i === idx ? { ...s, label: val } : s,
-                            ),
-                          );
-                        }}
-                        placeholder="e.g. Satisfaction Rate"
-                        className="text-xs h-8 bg-background"
+                        value={aboutBadge}
+                        onChange={(e) => setAboutBadge(e.target.value)}
+                        placeholder="Our Story & Standards"
+                        className="text-xs h-9 bg-background"
                       />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold text-foreground">
+                        About Headline Title
+                      </Label>
+                      <Input
+                        value={aboutTitle}
+                        onChange={(e) => setAboutTitle(e.target.value)}
+                        placeholder="A devotion to craftsmanship..."
+                        className="text-xs h-9 bg-background"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-foreground">
+                      Primary Story Paragraph
+                    </Label>
+                    <Textarea
+                      value={aboutDescription}
+                      onChange={(e) => setAboutDescription(e.target.value)}
+                      placeholder="At our store, we believe exceptional products begin with intentional curation..."
+                      className="text-xs min-h-20 bg-background resize-y"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-foreground">
+                      Secondary Assurance Paragraph
+                    </Label>
+                    <Textarea
+                      value={aboutSecondaryDescription}
+                      onChange={(e) =>
+                        setAboutSecondaryDescription(e.target.value)
+                      }
+                      placeholder="Whether you are discovering something new or ordering a signature favorite..."
+                      className="text-xs min-h-16 bg-background resize-y"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-foreground">
+                      Brand Mission Statement
+                    </Label>
+                    <Input
+                      value={aboutMission}
+                      onChange={(e) => setAboutMission(e.target.value)}
+                      placeholder="To bring authentic excellence and artisanal beauty together..."
+                      className="text-xs h-9 bg-background"
+                    />
+                  </div>
+
+                  {/* Showcase Card Configuration & Image */}
+                  <div className="p-4 rounded-xl border border-border bg-muted/20 space-y-3">
+                    <Label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                      <Sparkles className="size-3.5 text-primary" />
+                      Showcase Card (Right Side of About Section)
+                    </Label>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-medium text-foreground">
+                          Card Badge
+                        </Label>
+                        <Input
+                          value={aboutCardBadge}
+                          onChange={(e) => setAboutCardBadge(e.target.value)}
+                          placeholder="Crafted With Precision"
+                          className="text-xs h-8.5 bg-background"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-medium text-foreground">
+                          Card Title
+                        </Label>
+                        <Input
+                          value={aboutCardTitle}
+                          onChange={(e) => setAboutCardTitle(e.target.value)}
+                          placeholder="Designed For Discerning Clients"
+                          className="text-xs h-8.5 bg-background"
+                        />
+                      </div>
                     </div>
 
                     <div className="space-y-1">
-                      <Label className="text-[11px] font-semibold text-muted-foreground">
-                        Display Value
+                      <Label className="text-[11px] font-medium text-foreground">
+                        Card Description
                       </Label>
-                      {stat.type === "custom" ? (
-                        <Input
-                          value={stat.customValue || stat.value || ""}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setStatsList((prev) =>
-                              prev.map((s, i) =>
-                                i === idx
-                                  ? { ...s, value: val, customValue: val }
-                                  : s,
-                              ),
-                            );
-                          }}
-                          placeholder="e.g. 100%, 24/7, 10+"
-                          className="text-xs h-8 bg-background"
-                        />
-                      ) : (
-                        <div className="h-8 px-2.5 rounded-md border border-dashed border-border bg-muted/30 flex items-center text-[11px] text-muted-foreground font-mono">
-                          ⚡ Calculated from DB
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              {statsList.length < 4 && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    if (statsList.length >= 4) {
-                      toast.error("Maximum of 4 stats can be displayed.");
-                      return;
-                    }
-                    setStatsList((prev) => [
-                      ...prev,
-                      {
-                        id: `custom-${Date.now()}`,
-                        type: "custom",
-                        label: "Custom Metric",
-                        value: "100%",
-                        customValue: "100%",
-                        enabled: true,
-                      },
-                    ]);
-                  }}
-                  className="w-full text-xs h-8 gap-1 border-dashed"
-                >
-                  <Plus className="size-3.5" />
-                  <span>Add Credibility Metric ({statsList.length}/4)</span>
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Banner Section Content */}
-        {contentTab === "banner" && (
-          <div className="rounded-2xl border border-border bg-card p-5 md:p-6 shadow-xs space-y-4 animate-fadeIn">
-            <div className="flex items-center gap-2.5 pb-2 border-b border-border">
-              <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                <Megaphone className="size-4" />
-              </div>
-              <div>
-                <h5 className="font-bold text-foreground text-sm">
-                  Storefront Banner Section
-                </h5>
-                <p className="text-xs text-muted-foreground">
-                  Customize the promotional call-to-action banner displayed above the storefront footer.
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-foreground">
-                    Banner Top Badge
-                  </Label>
-                  <Input
-                    value={bannerBadge}
-                    onChange={(e) => setBannerBadge(e.target.value)}
-                    placeholder="Elevate Your Collection"
-                    className="text-xs h-9 bg-background"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-foreground">
-                    Button Label
-                  </Label>
-                  <Input
-                    value={bannerButtonText}
-                    onChange={(e) => setBannerButtonText(e.target.value)}
-                    placeholder="Shop Now"
-                    className="text-xs h-9 bg-background"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-foreground">
-                  Banner Main Title / Headline
-                </Label>
-                <Input
-                  value={bannerHeadline}
-                  onChange={(e) => setBannerHeadline(e.target.value)}
-                  placeholder={`Experience Excellence at ${formattedStoreName}`}
-                  className="text-xs h-9 bg-background"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-foreground">
-                  Banner Narrative / Description
-                </Label>
-                <Textarea
-                  value={bannerDescription}
-                  onChange={(e) => setBannerDescription(e.target.value)}
-                  placeholder="Discover exclusive collections, enjoy secure multi-currency payment checkout..."
-                  className="text-xs min-h-20 bg-background resize-y"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-foreground">
-                  Button Target URL / Link
-                </Label>
-                <Input
-                  value={bannerButtonLink}
-                  onChange={(e) => setBannerButtonLink(e.target.value)}
-                  placeholder={`/${tenantSlug}#collection`}
-                  className="text-xs h-9 bg-background font-mono text-[11px]"
-                />
-              </div>
-
-              {/* Banner Background Image */}
-              <div className="pt-2 border-t border-border space-y-2">
-                <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                  <ImageIcon className="size-3.5 text-primary" />
-                  Banner Background Image (Optional)
-                </Label>
-                <div className="flex flex-col sm:flex-row items-center gap-3">
-                  <div className="w-full sm:w-28 h-16 rounded-lg border border-border bg-muted/30 overflow-hidden relative shrink-0">
-                    {bannerUrl ? (
-                      <Image
-                        src={bannerUrl}
-                        alt="Banner Background"
-                        fill
-                        className="object-cover"
-                        unoptimized
+                      <Textarea
+                        value={aboutCardDescription}
+                        onChange={(e) =>
+                          setAboutCardDescription(e.target.value)
+                        }
+                        placeholder="Enjoy seamless checkout, tracked fulfilment, and instant payment settlement..."
+                        className="text-xs min-h-14 bg-background resize-y"
                       />
-                    ) : (
-                      <div className="size-full flex flex-col items-center justify-center text-muted-foreground/50 text-[10px]">
-                        <ImageIcon className="size-4 mb-0.5" />
-                        <span>No image</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 space-y-1 w-full">
-                    <input
-                      type="file"
-                      ref={bannerInputRef}
-                      onChange={(e) =>
-                        handleGenericImageUpload(
-                          e,
-                          "Banner Background",
-                          (url) => setBannerUrl(url || ""),
-                        )
-                      }
-                      accept="image/*"
-                      className="hidden"
-                    />
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        onClick={() => bannerInputRef.current?.click()}
-                        disabled={uploadingField === "Banner Background"}
-                        variant="outline"
-                        size="md"
-                        className="h-8 text-xs gap-1 cursor-pointer"
-                      >
-                        {uploadingField === "Banner Background" ? (
-                          <>
-                            <Loader2 className="size-3 animate-spin" />
-                            <span>Uploading...</span>
-                          </>
+                    </div>
+
+                    {/* Showcase Card Image Upload */}
+                    <div className="pt-2 border-t border-border flex flex-col sm:flex-row items-center gap-3">
+                      <div className="w-full sm:w-28 h-20 rounded-lg border border-border bg-muted/40 overflow-hidden relative shrink-0">
+                        {aboutImageUrl ? (
+                          <Image
+                            src={aboutImageUrl}
+                            alt="About Showcase"
+                            fill
+                            className="object-cover"
+                            unoptimized
+                          />
                         ) : (
-                          <>
-                            <Upload className="size-3" />
-                            <span>Upload Banner Image</span>
-                          </>
+                          <div className="size-full flex flex-col items-center justify-center text-muted-foreground/50 text-[10px]">
+                            <ImageIcon className="size-5 mb-1" />
+                            <span>No image</span>
+                          </div>
                         )}
-                      </Button>
-                      {bannerUrl && (
-                        <Button
-                          type="button"
-                          onClick={() => setBannerUrl("")}
-                          variant="outline"
-                          size="md"
-                          className="h-8 text-xs text-red-500 hover:text-red-600 hover:bg-red-500/10 cursor-pointer"
-                        >
-                          <Trash2 className="size-3" />
-                        </Button>
-                      )}
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <input
+                          type="file"
+                          ref={aboutImageInputRef}
+                          onChange={(e) =>
+                            handleGenericImageUpload(
+                              e,
+                              "About Showcase Image",
+                              setAboutImageUrl,
+                            )
+                          }
+                          accept="image/*"
+                          className="hidden"
+                        />
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            onClick={() => aboutImageInputRef.current?.click()}
+                            disabled={uploadingField === "About Showcase Image"}
+                            variant="outline"
+                            size="md"
+                            className="h-8 text-xs gap-1 cursor-pointer"
+                          >
+                            {uploadingField === "About Showcase Image" ? (
+                              <>
+                                <Loader2 className="size-3 animate-spin" />
+                                <span>Uploading...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="size-3" />
+                                <span>Upload Showcase Image</span>
+                              </>
+                            )}
+                          </Button>
+                          {aboutImageUrl && (
+                            <Button
+                              type="button"
+                              onClick={() => setAboutImageUrl(null)}
+                              variant="outline"
+                              size="md"
+                              className="h-8 text-xs text-red-500 hover:text-red-600 hover:bg-red-500/10 cursor-pointer"
+                            >
+                              <Trash2 className="size-3" />
+                            </Button>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">
+                          Photo displayed inside the About feature card on your
+                          storefront and about page.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3 Core Pillars */}
+                  <div className="space-y-2 pt-2 border-t border-border">
+                    <Label className="text-xs font-semibold text-foreground">
+                      Core Pillars / Standards Badges
+                    </Label>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="p-3 rounded-lg border border-border bg-card space-y-1.5">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+                          <ShieldCheck className="size-3.5 text-primary" />
+                          <span>Pillar 1</span>
+                        </div>
+                        <Input
+                          value={aboutFeature1Title}
+                          onChange={(e) =>
+                            setAboutFeature1Title(e.target.value)
+                          }
+                          placeholder="Authentic"
+                          className="text-xs h-7.5 bg-background font-semibold"
+                        />
+                        <Input
+                          value={aboutFeature1Desc}
+                          onChange={(e) => setAboutFeature1Desc(e.target.value)}
+                          placeholder="100% Verified"
+                          className="text-[11px] h-7 bg-background text-muted-foreground"
+                        />
+                      </div>
+
+                      <div className="p-3 rounded-lg border border-border bg-card space-y-1.5">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+                          <Award className="size-3.5 text-primary" />
+                          <span>Pillar 2</span>
+                        </div>
+                        <Input
+                          value={aboutFeature2Title}
+                          onChange={(e) =>
+                            setAboutFeature2Title(e.target.value)
+                          }
+                          placeholder="Guaranteed"
+                          className="text-xs h-7.5 bg-background font-semibold"
+                        />
+                        <Input
+                          value={aboutFeature2Desc}
+                          onChange={(e) => setAboutFeature2Desc(e.target.value)}
+                          placeholder="Top Craftsmanship"
+                          className="text-[11px] h-7 bg-background text-muted-foreground"
+                        />
+                      </div>
+
+                      <div className="p-3 rounded-lg border border-border bg-card space-y-1.5">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+                          <HeartHandshake className="size-3.5 text-primary" />
+                          <span>Pillar 3</span>
+                        </div>
+                        <Input
+                          value={aboutFeature3Title}
+                          onChange={(e) =>
+                            setAboutFeature3Title(e.target.value)
+                          }
+                          placeholder="Bespoke"
+                          className="text-xs h-7.5 bg-background font-semibold"
+                        />
+                        <Input
+                          value={aboutFeature3Desc}
+                          onChange={(e) => setAboutFeature3Desc(e.target.value)}
+                          placeholder="Care in Every Order"
+                          className="text-[11px] h-7 bg-background text-muted-foreground"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* About Background Image */}
+                  <div className="pt-2 border-t border-border space-y-2">
+                    <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                      <ImageIcon className="size-3.5 text-primary" />
+                      About Section Ambient Background Image (Optional)
+                    </Label>
+                    <div className="flex flex-col sm:flex-row items-center gap-3">
+                      <div className="w-full sm:w-28 h-16 rounded-lg border border-border bg-muted/30 overflow-hidden relative shrink-0">
+                        {aboutBackgroundUrl ? (
+                          <Image
+                            src={aboutBackgroundUrl}
+                            alt="About Background"
+                            fill
+                            className="object-cover"
+                            unoptimized
+                          />
+                        ) : (
+                          <div className="size-full flex flex-col items-center justify-center text-muted-foreground/50 text-[10px]">
+                            <ImageIcon className="size-4 mb-0.5" />
+                            <span>No image</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 space-y-1 w-full">
+                        <input
+                          type="file"
+                          ref={aboutBgInputRef}
+                          onChange={(e) =>
+                            handleGenericImageUpload(
+                              e,
+                              "About Background",
+                              setAboutBackgroundUrl,
+                            )
+                          }
+                          accept="image/*"
+                          className="hidden"
+                        />
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            onClick={() => aboutBgInputRef.current?.click()}
+                            disabled={uploadingField === "About Background"}
+                            variant="outline"
+                            size="md"
+                            className="h-8 text-xs gap-1 cursor-pointer"
+                          >
+                            {uploadingField === "About Background" ? (
+                              <>
+                                <Loader2 className="size-3 animate-spin" />
+                                <span>Uploading...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="size-3" />
+                                <span>Upload Background</span>
+                              </>
+                            )}
+                          </Button>
+                          {aboutBackgroundUrl && (
+                            <Button
+                              type="button"
+                              onClick={() => setAboutBackgroundUrl(null)}
+                              variant="outline"
+                              size="md"
+                              className="h-8 text-xs text-red-500 hover:text-red-600 hover:bg-red-500/10 cursor-pointer"
+                            >
+                              <Trash2 className="size-3" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+            )}
 
-    {/* Right Column: Live Interactive Storefront Preview */}
+            {/* Contact Section & Page Content */}
+            {contentTab === "contact" && (
+              <div className="rounded-2xl border border-border bg-card p-5 md:p-6 shadow-xs space-y-4 animate-fadeIn">
+                <div className="flex items-center gap-2.5 pb-2 border-b border-border">
+                  <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                    <MessageSquareText className="size-4" />
+                  </div>
+                  <div>
+                    <h5 className="font-bold text-foreground text-sm">
+                      Contact Section & Dedicated Page Content
+                    </h5>
+                    <p className="text-xs text-muted-foreground">
+                      Update your contact details, inquiry headlines, hours, and
+                      background imagery for /{tenantSlug}/contact and the
+                      storefront CTA banner.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-4 pt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold text-foreground">
+                        Section Top Badge
+                      </Label>
+                      <Input
+                        value={contactBadge}
+                        onChange={(e) => setContactBadge(e.target.value)}
+                        placeholder="Custom Orders & Inquiries"
+                        className="text-xs h-9 bg-background"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold text-foreground">
+                        Contact Main Headline
+                      </Label>
+                      <Input
+                        value={contactHeading}
+                        onChange={(e) => setContactHeading(e.target.value)}
+                        placeholder="Request Bespoke Customizations"
+                        className="text-xs h-9 bg-background"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-foreground">
+                      Contact Description / Subheading
+                    </Label>
+                    <Textarea
+                      value={contactSubheading}
+                      onChange={(e) => setContactSubheading(e.target.value)}
+                      placeholder="Need custom volume orders, personalized modifications, or tailored corporate bundles?..."
+                      className="text-xs min-h-20 bg-background resize-y"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                        <Mail className="size-3.5 text-primary" />
+                        Public Contact Email
+                      </Label>
+                      <Input
+                        type="email"
+                        value={storeContactEmail}
+                        onChange={(e) => setStoreContactEmail(e.target.value)}
+                        placeholder="hello@yourstore.com"
+                        className="text-xs h-9 bg-background"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                        <Phone className="size-3.5 text-primary" />
+                        Contact Phone / WhatsApp
+                      </Label>
+                      <Input
+                        value={storeContactPhone}
+                        onChange={(e) => setStoreContactPhone(e.target.value)}
+                        placeholder="+234 800 000 0000"
+                        className="text-xs h-9 bg-background"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                        <MapPin className="size-3.5 text-primary" />
+                        Physical Atelier / Address
+                      </Label>
+                      <Input
+                        value={storeContactAddress}
+                        onChange={(e) => setStoreContactAddress(e.target.value)}
+                        placeholder="123 Artisan Way, Lagos"
+                        className="text-xs h-9 bg-background"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                        <Clock className="size-3.5 text-primary" />
+                        Operating / Store Hours
+                      </Label>
+                      <Input
+                        value={storeContactHours}
+                        onChange={(e) => setStoreContactHours(e.target.value)}
+                        placeholder="Mon – Sat: 9:00 AM – 7:00 PM"
+                        className="text-xs h-9 bg-background"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Contact Background Image */}
+                  <div className="pt-2 border-t border-border space-y-2">
+                    <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                      <ImageIcon className="size-3.5 text-primary" />
+                      Contact Section Background Image (Optional)
+                    </Label>
+                    <div className="flex flex-col sm:flex-row items-center gap-3">
+                      <div className="w-full sm:w-28 h-16 rounded-lg border border-border bg-muted/30 overflow-hidden relative shrink-0">
+                        {contactBackgroundUrl ? (
+                          <Image
+                            src={contactBackgroundUrl}
+                            alt="Contact Background"
+                            fill
+                            className="object-cover"
+                            unoptimized
+                          />
+                        ) : (
+                          <div className="size-full flex flex-col items-center justify-center text-muted-foreground/50 text-[10px]">
+                            <ImageIcon className="size-4 mb-0.5" />
+                            <span>No image</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 space-y-1 w-full">
+                        <input
+                          type="file"
+                          ref={contactBgInputRef}
+                          onChange={(e) =>
+                            handleGenericImageUpload(
+                              e,
+                              "Contact Background",
+                              setContactBackgroundUrl,
+                            )
+                          }
+                          accept="image/*"
+                          className="hidden"
+                        />
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            onClick={() => contactBgInputRef.current?.click()}
+                            disabled={uploadingField === "Contact Background"}
+                            variant="outline"
+                            size="md"
+                            className="h-8 text-xs gap-1 cursor-pointer"
+                          >
+                            {uploadingField === "Contact Background" ? (
+                              <>
+                                <Loader2 className="size-3 animate-spin" />
+                                <span>Uploading...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="size-3" />
+                                <span>Upload Background</span>
+                              </>
+                            )}
+                          </Button>
+                          {contactBackgroundUrl && (
+                            <Button
+                              type="button"
+                              onClick={() => setContactBackgroundUrl(null)}
+                              variant="outline"
+                              size="md"
+                              className="h-8 text-xs text-red-500 hover:text-red-600 hover:bg-red-500/10 cursor-pointer"
+                            >
+                              <Trash2 className="size-3" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Stats Strip Content */}
+            {contentTab === "stats" && (
+              <div className="rounded-2xl border border-border bg-card p-5 md:p-6 shadow-xs space-y-4 animate-fadeIn">
+                <div className="flex items-center justify-between pb-2 border-b border-border">
+                  <div className="flex items-center gap-2.5">
+                    <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                      <BarChart3 className="size-4" />
+                    </div>
+                    <div>
+                      <h5 className="font-bold text-foreground text-sm">
+                        Stats & Credibility Strip
+                      </h5>
+                      <p className="text-xs text-muted-foreground">
+                        Configure up to 4 trust statistics displayed across your
+                        storefront.
+                      </p>
+                    </div>
+                  </div>
+                  <Badge variant="outline" className="text-xs">
+                    {statsList.filter((s) => s.enabled !== false).length} / 4
+                    Active
+                  </Badge>
+                </div>
+
+                <div className="space-y-3">
+                  {statsList.map((stat, idx) => (
+                    <div
+                      key={stat.id || idx}
+                      className="p-3.5 rounded-xl border border-border bg-background space-y-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-foreground">
+                          Metric #{idx + 1}
+                        </span>
+                        <div className="flex items-center gap-3">
+                          <label className="text-[11px] text-muted-foreground flex items-center gap-1.5 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={stat.enabled !== false}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                setStatsList((prev) =>
+                                  prev.map((s, i) =>
+                                    i === idx ? { ...s, enabled: checked } : s,
+                                  ),
+                                );
+                              }}
+                              className="rounded text-primary focus:ring-primary size-3.5"
+                            />
+                            <span>Visible</span>
+                          </label>
+                          {statsList.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setStatsList((prev) =>
+                                  prev.filter((_, i) => i !== idx),
+                                );
+                              }}
+                              className="text-xs text-rose-500 hover:text-rose-600 p-1"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                        <div className="space-y-1">
+                          <Label className="text-[11px] font-semibold text-muted-foreground">
+                            Metric Type
+                          </Label>
+                          <select
+                            value={stat.type}
+                            onChange={(e) => {
+                              const newType = e.target
+                                .value as StatConfigItem["type"];
+                              let defaultLabel = stat.label;
+                              if (newType === "satisfaction")
+                                defaultLabel = "Satisfaction Rate";
+                              else if (newType === "orders")
+                                defaultLabel = "Orders Delivered";
+                              else if (newType === "products")
+                                defaultLabel = "Curated Products";
+                              else if (newType === "custom" && !defaultLabel)
+                                defaultLabel = "Authentic Materials";
+
+                              setStatsList((prev) =>
+                                prev.map((s, i) =>
+                                  i === idx
+                                    ? {
+                                        ...s,
+                                        type: newType,
+                                        label: defaultLabel,
+                                      }
+                                    : s,
+                                ),
+                              );
+                            }}
+                            className="w-full text-xs h-8 px-2 rounded-md border border-border bg-background text-foreground"
+                          >
+                            <option value="satisfaction">
+                              Satisfaction Rate (Live DB)
+                            </option>
+                            <option value="orders">
+                              Orders Delivered (Live DB)
+                            </option>
+                            <option value="products">
+                              Curated Products (Live DB)
+                            </option>
+                            <option value="custom">
+                              Custom Metric (Manual)
+                            </option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-[11px] font-semibold text-muted-foreground">
+                            Label Text
+                          </Label>
+                          <Input
+                            value={stat.label}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setStatsList((prev) =>
+                                prev.map((s, i) =>
+                                  i === idx ? { ...s, label: val } : s,
+                                ),
+                              );
+                            }}
+                            placeholder="e.g. Satisfaction Rate"
+                            className="text-xs h-8 bg-background"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-[11px] font-semibold text-muted-foreground">
+                            Display Value
+                          </Label>
+                          {stat.type === "custom" ? (
+                            <Input
+                              value={stat.customValue || stat.value || ""}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setStatsList((prev) =>
+                                  prev.map((s, i) =>
+                                    i === idx
+                                      ? { ...s, value: val, customValue: val }
+                                      : s,
+                                  ),
+                                );
+                              }}
+                              placeholder="e.g. 100%, 24/7, 10+"
+                              className="text-xs h-8 bg-background"
+                            />
+                          ) : (
+                            <div className="h-8 px-2.5 rounded-md border border-dashed border-border bg-muted/30 flex items-center text-[11px] text-muted-foreground font-mono">
+                              ⚡ Calculated from DB
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {statsList.length < 4 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (statsList.length >= 4) {
+                          toast.error("Maximum of 4 stats can be displayed.");
+                          return;
+                        }
+                        setStatsList((prev) => [
+                          ...prev,
+                          {
+                            id: `custom-${Date.now()}`,
+                            type: "custom",
+                            label: "Custom Metric",
+                            value: "100%",
+                            customValue: "100%",
+                            enabled: true,
+                          },
+                        ]);
+                      }}
+                      className="w-full text-xs h-8 gap-1 border-dashed"
+                    >
+                      <Plus className="size-3.5" />
+                      <span>Add Credibility Metric ({statsList.length}/4)</span>
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Banner Section Content */}
+            {contentTab === "banner" && (
+              <div className="rounded-2xl border border-border bg-card p-5 md:p-6 shadow-xs space-y-4 animate-fadeIn">
+                <div className="flex items-center gap-2.5 pb-2 border-b border-border">
+                  <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                    <Megaphone className="size-4" />
+                  </div>
+                  <div>
+                    <h5 className="font-bold text-foreground text-sm">
+                      Storefront Banner Section
+                    </h5>
+                    <p className="text-xs text-muted-foreground">
+                      Customize the promotional call-to-action banner displayed
+                      above the storefront footer.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold text-foreground">
+                        Banner Top Badge
+                      </Label>
+                      <Input
+                        value={bannerBadge}
+                        onChange={(e) => setBannerBadge(e.target.value)}
+                        placeholder="Elevate Your Collection"
+                        className="text-xs h-9 bg-background"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold text-foreground">
+                        Button Label
+                      </Label>
+                      <Input
+                        value={bannerButtonText}
+                        onChange={(e) => setBannerButtonText(e.target.value)}
+                        placeholder="Shop Now"
+                        className="text-xs h-9 bg-background"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-foreground">
+                      Banner Main Title / Headline
+                    </Label>
+                    <Input
+                      value={bannerHeadline}
+                      onChange={(e) => setBannerHeadline(e.target.value)}
+                      placeholder={`Experience Excellence at ${formattedStoreName}`}
+                      className="text-xs h-9 bg-background"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-foreground">
+                      Banner Narrative / Description
+                    </Label>
+                    <Textarea
+                      value={bannerDescription}
+                      onChange={(e) => setBannerDescription(e.target.value)}
+                      placeholder="Discover exclusive collections, enjoy secure multi-currency payment checkout..."
+                      className="text-xs min-h-20 bg-background resize-y"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-foreground">
+                      Button Target URL / Link
+                    </Label>
+                    <Input
+                      value={bannerButtonLink}
+                      onChange={(e) => setBannerButtonLink(e.target.value)}
+                      placeholder={`/${tenantSlug}#collection`}
+                      className="text-xs h-9 bg-background font-mono text-[11px]"
+                    />
+                  </div>
+
+                  {/* Banner Background Image */}
+                  <div className="pt-2 border-t border-border space-y-2">
+                    <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                      <ImageIcon className="size-3.5 text-primary" />
+                      Banner Background Image (Optional)
+                    </Label>
+                    <div className="flex flex-col sm:flex-row items-center gap-3">
+                      <div className="w-full sm:w-28 h-16 rounded-lg border border-border bg-muted/30 overflow-hidden relative shrink-0">
+                        {bannerUrl ? (
+                          <Image
+                            src={bannerUrl}
+                            alt="Banner Background"
+                            fill
+                            className="object-cover"
+                            unoptimized
+                          />
+                        ) : (
+                          <div className="size-full flex flex-col items-center justify-center text-muted-foreground/50 text-[10px]">
+                            <ImageIcon className="size-4 mb-0.5" />
+                            <span>No image</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 space-y-1 w-full">
+                        <input
+                          type="file"
+                          ref={bannerInputRef}
+                          onChange={(e) =>
+                            handleGenericImageUpload(
+                              e,
+                              "Banner Background",
+                              (url) => setBannerUrl(url || ""),
+                            )
+                          }
+                          accept="image/*"
+                          className="hidden"
+                        />
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            onClick={() => bannerInputRef.current?.click()}
+                            disabled={uploadingField === "Banner Background"}
+                            variant="outline"
+                            size="md"
+                            className="h-8 text-xs gap-1 cursor-pointer"
+                          >
+                            {uploadingField === "Banner Background" ? (
+                              <>
+                                <Loader2 className="size-3 animate-spin" />
+                                <span>Uploading...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="size-3" />
+                                <span>Upload Banner Image</span>
+                              </>
+                            )}
+                          </Button>
+                          {bannerUrl && (
+                            <Button
+                              type="button"
+                              onClick={() => setBannerUrl("")}
+                              variant="outline"
+                              size="md"
+                              className="h-8 text-xs text-red-500 hover:text-red-600 hover:bg-red-500/10 cursor-pointer"
+                            >
+                              <Trash2 className="size-3" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right Column: Live Interactive Storefront Preview */}
         <div className="lg:col-span-5 space-y-4">
           <div className="rounded-2xl border border-border bg-card p-5 space-y-4 sticky top-6 shadow-xs">
             <div className="flex items-center justify-between pb-2 border-b border-border">

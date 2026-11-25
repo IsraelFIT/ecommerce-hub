@@ -517,7 +517,7 @@ export default function CoreTenantsPage() {
                     className="flex-1 px-3 py-2 bg-transparent text-foreground focus:outline-none"
                   />
                   <span className="px-2.5 py-2 bg-muted/50 text-muted-foreground text-[11px] border-l border-border">
-                    .ecommerce-hub.com
+                    .kiyostores.space
                   </span>
                 </div>
               </div>

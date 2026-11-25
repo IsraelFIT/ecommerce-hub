@@ -147,7 +147,7 @@ export default function CoreRevenuePage() {
     link.setAttribute("href", encodedUri);
     link.setAttribute(
       "download",
-      `ecommerce-hub-split-audit-${new Date().toISOString().slice(0, 10)}.csv`,
+      `kiyo-split-audit-${new Date().toISOString().slice(0, 10)}.csv`,
     );
     document.body.appendChild(link);
     link.click();

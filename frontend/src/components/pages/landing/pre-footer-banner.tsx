@@ -16,7 +16,7 @@ export function PreFooterBanner() {
       return;
     }
     toast.success(
-      "Welcome to EcommerceHub! Check your inbox for access instructions.",
+      "Welcome to Kiyo! Check your inbox for access instructions.",
     );
     setEmail("");
   };
@@ -38,7 +38,7 @@ export function PreFooterBanner() {
             <p className="text-muted-foreground font-normal leading-relaxed">
               Join thousands of fast-growing merchants building isolated, custom
               subdomain storefronts and scaling multi-channel sales on
-              EcommerceHub.
+              Kiyo.
             </p>
 
             <form
@@ -68,7 +68,7 @@ export function PreFooterBanner() {
                 <div className="w-5 h-5 rounded bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-bold">
                   <Store className="h-3 w-3" />
                 </div>
-                <span className="font-secondary">EcommerceHub Network</span>
+                <span className="font-secondary">Kiyo Network</span>
               </div>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-success/15 text-success font-semibold">
                 Live Data

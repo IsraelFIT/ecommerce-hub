@@ -29,15 +29,15 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
-        hostname: "cdn.ecommerce-hub.com",
+        hostname: "cdn.kiyostores.space",
       },
       {
         protocol: "https",
-        hostname: "**.ecommerce-hub.com",
+        hostname: "**.kiyostores.space",
       },
       {
         protocol: "https",
-        hostname: "ecommerce-hub.com",
+        hostname: "kiyostores.space",
       },
       {
         protocol: "https",

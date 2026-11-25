@@ -480,9 +480,7 @@ export default function TenantReviewsAdminPage() {
                       >
                         <Star
                           className={`h-3 w-3 ${
-                            r.is_featured
-                              ? "fill-amber-500 text-amber-500"
-                              : ""
+                            r.is_featured ? "fill-amber-500 text-amber-500" : ""
                           }`}
                         />
                         <span>{r.is_featured ? "Featured" : "Feature"}</span>

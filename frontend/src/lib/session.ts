@@ -61,7 +61,7 @@ function getCookieDomain(): string | undefined {
   ) {
     return undefined;
   }
-  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || "ecommerce-hub.com";
+  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || "kiyostores.space";
   if (hostname.endsWith(rootDomain)) {
     return `.${rootDomain}`;
   }
@@ -222,7 +222,7 @@ export async function deleteSession(): Promise<void> {
   // 2. Delete root-domain cookies if in browser on custom subdomain
   if (typeof window !== "undefined") {
     const rootDomain =
-      process.env.NEXT_PUBLIC_ROOT_DOMAIN || "ecommerce-hub.com";
+      process.env.NEXT_PUBLIC_ROOT_DOMAIN || "kiyostores.space";
     const hostname = window.location.hostname;
     if (hostname.endsWith(rootDomain)) {
       cookieNames.forEach((name) => {

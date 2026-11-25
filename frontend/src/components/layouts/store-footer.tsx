@@ -29,7 +29,7 @@ export function StoreFooter() {
               href={getRootAppUrl("/")}
               className="hover:underline hover:text-primary transition-colors"
             >
-              EcommerceHub
+              Kiyo
             </a>
           </span>{" "}
           Multi-Tenant Engine.

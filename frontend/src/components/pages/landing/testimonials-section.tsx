@@ -24,7 +24,7 @@ export function TestimonialsSection() {
         {/* Subtitle */}
         <p className="text-muted-foreground max-w-2xl mx-auto font-normal leading-relaxed mb-16">
           Real experiences from entrepreneurs, bakeries, boutique founders, and
-          retail brands scaling with EcommerceHub.
+          retail brands scaling with Kiyo.
         </p>
 
         {/* Masonry / Multi-column Grid */}
@@ -34,9 +34,9 @@ export function TestimonialsSection() {
             {/* Card 1: Sara John */}
             <div className="bg-card rounded-3xl border border-border p-6 space-y-4">
               <p className="text-xs md:text-sm text-muted-foreground leading-relaxed font-normal">
-                &quot;EcommerceHub made launching our bakery storefront
-                effortless. The subdomain routing and instant checkout increased
-                our custom orders by 140%.&quot;
+                &quot;Kiyo made launching our bakery storefront effortless. The
+                subdomain routing and instant checkout increased our custom
+                orders by 140%.&quot;
               </p>
               <div className="flex items-center gap-3 pt-2 border-t border-border">
                 <div className="w-9 h-9 rounded-full bg-primary-light flex items-center justify-center font-bold text-xs text-primary">
@@ -81,8 +81,7 @@ export function TestimonialsSection() {
               <div className="relative z-10 space-y-3">
                 <p className="text-xs text-stone-200 font-normal leading-relaxed">
                   &quot;The speed, reliability, and automated payout system
-                  makes EcommerceHub the gold standard for multi-store
-                  brands.&quot;
+                  makes Kiyo the gold standard for multi-store brands.&quot;
                 </p>
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center font-bold text-xs text-primary-foreground">
@@ -201,9 +200,8 @@ export function TestimonialsSection() {
               <div className="absolute inset-0 bg-linear-to-t from-black/90 via-black/40 to-transparent" />
               <div className="relative z-10 space-y-3">
                 <p className="text-xs text-stone-200 font-normal leading-relaxed">
-                  &quot;I recommend EcommerceHub to every merchant who needs a
-                  robust, multi-tenant architecture with custom
-                  subdomains.&quot;
+                  &quot;I recommend Kiyo to every merchant who needs a robust,
+                  multi-tenant architecture with custom subdomains.&quot;
                 </p>
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center font-bold text-xs text-primary-foreground">

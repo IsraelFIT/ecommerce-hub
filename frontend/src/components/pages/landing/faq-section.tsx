@@ -12,8 +12,8 @@ export function FaqSection() {
 
   const faqs = [
     {
-      q: "How does subdomain routing work on EcommerceHub?",
-      a: "Every store receives an instant, isolated subdomain (e.g., yourstore.ecommercehub.com). Our edge proxy automatically resolves the subdomain, binds the tenant context, and presents your branded storefront without manual DNS configuration.",
+      q: "How does subdomain routing work on Kiyo?",
+      a: "Every store receives an instant, isolated subdomain (e.g., yourstore.kiyostores.space). Our edge proxy automatically resolves the subdomain, binds the tenant context, and presents your branded storefront without manual DNS configuration.",
     },
     {
       q: "Can merchants connect their own custom domain names?",
@@ -21,7 +21,7 @@ export function FaqSection() {
     },
     {
       q: "How are payments and merchant payouts processed?",
-      a: "EcommerceHub integrates with top-tier payment gateways including Stripe, Apple Pay, and local gateways. Funds are settled directly into the merchant's connected bank account with automated payout schedules.",
+      a: "Kiyo integrates with top-tier payment gateways including Stripe, Apple Pay, and local gateways. Funds are settled directly into the merchant's connected bank account with automated payout schedules.",
     },
     {
       q: "Is merchant and customer data isolated securely?",
@@ -39,7 +39,7 @@ export function FaqSection() {
       toast.error("Please enter your email address");
       return;
     }
-    toast.success("Subscribed to EcommerceHub platform & feature updates!");
+    toast.success("Subscribed to Kiyo platform & feature updates!");
     setEmail("");
   };
 

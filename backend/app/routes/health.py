@@ -33,7 +33,7 @@ async def health_check(db: AsyncSession = Depends(get_db)) -> Dict[str, Any]:
     return success_response(
         data={
             "overall_status": "healthy" if overall_healthy else "degraded",
-            "service": "EcommerceHub-Core-API",
+            "service": "Kiyo-Core-API",
             "database": db_status,
             "cache": cache_status,
         },

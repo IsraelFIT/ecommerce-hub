@@ -459,7 +459,7 @@ export default function CoreUserDetailPage({ params }: UserDetailPageProps) {
                       /^https?:\/\//,
                       "",
                     )
-                  : "store.ecommerce-hub.com"}
+                  : "store.kiyostores.space"}
               </span>
             </div>
             <div>

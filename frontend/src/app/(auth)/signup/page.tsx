@@ -402,7 +402,7 @@ export default function SignupPage() {
                 {/* Header */}
                 <div className="space-y-1.5">
                   <h3 className="font-secondary font-bold text-foreground tracking-tight">
-                    Welcome to Ecommerce Hub
+                    Welcome to Kiyo
                   </h3>
                   <p className="text-muted-foreground leading-relaxed">
                     Provision your multi-tenant digital storefront in 3 simple
@@ -692,7 +692,7 @@ export default function SignupPage() {
                       <span className="truncate">
                         Store URL:{" "}
                         <strong className="underline">
-                          {storeSlug || "your-store"}.ecommerce-hub.com
+                          {storeSlug || "your-store"}.kiyostores.space
                         </strong>
                       </span>
                     </div>
@@ -875,7 +875,7 @@ export default function SignupPage() {
 
       {/* Footer copyright */}
       <footer className="relative z-10 container h-16 items-center justify-between text-muted-foreground">
-        <span>© {new Date().getFullYear()} EcommerceHub Platform.</span>
+        <span>© {new Date().getFullYear()} Kiyo Platform.</span>
         <div className="flex gap-4">
           <Link href="/privacy" className="hover:text-foreground">
             Privacy

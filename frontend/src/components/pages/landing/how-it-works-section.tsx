@@ -47,7 +47,7 @@ export function HowItWorksSection() {
                 <div className="flex items-center gap-2">
                   <div className="h-4 w-4 rounded-full bg-primary/70" />
                   <span className="text-xs font-bold text-foreground ">
-                    your-store.ecommercehub.com
+                    your-store.kiyostores.space
                   </span>
                 </div>
                 <div className="pt-1 flex items-center justify-between text-[10px] text-muted-foreground">

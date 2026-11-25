@@ -1,0 +1,148 @@
+services:
+  - type: web
+    name: kiyo-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    branch: main
+    healthCheckPath: /api/health
+    autoDeploy: true
+    domains:
+      - api.kiyostores.space
+    envVars:
+      - key: APP_NAME
+        value: Kiyo-Core
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "False"
+      - key: PORT
+        value: "8000"
+      - key: HOST
+        value: 0.0.0.0
+      - key: API_BASE_URL
+        value: https://api.kiyostores.space
+      - key: FRONTEND_URL
+        value: https://kiyostores.space
+      - key: CORS_ORIGINS
+        value: https://kiyostores.space,https://www.kiyostores.space
+      - key: CORS_ORIGIN_REGEX
+        value: ^https://([a-z0-9-]+\.)?kiyostores\.space$
+      - key: EMAIL_PROVIDER
+        value: smtp
+      - key: SMTP_HOST
+        value: smtp-relay.brevo.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USE_TLS
+        value: "True"
+      - key: SMTP_FROM_EMAIL
+        value: no-reply@kiyostores.space
+      - key: SMTP_FROM_NAME
+        value: Kiyo
+      - key: SUPPORT_EMAIL
+        value: help@kiyostores.space
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: PAYSTACK_SECRET_KEY
+        sync: false
+      - key: PAYSTACK_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_ENDPOINT_URL_S3
+        sync: false
+      - key: NEON_STORAGE_BUCKET
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: SENTRY_ENVIRONMENT
+        value: production
+
+  - type: web
+    name: kiyo-api-staging
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    branch: staging
+    healthCheckPath: /api/health
+    autoDeploy: true
+    domains:
+      - staging-api.kiyostores.space
+    envVars:
+      - key: APP_NAME
+        value: Kiyo-Core-Staging
+      - key: ENVIRONMENT
+        value: staging
+      - key: DEBUG
+        value: "False"
+      - key: PORT
+        value: "8000"
+      - key: HOST
+        value: 0.0.0.0
+      - key: API_BASE_URL
+        value: https://staging-api.kiyostores.space
+      - key: FRONTEND_URL
+        value: https://staging.kiyostores.space
+      - key: CORS_ORIGINS
+        value: https://staging.kiyostores.space
+      - key: CORS_ORIGIN_REGEX
+        value: ^https://([a-z0-9-]+\.)?staging\.kiyostores\.space$
+      - key: EMAIL_PROVIDER
+        value: smtp
+      - key: SMTP_HOST
+        value: smtp-relay.brevo.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USE_TLS
+        value: "True"
+      - key: SMTP_FROM_EMAIL
+        value: no-reply@kiyostores.space
+      - key: SMTP_FROM_NAME
+        value: Kiyo
+      - key: SUPPORT_EMAIL
+        value: help@kiyostores.space
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: PAYSTACK_SECRET_KEY
+        sync: false
+      - key: PAYSTACK_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_ENDPOINT_URL_S3
+        sync: false
+      - key: NEON_STORAGE_BUCKET
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: SENTRY_ENVIRONMENT
+        value: staging

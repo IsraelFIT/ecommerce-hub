@@ -157,7 +157,7 @@ export const EXTRA_CORE_PAGE_INFO: Record<string, PageInfo> = {
 
 export const DEFAULT_CORE_PAGE_INFO: PageInfo = {
   title: "Core Console",
-  subtitle: "EcommerceHub Master Management & Multi-Tenant Infrastructure",
+  subtitle: "Kiyo Master Management & Multi-Tenant Infrastructure",
 };
 
 export function getCorePageInfo(pathname: string): PageInfo {

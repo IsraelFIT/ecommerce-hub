@@ -17,11 +17,10 @@ export function TenantCollection({
   storeName,
   tenantSlug,
 }: TenantCollectionProps) {
-  const { branding, tenant } = useTenantTheme();
+  const { branding } = useTenantTheme();
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fallbackCurrency = tenant?.currency || "NGN";
   const secondaryColor = branding?.secondaryColor || "#10b981";
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -64,6 +63,7 @@ export function TenantCollection({
   }, [tenantSlug]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadTenantProducts();
   }, [loadTenantProducts]);
 

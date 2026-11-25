@@ -4,7 +4,7 @@
  * Used to determine whether proactive access token refreshing should occur or if the user is idle.
  */
 
-export const LAST_ACTIVITY_STORAGE_KEY = "ecommerce_hub_last_active_at";
+export const LAST_ACTIVITY_STORAGE_KEY = "kiyo_last_active_at";
 export const INACTIVITY_WINDOW_MS = 25 * 60 * 1000; // 25 minutes inactivity cutoff
 
 let inMemoryLastActive = typeof window !== "undefined" ? Date.now() : 0;

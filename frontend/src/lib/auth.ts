@@ -9,7 +9,7 @@ function getCookieDomain(): string | undefined {
     // Browsers reject Domain=localhost cookies. Leaving domain undefined sets the cookie for the current host.
     return undefined;
   }
-  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || "ecommerce-hub.com";
+  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || "kiyostores.space";
   if (hostname.endsWith(rootDomain)) {
     return `.${rootDomain}`;
   }

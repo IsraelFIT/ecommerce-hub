@@ -83,15 +83,15 @@ function getCurrentTenantSlug(fallback?: string): string {
   }
 
   if (typeof window !== "undefined") {
-    // 2. Check subdomain: e.g. jazz-cakes-ltd.localhost:3000 or jazz-cakes-ltd.ecommerce-hub.com
+    // 2. Check subdomain: e.g. jazz-cakes-ltd.localhost:3000 or jazz-cakes-ltd.kiyostores.space
     const host = window.location.hostname.toLowerCase();
     const rootDomain = (
-      process.env.NEXT_PUBLIC_ROOT_DOMAIN || "ecommerce-hub.com"
+      process.env.NEXT_PUBLIC_ROOT_DOMAIN || "kiyostores.space"
     ).toLowerCase();
 
     if (host.endsWith(".localhost") && host !== "localhost") {
       const sub = host.replace(".localhost", "");
-      if (sub && !["app", "core", "www", "api"].includes(sub)) {
+      if (sub && !["app", "core", "www", "api", "staging", "staging-api"].includes(sub)) {
         return sub;
       }
     } else if (
@@ -99,7 +99,10 @@ function getCurrentTenantSlug(fallback?: string): string {
       host !== rootDomain &&
       !host.startsWith("www.") &&
       !host.startsWith("app.") &&
-      !host.startsWith("core.")
+      !host.startsWith("core.") &&
+      !host.startsWith("api.") &&
+      !host.startsWith("staging.") &&
+      !host.startsWith("staging-api.")
     ) {
       const sub = host.replace(`.${rootDomain}`, "");
       if (sub) {

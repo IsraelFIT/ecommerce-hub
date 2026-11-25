@@ -21,8 +21,8 @@ const bricolageGrotesque = Bricolage_Grotesque({
 
 export const metadata: Metadata = {
   title: {
-    default: "EcommerceHub — Multi-Tenant E-Commerce Platform",
-    template: "%s | EcommerceHub",
+    default: "Kiyo — Multi-Tenant E-Commerce Platform",
+    template: "%s | Kiyo",
   },
   description:
     "Next-generation multi-tenant platform, bespoke custom storefronts, and artisanal commerce.",

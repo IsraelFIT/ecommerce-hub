@@ -1,0 +1,6 @@
+[tool.ruff]
+line-length = 100
+src = ["backend"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]

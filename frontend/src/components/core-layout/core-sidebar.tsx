@@ -89,7 +89,7 @@ export function CoreSidebar() {
       `${user.first_name || ""} ${user.last_name || ""}`.trim() ||
       "Super Admin"
     : "Super Admin";
-  const displayEmail = user?.email || "admin@ecommerce-hub.com";
+  const displayEmail = user?.email || "help@kiyostores.space";
   const displayInitials =
     (user?.first_name?.[0] || "") + (user?.last_name?.[0] || "") ||
     user?.name?.slice(0, 2)?.toUpperCase() ||
@@ -110,7 +110,7 @@ export function CoreSidebar() {
           <Link
             href="/"
             className="flex items-center group overflow-hidden"
-            title="EcommerceHub Core Console"
+            title="Kiyo Core Console"
           >
             {/* Logo Badge */}
             <div className="size-8.5 rounded-xl bg-primary flex items-center justify-center text-primary-foreground shadow-sm shrink-0 font-secondary font-black text-sm tracking-tighter">
@@ -127,7 +127,7 @@ export function CoreSidebar() {
             >
               <div className="flex items-center gap-1.5">
                 <span className="font-secondary font-bold text-foreground leading-tight text-[13px]">
-                  EcommerceHub
+                  Kiyo
                 </span>
               </div>
               <span className="text-[10px] text-muted-foreground font-medium leading-tight">

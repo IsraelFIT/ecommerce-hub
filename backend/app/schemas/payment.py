@@ -1,9 +1,11 @@
 import uuid
-from typing import Optional, Dict, Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class SplitDetails(BaseModel):
+    """Breakdown of total order amount, platform fee, and tenant payout."""
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -19,27 +21,31 @@ class SplitDetails(BaseModel):
     total_amount: float
     platform_fee: float
     tenant_payout: float
-    subaccount_code: Optional[str] = None
+    subaccount_code: str | None = None
     currency: str = "USD"
 
 
 class CheckoutSessionCreate(BaseModel):
+    """Payload to initialize a checkout session for an order."""
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
                 "order_id": "18492048-e230-4131-b841-382947192301",
                 "gateway": "stripe",
-                "callback_url": "https://cakes-by-bode.ecommerce-hub.com/orders/confirmation",
+                "callback_url": "https://cakes-by-bode.kiyostores.space/orders/confirmation",
             }
         }
     )
 
     order_id: uuid.UUID
-    gateway: Optional[str] = Field(default=None, description="paystack or stripe")
+    gateway: str | None = Field(default=None, description="paystack or stripe")
     callback_url: str
 
 
 class CheckoutSessionResponse(BaseModel):
+    """Response containing checkout redirect URL, reference, and split details."""
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -60,34 +66,44 @@ class CheckoutSessionResponse(BaseModel):
     checkout_url: str
     reference: str
     gateway: str
-    split_details: Optional[SplitDetails] = None
+    split_details: SplitDetails | None = None
 
 
 class PaystackBank(BaseModel):
+    """Paystack bank directory entry."""
+
     name: str
     code: str
-    slug: Optional[str] = None
-    id: Optional[int] = None
+    slug: str | None = None
+    id: int | None = None
 
 
 class ResolveAccountRequest(BaseModel):
+    """Request payload to resolve a bank account number."""
+
     account_number: str
     bank_code: str
 
 
 class ResolveAccountResponse(BaseModel):
+    """Resolved bank account holder details."""
+
     account_number: str
     account_name: str
-    bank_id: Optional[int] = None
+    bank_id: int | None = None
 
 
 class CreateSubaccountRequest(BaseModel):
+    """Request payload to create a Paystack subaccount."""
+
     bank_code: str
     account_number: str
-    business_name: Optional[str] = None
+    business_name: str | None = None
 
 
 class CreateSubaccountResponse(BaseModel):
+    """Created Paystack subaccount details."""
+
     subaccount_code: str
     business_name: str
     settlement_bank: str
@@ -96,10 +112,14 @@ class CreateSubaccountResponse(BaseModel):
 
 
 class StripeOnboardRequest(BaseModel):
-    return_url: Optional[str] = None
-    refresh_url: Optional[str] = None
+    """Request payload to initiate Stripe Connect onboarding."""
+
+    return_url: str | None = None
+    refresh_url: str | None = None
 
 
 class StripeOnboardResponse(BaseModel):
+    """Stripe Connect onboarding link response."""
+
     account_id: str
     onboarding_url: str

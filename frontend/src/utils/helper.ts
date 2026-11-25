@@ -79,7 +79,7 @@ export function formatDate(date: string | Date): string {
 /**
  * Returns the proper subdomain URL for a tenant depending on the environment.
  * In development: http://{tenantSlug}.localhost:3000{path}
- * In production: https://{tenantSlug}.ecommerce-hub.com{path}
+ * In production: https://{tenantSlug}.kiyostores.space{path}
  */
 export function getTenantSubdomainUrl(
   tenantSlug: string,
@@ -92,7 +92,7 @@ export function getTenantSubdomainUrl(
     cleanPath = "/";
   }
   const rootDomain = (
-    process.env.NEXT_PUBLIC_ROOT_DOMAIN || "ecommerce-hub.com"
+    process.env.NEXT_PUBLIC_ROOT_DOMAIN || "kiyostores.space"
   ).toLowerCase();
 
   if (typeof window !== "undefined") {
@@ -132,7 +132,7 @@ export function getTenantSubdomainUrl(
  */
 export function isSubdomainEnv(): boolean {
   const rootDomain = (
-    process.env.NEXT_PUBLIC_ROOT_DOMAIN || "ecommerce-hub.com"
+    process.env.NEXT_PUBLIC_ROOT_DOMAIN || "kiyostores.space"
   ).toLowerCase();
 
   // *.vercel.app never supports wildcard tenant subdomains
@@ -151,7 +151,10 @@ export function isSubdomainEnv(): boolean {
       host !== rootDomain &&
       !host.startsWith("www.") &&
       !host.startsWith("app.") &&
-      !host.startsWith("core.");
+      !host.startsWith("core.") &&
+      !host.startsWith("api.") &&
+      !host.startsWith("staging.") &&
+      !host.startsWith("staging-api.");
 
     return isDevSub || isProdSub;
   }
@@ -200,11 +203,11 @@ export function getTenantRoute(
 /**
  * Returns the root application URL (outside of any tenant subdomains).
  * In development: http://localhost:3000{path}
- * In production: https://ecommerce-hub.com{path}
+ * In production: https://kiyostores.space{path}
  */
 export function getRootAppUrl(path: string = "/"): string {
   const cleanPath = path ? (path.startsWith("/") ? path : `/${path}`) : "/";
-  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || "ecommerce-hub.com";
+  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || "kiyostores.space";
 
   if (typeof window !== "undefined") {
     const host = window.location.hostname;

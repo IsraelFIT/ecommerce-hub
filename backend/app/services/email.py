@@ -1,10 +1,11 @@
+"""Transactional email dispatch (Brevo SMTP) and HTML email template builders."""
+
 import asyncio
 import logging
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import Any, Dict, List, Optional
-import httpx
+from typing import Any
 
 from app.config import settings
 
@@ -129,7 +130,12 @@ def _get_html_wrapper(title: str, content: str) -> str:
         {content}
       </div>
       <div class="footer">
-        <p style="margin: 0;">Sent by {settings.EMAIL_FROM_NAME}. Powered by Ecommerce Hub.</p>
+        <p style="margin: 0;">
+          Sent by {settings.SMTP_FROM_NAME}. Powered by Kiyo. Need help?
+          Contact <a href="mailto:{settings.SUPPORT_EMAIL}" style="color: #64748b;">
+            {settings.SUPPORT_EMAIL}
+          </a>.
+        </p>
       </div>
     </div>
   </div>
@@ -141,69 +147,29 @@ async def send_email(
     to_email: str,
     subject: str,
     html_content: str,
-    text_content: Optional[str] = None,
+    text_content: str | None = None,
 ) -> bool:
     """
-    Sends an email using the configured provider (Resend API, standard SMTP, or console mock).
+    Sends an email using Brevo SMTP (when configured) or console fallback in development.
     Fails safely without raising exceptions to ensure background tasks do not disrupt main API flows.
     """
     provider = (settings.EMAIL_PROVIDER or "auto").lower()
-    from_header = f"{settings.EMAIL_FROM_NAME} <{settings.EMAIL_FROM_ADDRESS}>"
+    from_header = f"{settings.SMTP_FROM_NAME} <{settings.SMTP_FROM_EMAIL}>"
+    has_smtp_credentials = bool(
+        settings.SMTP_HOST and settings.SMTP_USER and settings.SMTP_PASSWORD
+    )
 
-    # 1. Resend API (Free tier: 3,000 emails/month, 100/day, no credit card required)
-    if (provider == "resend" or (provider == "auto" and settings.RESEND_API_KEY)) and settings.RESEND_API_KEY:
+    # 1. Brevo / Standard SMTP Delivery
+    if (provider == "smtp" and settings.SMTP_HOST) or (provider == "auto" and has_smtp_credentials):
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                res = await client.post(
-                    "https://api.resend.com/emails",
-                    headers={
-                        "Authorization": f"Bearer {settings.RESEND_API_KEY.strip()}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "from": from_header,
-                        "to": [to_email],
-                        "subject": subject,
-                        "html": html_content,
-                        **({"text": text_content} if text_content else {}),
-                    },
-                )
-                if res.status_code in (200, 201):
-                    logger.info(f"✅ Email delivered via Resend to [{to_email}] (Subject: '{subject}')")
-                    return True
-                else:
-                    err_msg = res.text
-                    try:
-                        err_data = res.json()
-                        err_msg = err_data.get("message", res.text)
-                    except Exception:
-                        pass
-                    
-                    logger.warning(
-                        f"⚠️ Resend API returned status {res.status_code} for [{to_email}]: {err_msg}"
-                    )
-                    # If using Resend sandbox (onboarding@resend.dev) to an unverified recipient in dev, print preview
-                    if res.status_code == 403 and "send testing emails to your own email address" in err_msg:
-                        logger.info(
-                            f"\nℹ️ [Resend Free Tier Testing Notice]:\n"
-                            f"With the default test domain 'onboarding@resend.dev', Resend only delivers live emails to your account address.\n"
-                            f"To deliver live emails to any customer email address, add and verify your domain at https://resend.com/domains.\n"
-                            f"--- [Dev Email Content for {to_email}] ---\n"
-                            f"Subject: {subject}\n"
-                            f"{text_content or '[HTML content]'}\n"
-                            f"-----------------------------------------"
-                        )
-        except Exception as e:
-            logger.error(f"❌ Failed to dispatch email via Resend to [{to_email}]: {e}")
 
-    # 2. Standard SMTP Fallback (Brevo, Gmail, SES, etc.)
-    elif (provider == "smtp" or (provider == "auto" and settings.SMTP_HOST)) and settings.SMTP_HOST:
-        try:
             def _send_smtp():
                 msg = MIMEMultipart("alternative")
                 msg["Subject"] = subject
                 msg["From"] = from_header
                 msg["To"] = to_email
+                if settings.SUPPORT_EMAIL:
+                    msg["Reply-To"] = settings.SUPPORT_EMAIL
 
                 if text_content:
                     msg.attach(MIMEText(text_content, "plain"))
@@ -217,19 +183,29 @@ async def send_email(
                     server.send_message(msg)
 
             await asyncio.to_thread(_send_smtp)
-            logger.info(f"✅ Email delivered via SMTP to [{to_email}] (Subject: '{subject}')")
+            logger.info(
+                "Email delivered via Brevo SMTP to [%s] (Subject: '%s')",
+                to_email,
+                subject,
+            )
             return True
-        except Exception as e:
-            logger.error(f"❌ Failed to dispatch email via SMTP to [{to_email}]: {e}")
+        except (smtplib.SMTPException, OSError) as e:
+            logger.error("Failed to dispatch email via SMTP to [%s]: %s", to_email, e)
 
-    # 3. Development / Bootstrap Console Fallback
+    # 2. Development / Bootstrap Console Fallback
     logger.info(
-        f"\n========== 📧 [DEV EMAIL CONSOLE] ==========\n"
-        f"To: {to_email}\n"
-        f"From: {from_header}\n"
-        f"Subject: {subject}\n"
-        f"Body Preview:\n{text_content or '[HTML content rendered]'}\n"
-        f"============================================"
+        "\n========== [DEV EMAIL CONSOLE] ==========\n"
+        "To: %s\n"
+        "From: %s\n"
+        "Reply-To: %s\n"
+        "Subject: %s\n"
+        "Body Preview:\n%s\n"
+        "============================================",
+        to_email,
+        from_header,
+        settings.SUPPORT_EMAIL,
+        subject,
+        text_content or "[HTML content rendered]",
     )
     return True
 
@@ -254,7 +230,9 @@ async def send_customer_welcome_email(
     """
     html = _get_html_wrapper(title=f"Welcome to {store_name}", content=body)
     text = f"Hello {customer_name},\n\nWelcome to {store_name}! Visit our store at {store_url} to start shopping."
-    return await send_email(to_email=to_email, subject=subject, html_content=html, text_content=text)
+    return await send_email(
+        to_email=to_email, subject=subject, html_content=html, text_content=text
+    )
 
 
 async def send_tenant_admin_welcome_email(
@@ -266,10 +244,10 @@ async def send_tenant_admin_welcome_email(
     """Sends an onboarding email to a newly registered store owner/tenant admin."""
     admin_url = f"{settings.FRONTEND_URL}/{store_slug}/admin"
     store_url = f"{settings.FRONTEND_URL}/{store_slug}"
-    subject = f"Welcome to Ecommerce Hub - Your store {store_name} is live!"
+    subject = f"Welcome to Kiyo - Your store {store_name} is live!"
     body = f"""
       <p>Hello <strong>{admin_name}</strong>,</p>
-      <p>Congratulations on launching your digital storefront on <strong>Ecommerce Hub</strong>!</p>
+      <p>Congratulations on launching your digital storefront on <strong>Kiyo</strong>!</p>
       <p>Your store <strong>{store_name}</strong> has been provisioned and is ready for business:</p>
       <ul style="color: #334155; padding-left: 20px; line-height: 1.8;">
         <li><strong>Storefront URL:</strong> <a href="{store_url}" style="color: #059669;">{store_url}</a></li>
@@ -288,11 +266,13 @@ async def send_tenant_admin_welcome_email(
     html = _get_html_wrapper(title="Store Provisioned Successfully", content=body)
     text = (
         f"Hello {admin_name},\n\n"
-        f"Welcome to Ecommerce Hub! Your store '{store_name}' is live.\n"
+        f"Welcome to Kiyo! Your store '{store_name}' is live.\n"
         f"Storefront: {store_url}\n"
         f"Admin Portal: {admin_url}\n"
     )
-    return await send_email(to_email=to_email, subject=subject, html_content=html, text_content=text)
+    return await send_email(
+        to_email=to_email, subject=subject, html_content=html, text_content=text
+    )
 
 
 async def send_password_reset_email(
@@ -314,7 +294,9 @@ async def send_password_reset_email(
     """
     html = _get_html_wrapper(title="Password Reset Verification", content=body)
     text = f"Hello {user_name},\n\nYour password reset verification code is: {otp_code}\nThis code expires in {expires_in_minutes} minutes."
-    return await send_email(to_email=to_email, subject=subject, html_content=html, text_content=text)
+    return await send_email(
+        to_email=to_email, subject=subject, html_content=html, text_content=text
+    )
 
 
 async def send_order_confirmation_email(
@@ -323,11 +305,11 @@ async def send_order_confirmation_email(
     order_reference: str,
     store_name: str,
     store_slug: str,
-    items: List[Dict[str, Any]],
+    items: list[dict[str, Any]],
     total_amount: float,
     currency: str = "NGN",
     fulfillment_type: str = "pickup",
-    order_id: Optional[str] = None,
+    order_id: str | None = None,
 ) -> bool:
     """Sends a detailed receipt and order confirmation email upon successful payment."""
     subject = f"Order Confirmation #{order_reference} - {store_name}"
@@ -381,5 +363,6 @@ async def send_order_confirmation_email(
         f"Total: {currency} {total_amount:,.2f}\n"
         f"Track here: {tracking_url}\n"
     )
-    return await send_email(to_email=to_email, subject=subject, html_content=html, text_content=text)
-
+    return await send_email(
+        to_email=to_email, subject=subject, html_content=html, text_content=text
+    )

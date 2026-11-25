@@ -22,7 +22,7 @@ export function Footer() {
       toast.error("Please enter your email");
       return;
     }
-    toast.success("Subscribed to EcommerceHub product dispatches!");
+    toast.success("Subscribed to Kiyo product dispatches!");
     setEmail("");
   };
 
@@ -83,7 +83,7 @@ export function Footer() {
             </div>
 
             <p className="text-stone-400 text-xs font-light leading-relaxed">
-              EcommerceHub empowers merchants and retail brands to deploy
+              Kiyo empowers merchants and retail brands to deploy
               isolated subdomain storefronts, automate order operations, and
               scale multi-channel commerce.
             </p>
@@ -325,7 +325,7 @@ export function Footer() {
           >
             Privacy Policy
           </Link>
-          <p>© {new Date().getFullYear()} EcommerceHub. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Kiyo. All rights reserved.</p>
           <Link
             href="/terms"
             className="text-stone-400 hover:text-stone-300 transition-colors"

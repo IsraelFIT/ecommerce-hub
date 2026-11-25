@@ -548,7 +548,7 @@ export default function TenantOverviewPage({ params }: AdminPageProps) {
               <div className="flex items-center justify-between py-1.5 border-b border-border">
                 <span className="text-muted-foreground">Subdomain Route</span>
                 <span className="text-foreground">
-                  {tenantSlug}.ecommerce-hub.com
+                  {tenantSlug}.kiyostores.space
                 </span>
               </div>
               <div className="flex items-center justify-between py-1.5 border-b border-border">

@@ -13,17 +13,17 @@ function getSubdomainSnapshot(): boolean {
   if (typeof window === "undefined") return false;
   const hostname = window.location.hostname.toLowerCase();
   const rootDomain = (
-    process.env.NEXT_PUBLIC_ROOT_DOMAIN || "ecommerce-hub.com"
+    process.env.NEXT_PUBLIC_ROOT_DOMAIN || "kiyostores.space"
   ).toLowerCase();
 
   const isDevSubdomain =
     hostname.endsWith(".localhost") && hostname !== "localhost";
+  const sub = hostname.endsWith(`.${rootDomain}`)
+    ? hostname.slice(0, -(rootDomain.length + 1))
+    : "";
   const isProdSubdomain =
-    hostname.endsWith(`.${rootDomain}`) &&
-    hostname !== rootDomain &&
-    hostname !== `www.${rootDomain}` &&
-    hostname !== `app.${rootDomain}` &&
-    hostname !== `core.${rootDomain}`;
+    Boolean(sub) &&
+    !["www", "app", "core", "api", "staging", "staging-api"].includes(sub);
 
   return isDevSubdomain || isProdSubdomain;
 }
@@ -35,12 +35,12 @@ function getServerSnapshot(): boolean {
 /**
  * Hook to determine if the root platform Header and Footer should be hidden.
  * Returns true if the user is on:
- * - A tenant subdomain (e.g. jazz-cakes.localhost:3000 or jazz-cakes.ecommerce-hub.com)
+ * - A tenant subdomain (e.g. jazz-cakes.localhost:3000 or jazz-cakes.kiyostores.space)
  * - Any tenant route ([tenant], /admin, /cart, /checkout, /menu, etc.)
  * - Auth pages (/signup, /register, /login, /forgot-password, /reset-password)
  * - Platform dashboard (/dashboard and subpaths)
  *
- * Returns false on root marketing landing page (http://localhost:3000/ or http://ecommerce-hub.com/)
+ * Returns false on root marketing landing page (http://localhost:3000/ or https://kiyostores.space/)
  */
 export default function useInvalidPaths(): boolean {
   const pathname = usePathname() || "";

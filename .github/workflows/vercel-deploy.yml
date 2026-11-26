@@ -14,7 +14,7 @@ env:
 
 jobs:
   deploy-production:
-    if: github.ref == 'refs/heads/main'
+    if: github.repository == 'hubbleflowlabs/kiyo' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -58,7 +58,7 @@ jobs:
           set_commits: auto
 
   deploy-staging:
-    if: github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/dev'
+    if: github.repository == 'hubbleflowlabs/kiyo' && (github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/dev')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository

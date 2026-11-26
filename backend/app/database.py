@@ -1,19 +1,45 @@
-import os
 import asyncio
+import os
 from typing import AsyncGenerator
+from urllib.parse import parse_qs, urlencode
+
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.pool import NullPool
 from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy import text
+from sqlalchemy.pool import NullPool
+
 from app.config import settings
 
 SQLITE_FALLBACK_URL = "sqlite+aiosqlite:///./ecommerce_hub.db"
 
-is_sqlite = settings.DATABASE_URL.startswith("sqlite")
+
+def _normalize_database_url(url: str) -> str:
+    """Ensure Postgres URLs use the asyncpg driver and asyncpg-compatible SSL params."""
+    if url.startswith("postgres://"):
+        url = "postgresql+asyncpg://" + url[len("postgres://") :]
+    elif url.startswith("postgresql://"):
+        url = "postgresql+asyncpg://" + url[len("postgresql://") :]
+
+    if url.startswith("postgresql+asyncpg://") and "?" in url:
+        base, query = url.split("?", 1)
+        params = parse_qs(query, keep_blank_values=True)
+        sslmode = params.pop("sslmode", [None])[0]
+        params.pop("channel_binding", None)
+        if sslmode and "ssl" not in params:
+            params["ssl"] = ["require" if sslmode != "disable" else "disable"]
+        new_query = urlencode(params, doseq=True)
+        url = f"{base}?{new_query}" if new_query else base
+
+    return url
+
+
+RESOLVED_DATABASE_URL = _normalize_database_url(settings.DATABASE_URL)
+
+is_sqlite = RESOLVED_DATABASE_URL.startswith("sqlite")
 connect_args = (
     {"check_same_thread": False}
     if is_sqlite
@@ -22,7 +48,7 @@ connect_args = (
 
 # Create async engine
 engine = create_async_engine(
-    settings.DATABASE_URL,
+    RESOLVED_DATABASE_URL,
     echo=False,
     future=True,
     pool_pre_ping=True,

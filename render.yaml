@@ -85,8 +85,6 @@ services:
     branch: staging
     healthCheckPath: /api/health
     autoDeploy: true
-    domains:
-      - staging-api.kiyostores.space
     envVars:
       - key: APP_NAME
         value: Kiyo-Core-Staging
@@ -99,7 +97,7 @@ services:
       - key: HOST
         value: 0.0.0.0
       - key: API_BASE_URL
-        value: https://staging-api.kiyostores.space
+        value: https://kiyo-api-staging.onrender.com
       - key: FRONTEND_URL
         value: https://staging.kiyostores.space
       - key: CORS_ORIGINS

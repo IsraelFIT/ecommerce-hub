@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - staging
+      - dev
 
 env:
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -57,7 +58,7 @@ jobs:
           set_commits: auto
 
   deploy-staging:
-    if: github.ref == 'refs/heads/staging'
+    if: github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/dev'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository

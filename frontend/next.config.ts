@@ -1,10 +1,20 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs/config";
 
-const BACKEND_URL =
+const rawBackendUrl = (
   process.env.INTERNAL_BACKEND_URL ||
   process.env.NEXT_PUBLIC_BACKEND_URL ||
-  "http://127.0.0.1:8000";
+  "http://127.0.0.1:8000"
+)
+  .trim()
+  .replace(/^["']|["']$/g, "")
+  .replace(/\/+$/, "");
+
+const BACKEND_URL = rawBackendUrl
+  ? /^https?:\/\//i.test(rawBackendUrl)
+    ? rawBackendUrl
+    : `https://${rawBackendUrl}`
+  : "http://127.0.0.1:8000";
 
 const nextConfig: NextConfig = {
   images: {

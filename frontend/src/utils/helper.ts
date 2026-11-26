@@ -77,9 +77,34 @@ export function formatDate(date: string | Date): string {
 }
 
 /**
+ * Returns true if the given host/rootDomain supports wildcard tenant subdomains.
+ * Localhost and production .com domains support wildcard subdomains;
+ * *.vercel.app and *.space domains (until migrated to .com) use path-based routing.
+ */
+export function supportsWildcardSubdomains(
+  host: string,
+  rootDomain: string,
+): boolean {
+  const h = host.toLowerCase();
+  const r = rootDomain.toLowerCase();
+  if (
+    h.endsWith(".vercel.app") ||
+    r.endsWith(".vercel.app") ||
+    h === "kiyostores.space" ||
+    h.endsWith(".kiyostores.space") ||
+    r === "kiyostores.space" ||
+    r.endsWith(".kiyostores.space")
+  ) {
+    return false;
+  }
+  return true;
+}
+
+/**
  * Returns the proper subdomain URL for a tenant depending on the environment.
  * In development: http://{tenantSlug}.localhost:3000{path}
- * In production: https://{tenantSlug}.kiyostores.space{path}
+ * On wildcard-capable domains (.com): https://{tenantSlug}.kiyostores.com{path}
+ * On path-based domains (.space / *.vercel.app): https://{host}/{tenantSlug}{path}
  */
 export function getTenantSubdomainUrl(
   tenantSlug: string,
@@ -104,8 +129,8 @@ export function getTenantSubdomainUrl(
       return `http://${tenantSlug}.localhost${port}${cleanPath}`;
     }
 
-    // On *.vercel.app or domains that don't support wildcard subdomains, use path-based URLs
-    if (host.endsWith(".vercel.app") || rootDomain.endsWith(".vercel.app")) {
+    // On *.vercel.app or .space domains without wildcard subdomains, use path-based URLs
+    if (!supportsWildcardSubdomains(host, rootDomain)) {
       const tenantBase = tenantSlug === "core" ? "/core" : `/${tenantSlug}`;
       const suffix = cleanPath === "/" ? "" : cleanPath;
       return `${protocol}//${host}${tenantBase}${suffix}`;
@@ -118,7 +143,7 @@ export function getTenantSubdomainUrl(
     return `http://${tenantSlug}.localhost:3000${cleanPath}`;
   }
 
-  if (rootDomain.endsWith(".vercel.app")) {
+  if (!supportsWildcardSubdomains(rootDomain, rootDomain)) {
     const tenantBase = tenantSlug === "core" ? "/core" : `/${tenantSlug}`;
     const suffix = cleanPath === "/" ? "" : cleanPath;
     return `https://${rootDomain}${tenantBase}${suffix}`;
@@ -135,14 +160,13 @@ export function isSubdomainEnv(): boolean {
     process.env.NEXT_PUBLIC_ROOT_DOMAIN || "kiyostores.space"
   ).toLowerCase();
 
-  // *.vercel.app never supports wildcard tenant subdomains
-  if (rootDomain.endsWith(".vercel.app")) {
+  if (!supportsWildcardSubdomains(rootDomain, rootDomain)) {
     return false;
   }
 
   if (typeof window !== "undefined") {
     const host = window.location.hostname.toLowerCase();
-    if (host.endsWith(".vercel.app")) {
+    if (!supportsWildcardSubdomains(host, rootDomain)) {
       return false;
     }
     const isDevSub = host.endsWith(".localhost") && host !== "localhost";
@@ -159,7 +183,7 @@ export function isSubdomainEnv(): boolean {
     return isDevSub || isProdSub;
   }
 
-  // On SSR, default to true for subdomain multi-tenancy unless deployed on vercel.app
+  // On SSR, default to true for wildcard-capable domains
   return true;
 }
 

@@ -518,8 +518,12 @@ export async function proxy(request: NextRequest) {
     const isLocal =
       currentHost === "localhost" || currentHost.endsWith(".localhost");
 
-    // On *.vercel.app without custom wildcard subdomains, rewrite internally instead of redirecting
-    if (currentHost.endsWith(".vercel.app")) {
+    // On *.vercel.app or .space domains without wildcard subdomains, rewrite internally instead of redirecting
+    if (
+      currentHost.endsWith(".vercel.app") ||
+      currentHost === "kiyostores.space" ||
+      currentHost.endsWith(".kiyostores.space")
+    ) {
       const targetPath =
         subPath === "/login"
           ? "/login"

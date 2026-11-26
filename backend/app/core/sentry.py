@@ -1,11 +1,16 @@
+"""Sentry error tracking initialization and sensitive payload scrubbing."""
+
 import logging
+import os
 import re
-from typing import Any, Dict, Optional
+from typing import Any
+
 import sentry_sdk
 from sentry_sdk.integrations.fastapi import FastApiIntegration
-from sentry_sdk.integrations.starlette import StarletteIntegration
-from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 from sentry_sdk.integrations.redis import RedisIntegration
+from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+from sentry_sdk.integrations.starlette import StarletteIntegration
+from sentry_sdk.types import Event, Hint
 
 from app.config import settings
 
@@ -47,30 +52,32 @@ def _scrub_data(data: Any) -> Any:
     elif isinstance(data, str):
         # Scrub Bearer tokens in headers/strings
         if "bearer " in data.lower():
-            return re.sub(r'(?i)bearer\s+[a-zA-Z0-9_\-\.]+', 'Bearer [SCRUBBED]', data)
+            return re.sub(r"(?i)bearer\s+[a-zA-Z0-9_\-\.]+", "Bearer [SCRUBBED]", data)
         return data
     return data
 
 
-def _before_send(event: Dict[str, Any], hint: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def _before_send(event: Event, _hint: Hint) -> Event | None:
     """Filter hook executed before an event is dispatched to Sentry."""
     try:
         # Scrub request headers
         req = event.get("request", {})
-        if "headers" in req:
-            req["headers"] = _scrub_data(req["headers"])
-        if "data" in req:
-            req["data"] = _scrub_data(req["data"])
-        if "cookies" in req:
-            req["cookies"] = "[SCRUBBED]"
+        if isinstance(req, dict):
+            if "headers" in req:
+                req["headers"] = _scrub_data(req["headers"])
+            if "data" in req:
+                req["data"] = _scrub_data(req["data"])
+            if "cookies" in req:
+                req["cookies"] = "[SCRUBBED]"
 
         # Scrub breadcrumbs
-        if "breadcrumbs" in event and "values" in event["breadcrumbs"]:
-            for b in event["breadcrumbs"]["values"]:
-                if "data" in b:
+        breadcrumbs = event.get("breadcrumbs")
+        if isinstance(breadcrumbs, dict) and isinstance(breadcrumbs.get("values"), list):
+            for b in breadcrumbs["values"]:
+                if isinstance(b, dict) and "data" in b:
                     b["data"] = _scrub_data(b["data"])
-    except Exception as e:
-        logger.debug(f"Error in Sentry before_send scrubbing: {e}")
+    except (KeyError, TypeError, ValueError, AttributeError) as e:
+        logger.debug("Error in Sentry before_send scrubbing: %s", e)
 
     return event
 
@@ -99,22 +106,29 @@ def init_sentry() -> bool:
                 SqlalchemyIntegration(),
                 RedisIntegration(),
             ],
-            release=f"{settings.APP_NAME}@1.0.0",
+            release=(
+                os.getenv("SENTRY_RELEASE")
+                or os.getenv("RENDER_GIT_COMMIT")
+                or f"{settings.APP_NAME}@1.0.0"
+            ),
         )
-        logger.info(f"✅ Sentry error tracking initialized successfully (env: {settings.SENTRY_ENVIRONMENT}).")
+        logger.info(
+            "✅ Sentry error tracking initialized successfully (env: %s).",
+            settings.SENTRY_ENVIRONMENT,
+        )
         return True
-    except Exception as e:
-        logger.warning(f"⚠️ Failed to initialize Sentry: {e}. Running without error tracking.")
+    except (ValueError, TypeError, RuntimeError, OSError) as e:
+        logger.warning("⚠️ Failed to initialize Sentry: %s. Running without error tracking.", e)
         return False
 
 
 def capture_exception_with_context(
     exc: Exception,
-    request: Optional[Any] = None,
-    user_id: Optional[str] = None,
-    tenant_slug: Optional[str] = None,
-    extra: Optional[Dict[str, Any]] = None,
-) -> Optional[str]:
+    request: Any | None = None,
+    user_id: str | None = None,
+    tenant_slug: str | None = None,
+    extra: dict[str, Any] | None = None,
+) -> str | None:
     """
     Captures an exception with explicit multi-tenant and user context.
     Returns Sentry event ID if sent, or None.
@@ -139,4 +153,3 @@ def capture_exception_with_context(
                 scope.set_extra(k, _scrub_data(v))
 
         return sentry_sdk.capture_exception(exc)
-

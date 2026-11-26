@@ -9,6 +9,7 @@ on:
 env:
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
   VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+  SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
 
 jobs:
   deploy-production:
@@ -17,6 +18,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -42,12 +45,25 @@ jobs:
           trap 'mv /tmp/repo.git .git 2>/dev/null || true' EXIT
           npx vercel@latest deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
 
+      - name: Create Sentry Releases & Deploys (Production)
+        if: env.SENTRY_AUTH_TOKEN != ''
+        uses: getsentry/action-release@v3
+        env:
+          SENTRY_ORG: hubbleflow-labs
+        with:
+          environment: production
+          release: ${{ github.sha }}
+          projects: kiyo-frontend kiyo-backend
+          set_commits: auto
+
   deploy-staging:
     if: github.ref == 'refs/heads/staging'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -74,3 +90,14 @@ jobs:
           DEPLOY_URL=$(npx vercel@latest deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
           echo "Deployed staging preview: $DEPLOY_URL"
           npx vercel@latest alias set "$DEPLOY_URL" staging.kiyostores.space --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Create Sentry Releases & Deploys (Staging)
+        if: env.SENTRY_AUTH_TOKEN != ''
+        uses: getsentry/action-release@v3
+        env:
+          SENTRY_ORG: hubbleflow-labs
+        with:
+          environment: staging
+          release: ${{ github.sha }}
+          projects: kiyo-frontend kiyo-backend
+          set_commits: auto

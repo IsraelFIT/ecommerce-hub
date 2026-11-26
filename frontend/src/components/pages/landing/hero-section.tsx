@@ -85,8 +85,8 @@ export function HeroSection() {
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-xs">
                   <Store className="h-4 w-4" />
                 </div>
-                <span className="font-secondary font-bold text-base text-foreground">
-                  Ecommerce<span className="text-primary">Hub</span>
+                <span className="font-secondary font-bold text-base text-primary">
+                  Kiyo
                 </span>
               </div>
 

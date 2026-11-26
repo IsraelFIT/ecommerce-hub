@@ -53,8 +53,8 @@ export function Navbar() {
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
               <Store className="h-5 w-5" />
             </div>
-            <span className="font-secondary text-lg font-bold text-foreground">
-              Ecommerce<span className="text-primary">Hub</span>
+            <span className="font-secondary text-lg font-bold text-primary">
+              Kiyo
             </span>
           </Link>
         </div>

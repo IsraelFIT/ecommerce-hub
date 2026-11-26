@@ -168,16 +168,13 @@ export function MenuCard({
     setOverrideLiked({ id: product.id, liked: next });
 
     try {
-      const storedLikes = localStorage.getItem(`ecommerce_likes_${tenantSlug}`);
+      const storedLikes = localStorage.getItem(`kiyo_likes_${tenantSlug}`);
       const parsed = storedLikes ? (JSON.parse(storedLikes) as string[]) : [];
       const updated = next
         ? Array.from(new Set([...parsed, product.id]))
         : parsed.filter((id) => id !== product.id);
 
-      localStorage.setItem(
-        `ecommerce_likes_${tenantSlug}`,
-        JSON.stringify(updated),
-      );
+      localStorage.setItem(`kiyo_likes_${tenantSlug}`, JSON.stringify(updated));
     } catch {
       // ignore
     }

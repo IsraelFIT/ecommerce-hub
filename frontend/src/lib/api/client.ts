@@ -230,7 +230,7 @@ export const apiRequest = async <T = unknown>(
 
     const guestId =
       typeof window !== "undefined"
-        ? localStorage.getItem("ecommerce_guest_session_id")
+        ? localStorage.getItem("kiyo_guest_session_id")
         : null;
 
     // 1. Primary Source of Truth: Decode tenant slug from access token claims

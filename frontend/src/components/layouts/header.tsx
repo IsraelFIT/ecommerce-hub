@@ -28,8 +28,8 @@ export function Header() {
           <div className="flex items-center justify-center">
             <Store className="h-6 w-6 text-primary" />
           </div>
-          <h4 className="font-secondary text-2xl font-bold tracking-tight text-foreground">
-            Ecommerce<span className="text-primary">Hub</span>
+          <h4 className="font-secondary text-2xl font-bold tracking-tight text-primary">
+            Kiyo
           </h4>
         </Link>
 

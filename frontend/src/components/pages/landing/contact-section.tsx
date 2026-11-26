@@ -31,7 +31,7 @@ export function ContactSection() {
     setIsSubmitting(true);
     setTimeout(() => {
       toast.success(
-        "Thank you! Our eCommerce platform specialists will be in touch shortly.",
+        "Thank you! Our platform specialists will be in touch shortly.",
       );
       setFullName("");
       setEmail("");

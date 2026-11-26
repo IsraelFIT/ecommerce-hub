@@ -74,18 +74,18 @@ export function Footer() {
               </div>
               <div className="leading-tight">
                 <span className="block font-secondary font-bold text-base text-white">
-                  Ecommerce<span className="text-primary">Hub</span>
+                  Kiyo
                 </span>
                 <span className="block text-[9px] uppercase tracking-widest text-stone-500 font-bold">
-                  Commerce Cloud
+                  Cloud
                 </span>
               </div>
             </div>
 
             <p className="text-stone-400 text-xs font-light leading-relaxed">
-              Kiyo empowers merchants and retail brands to deploy
-              isolated subdomain storefronts, automate order operations, and
-              scale multi-channel commerce.
+              Kiyo empowers merchants and retail brands to deploy isolated
+              subdomain storefronts, automate order operations, and scale
+              multi-channel commerce.
             </p>
 
             {/* Social Icons */}

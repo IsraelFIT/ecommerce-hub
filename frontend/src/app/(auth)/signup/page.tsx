@@ -254,8 +254,8 @@ export default function SignupPage() {
           <div className="flex items-center justify-center">
             <Store className="h-6 w-6 text-primary" />
           </div>
-          <span className="font-secondary text-xl font-bold tracking-tight text-foreground">
-            Ecommerce<span className="text-primary">Hub</span>
+          <span className="font-secondary text-xl font-bold tracking-tight text-primary">
+            Kiyo
           </span>
         </Link>
 

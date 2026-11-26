@@ -10,13 +10,13 @@ export interface LikeResponseData {
 export function getOrCreateGuestSessionId(): string {
   if (typeof window === "undefined") return "guest-default";
   try {
-    let guestId = localStorage.getItem("ecommerce_guest_session_id");
+    let guestId = localStorage.getItem("kiyo_guest_session_id");
     if (!guestId) {
       guestId =
         "guest_" +
         Math.random().toString(36).substring(2) +
         Date.now().toString(36);
-      localStorage.setItem("ecommerce_guest_session_id", guestId);
+      localStorage.setItem("kiyo_guest_session_id", guestId);
     }
     return guestId;
   } catch {
